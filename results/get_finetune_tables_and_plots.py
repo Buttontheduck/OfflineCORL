@@ -128,7 +128,14 @@ add_domains_avg(last_offline_scores)
 add_domains_avg(last_online_scores)
 add_domains_avg(regrets)
 
-algorithms = ["AWAC", "CQL", "IQL", "SPOT", "Cal-QL", "ReBRAC",]
+algorithms = [
+    "AWAC",
+    "CQL",
+    "IQL",
+    "SPOT",
+    "Cal-QL",
+    "ReBRAC",
+]
 datasets = dataframe["dataset"].unique()
 ordered_datasets = [
     "antmaze-umaze-v2",

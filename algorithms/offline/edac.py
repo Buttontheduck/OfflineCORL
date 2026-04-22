@@ -19,6 +19,7 @@ import wandb
 from torch.distributions import Normal
 from tqdm import trange
 
+
 @dataclass
 class TrainConfig:
     # wandb project name

@@ -45,9 +45,7 @@ def process_runs(df):
     ):
         full_scores[row["algorithm"]][row["dataset"]].append(
             get_run_scores(
-                row["url"],
-                row["algorithm"] == "DT",
-                row["algorithm"] == "AWAC"
+                row["url"], row["algorithm"] == "DT", row["algorithm"] == "AWAC"
             )
         )
     return full_scores

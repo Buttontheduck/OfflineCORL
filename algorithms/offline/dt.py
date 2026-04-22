@@ -19,6 +19,7 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader, IterableDataset
 from tqdm.auto import trange
 
+
 @dataclass
 class TrainConfig:
     # wandb project name

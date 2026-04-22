@@ -299,8 +299,7 @@ def get_return_to_go(dataset: Dict, env: gym.Env, config: TrainConfig) -> np.nda
             prev_return = 0
             if (
                 config.is_sparse_reward
-                and r
-                == env.ref_min_score * config.reward_scale + config.reward_bias
+                and r == env.ref_min_score * config.reward_scale + config.reward_bias
             ):
                 discounted_returns = [r / (1 - config.discount)] * ep_len
             else:
@@ -867,8 +866,8 @@ class CalQL:
                 cql_q2_next_actions=cql_q2_next_actions.mean().item(),
                 alpha_prime_loss=alpha_prime_loss.item(),
                 alpha_prime=alpha_prime.item(),
-                bound_rate_cql_q1_current_actions=bound_rate_cql_q1_current_actions.item(),  # noqa
-                bound_rate_cql_q2_current_actions=bound_rate_cql_q2_current_actions.item(),  # noqa
+                bound_rate_cql_q1_current_actions=bound_rate_cql_q1_current_actions.item(),
+                bound_rate_cql_q2_current_actions=bound_rate_cql_q2_current_actions.item(),
                 bound_rate_cql_q1_next_actions=bound_rate_cql_q1_next_actions.item(),
                 bound_rate_cql_q2_next_actions=bound_rate_cql_q2_next_actions.item(),
             )

@@ -19,6 +19,7 @@ import wandb
 from torch.distributions import Normal
 from tqdm import trange
 
+
 # base batch size: 256
 # base learning rate: 3e-4
 @dataclass
