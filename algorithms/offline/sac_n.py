@@ -15,9 +15,10 @@ import numpy as np
 import pyrallis
 import torch
 import torch.nn as nn
-import wandb
 from torch.distributions import Normal
 from tqdm import trange
+
+import wandb
 
 
 @dataclass
@@ -488,7 +489,7 @@ def eval_actor(
 
 
 # normalization like in the IQL paper
-# https://github.com/ikostrikov/implicit_q_learning/blob/09d700248117881a75cb21f0adb95c6c8a694cb2/train_offline.py#L35 # noqa
+# https://github.com/ikostrikov/implicit_q_learning/blob/09d700248117881a75cb21f0adb95c6c8a694cb2/train_offline.py#L35
 def return_reward_range(dataset, max_episode_steps):
     returns, lengths = [], []
     ep_ret, ep_len = 0.0, 0

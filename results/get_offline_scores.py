@@ -1,60 +1,55 @@
 import os
 import pickle
 
-import pandas as pd
-import wandb
-from tqdm import tqdm
+import matplotlib.pyplot as plt
 
-dataframe = pd.read_csv("runs_tables/offline_urls.csv")
-
-api = wandb.Api(timeout=29)
-
-
-def get_run_scores(run_id, is_dt=False, is_awac=False):
-    run = api.run(run_id)
-    score_key = None
-    all_scores = []
-    max_dt = -1e10
-
-    for k in run.history().keys():
-        if "normalized" in k and "score" in k and "std" not in k:
-            if is_dt:
-                st = k
-                if "eval/" in st:
-                    st = st.replace("eval/", "")
-                target = float(st.split("_")[0])
-                if target > max_dt:
-                    max_dt = target
-                    score_key = k
-            else:
-                score_key = k
-                break
-    for _, row in run.history(keys=[score_key], samples=5000).iterrows():
-        all_scores.append(row[score_key])
-    if is_awac and len(all_scores) > 200:
-        all_scores = all_scores[::5]
-    return all_scores
+# Path to the pickle file you generated
+FILE_PATH = (
+    "/Users/batin13/Desktop/RL Projects/Experimental/offline_raw_scores_subset.pickle"
+)
 
 
-def process_runs(df):
-    algorithms = df["algorithm"].unique()
-    datasets = df["dataset"].unique()
-    full_scores = {algo: {ds: [] for ds in datasets} for algo in algorithms}
-    for _, row in tqdm(
-        df.iterrows(), desc="Runs scores downloading", position=0, leave=True
-    ):
-        full_scores[row["algorithm"]][row["dataset"]].append(
-            get_run_scores(
-                row["url"], row["algorithm"] == "DT", row["algorithm"] == "AWAC"
-            )
-        )
-    return full_scores
+def read_and_inspect_data():
+    if not os.path.exists(FILE_PATH):
+        print(f"Error: Could not find the file at {FILE_PATH}")
+        return
+
+    # Load the pickle file
+    with open(FILE_PATH, "rb") as handle:
+        data = pickle.load(handle)
+
+    print("--- Data Structure & Statistics ---")
+
+    # Iterate through the nested dictionary
+    for algorithm, datasets in data.items():
+        for dataset, runs in datasets.items():
+            # Skip empty datasets (since we filtered, many will be empty)
+            if not runs:
+                continue
+
+            print(f"\nAlgorithm: {algorithm} | Dataset: {dataset}")
+            print(f"Number of runs collected: {len(runs)}")
+
+            # Plotting setup
+            plt.figure(figsize=(10, 6))
+
+            # Inspect each run and plot it
+            for i, run_scores in enumerate(runs):
+                print(f"  Run {i + 1}: Contains {len(run_scores)} evaluation steps.")
+
+                # Plot the raw scores for this run
+                plt.plot(run_scores, label=f"Run {i + 1}", alpha=0.8)
+
+            # Format the plot
+            plt.title(f"Raw Evaluation Scores: {algorithm} on {dataset}")
+            plt.xlabel("Evaluation Steps")
+            plt.ylabel("Raw Return")
+            plt.legend()
+            plt.grid(True, linestyle="--", alpha=0.6)
+
+            # Show the plot
+            plt.show()
 
 
-# Run if runs must be recollected
-full_scores = process_runs(dataframe)
-
-os.makedirs("bin", exist_ok=True)
-
-with open("bin/offline_scores.pickle", "wb") as handle:
-    pickle.dump(full_scores, handle, protocol=pickle.HIGHEST_PROTOCOL)
+if __name__ == "__main__":
+    read_and_inspect_data()

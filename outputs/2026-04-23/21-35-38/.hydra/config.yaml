@@ -1,0 +1,21 @@
+project: CORL
+group: AWAC-D4RL
+name: AWAC
+run_id: mps
+env_name: mujoco/halfcheetah/simple-v0
+hidden_dim: 256
+learning_rate: 0.0003
+gamma: 0.99
+tau: 0.005
+awac_lambda: 1.0
+num_train_ops: 1000000
+batch_size: 256
+buffer_size: 2000000
+normalize_reward: false
+eval_frequency: 1000
+n_test_episodes: 10
+checkpoints_path: /Users/batin13/Desktop/RL Projects/Trained_Models/checkpoints/
+deterministic_torch: false
+seed: 42
+test_seed: 69
+device: mps

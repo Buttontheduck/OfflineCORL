@@ -14,10 +14,11 @@ import numpy as np
 import pyrallis
 import torch
 import torch.nn as nn
-import wandb
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, IterableDataset
 from tqdm.auto import trange
+
+import wandb
 
 
 @dataclass
@@ -194,12 +195,12 @@ class SequenceDataset(IterableDataset):
 
         self.state_mean = info["obs_mean"]
         self.state_std = info["obs_std"]
-        # https://github.com/kzl/decision-transformer/blob/e2d82e68f330c00f763507b3b01d774740bee53f/gym/experiment.py#L116 # noqa
+        # https://github.com/kzl/decision-transformer/blob/e2d82e68f330c00f763507b3b01d774740bee53f/gym/experiment.py#L116
         self.sample_prob = info["traj_lens"] / info["traj_lens"].sum()
 
     def __prepare_sample(self, traj_idx, start_idx):
         traj = self.dataset[traj_idx]
-        # https://github.com/kzl/decision-transformer/blob/e2d82e68f330c00f763507b3b01d774740bee53f/gym/experiment.py#L128 # noqa
+        # https://github.com/kzl/decision-transformer/blob/e2d82e68f330c00f763507b3b01d774740bee53f/gym/experiment.py#L128
         states = traj["observations"][start_idx : start_idx + self.seq_len]
         actions = traj["actions"][start_idx : start_idx + self.seq_len]
         returns = traj["returns"][start_idx : start_idx + self.seq_len]
@@ -272,7 +273,7 @@ class TransformerBlock(nn.Module):
         )[0]
         # by default pytorch attention does not use dropout
         # after final attention weights projection, while minGPT does:
-        # https://github.com/karpathy/minGPT/blob/7218bcfa527c65f164de791099de715b81a95106/mingpt/model.py#L70 # noqa
+        # https://github.com/karpathy/minGPT/blob/7218bcfa527c65f164de791099de715b81a95106/mingpt/model.py#L70
         x = x + self.drop(attention_out)
         x = x + self.mlp(self.norm2(x))
         return x

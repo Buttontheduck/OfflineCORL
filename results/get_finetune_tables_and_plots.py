@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from rliable import library as rly, metrics, plot_utils
+from rliable import library as rly
+from rliable import metrics, plot_utils
 
 dataframe = pd.read_csv("runs_tables/finetune_urls.csv")
 with open("bin/finetune_scores.pickle", "rb") as handle:
@@ -184,7 +185,7 @@ def get_table(
                     + (
                         ""
                         if scores2 is None
-                        else f"{scores_delim} {scores2[algo][data]:.2f} {pm} {stds2[algo][data]:.2f}"  # noqa
+                        else f"{scores_delim} {scores2[algo][data]:.2f} {pm} {stds2[algo][data]:.2f}"
                     )
                 )
             else:

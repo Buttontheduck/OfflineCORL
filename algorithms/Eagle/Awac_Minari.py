@@ -11,9 +11,10 @@ import pyrallis
 import torch
 import torch.nn as nn
 import torch.nn.functional
-import wandb
-from minari_dataset import prepare_minari_data
+from minari_utils import get_ref_scores, minari_normalized_score, prepare_minari_data
 from tqdm import trange
+
+import wandb
 
 TensorBatch = List[torch.Tensor]
 
@@ -27,7 +28,7 @@ class TrainConfig:
     # wandb run name
     name: str = "AWAC"
     # training dataset and evaluation environment
-    env_name: str = "mujoco/halfcheetah-medium-v0"  # "halfcheetah-medium-expert-v2"
+    env_name: str = "D4RL/pen/human-v2"  # "mujoco/hopper/medium-v0" #"mujoco/halfcheetah/medium-v0"  # "halfcheetah-medium-expert-v2"
     # actor and critic hidden dim
     hidden_dim: int = 256
     # actor and critic learning rate
@@ -53,7 +54,9 @@ class TrainConfig:
     # number of episodes to run during evaluation
     n_test_episodes: int = 10
     # path for checkpoints saving, optional
-    checkpoints_path: Optional[str] = None
+    checkpoints_path: Optional[str] = (
+        "/Users/batin13/Desktop/RL Projects/Experimental/EqM based/OfflineCORL/algorithms/Eagle/checkpoints/"
+    )
     # configure PyTorch to use deterministic algorithms instead
     # of nondeterministic ones
     deterministic_torch: bool = False
@@ -62,7 +65,7 @@ class TrainConfig:
     # evaluation random seed
     test_seed: int = 69
     # training device
-    device: str = "cuda"
+    device: str = "cpu"
 
     def __post_init__(self):
         self.name = f"{self.name}-{self.env_name}-{str(uuid.uuid4())[:8]}"
@@ -194,7 +197,9 @@ class Actor(nn.Module):
             action_t = policy.sample()
         else:
             action_t = policy.mean
-        action = action_t[0].cpu().numpy()
+        # Use .detach() to break the tensor off the gradient graph
+        action = action_t[0].detach().cpu().numpy()
+
         return action
 
 
@@ -362,9 +367,16 @@ def wrap_env(
     state_std: Union[np.ndarray, float] = 1.0,
 ) -> gym.Env:
     def normalize_state(state):
-        return (state - state_mean) / state_std
+        # Ensure the state matches the 32-bit float dtype standard in RL
+        return ((state - state_mean) / state_std).astype(np.float32)
 
-    env = gym.wrappers.TransformObservation(env, normalize_state)
+    # Gymnasium requires explicitly defining the new observation space.
+    # Since we normalized, the bounds are technically [-inf, inf]
+    new_obs_space = gym.spaces.Box(
+        low=-np.inf, high=np.inf, shape=env.observation_space.shape, dtype=np.float32
+    )
+
+    env = gym.wrappers.TransformObservation(env, normalize_state, new_obs_space)
     return env
 
 
@@ -424,16 +436,17 @@ def wandb_init(config: dict) -> None:
         name=config["name"],
         id=str(uuid.uuid4()),
     )
-    wandb.run.save()
 
 
 @pyrallis.wrap()
 def train(config: TrainConfig):
 
-    env, dataset = prepare_minari_data(config.env_name)
+    env, dataset, minari_dataset = prepare_minari_data(config.env_name)
     set_seed(config.seed, env, deterministic_torch=config.deterministic_torch)
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
+
+    ref_scores = get_ref_scores(minari_dataset)
 
     if config.normalize_reward:
         modify_reward(dataset, config.env_name)
@@ -500,11 +513,10 @@ def train(config: TrainConfig):
             )
 
             wandb.log({"eval_score": eval_scores.mean()}, step=t)
-            # if hasattr(env, "get_normalized_score"):
-            # normalized_eval_scores = env.get_normalized_score(eval_scores) * 100.0
-            # wandb.log(
-            # {"d4rl_normalized_score": normalized_eval_scores.mean()}, step=t
-            # )
+            normalized_eval_scores = minari_normalized_score(
+                eval_scores.mean(), ref_scores
+            )
+            wandb.log({"minari_normalized_score": normalized_eval_scores}, step=t)
 
             if config.checkpoints_path is not None:
                 torch.save(
