@@ -11,8 +11,9 @@ import torch.nn.functional
 from agent import AdvantageWeightedActorCritic
 from buffer import ReplayBuffer
 from minari_utils import get_ref_scores, minari_normalized_score, prepare_minari_data
-from actor_models import EagleActor,Actor
+from actor_models import Actor
 from critic_models import Critic
+from agent import EagleAgent
 from omegaconf import DictConfig, OmegaConf
 from tqdm import trange
 

@@ -1,0 +1,258 @@
+from copy import deepcopy
+from typing import Any, Dict, List
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+TensorBatch = List[torch.Tensor]
+
+
+def soft_update(target: nn.Module, source: nn.Module, tau: float):
+    for target_param, source_param in zip(target.parameters(), source.parameters()):
+        target_param.data.copy_((1 - tau) * target_param.data + tau * source_param.data)
+
+
+def expand_t_like_x(t, x):
+    
+    """Function to reshape time t to broadcastable dimension of x
+    Args:
+      t: [batch_dim,], time vector
+      x: [batch_dim,...], data point
+    """
+    dims = [1] * (len(x.size()) - 1)
+    t = t.view(t.size(0), *dims)
+    return t
+  
+
+class Otter(nn.Module):
+    def __init__(
+        self,
+        model: nn.Module,
+        model_optimizer: torch.optim.Optimizer,
+        critic_1: nn.Module,
+        critic_1_optimizer: torch.optim.Optimizer,
+        critic_2: nn.Module,
+        critic_2_optimizer: torch.optim.Optimizer,
+        gamma: float = 0.99,
+        tau: float = 5e-3,  # parameter for the soft target update,
+        awac_lambda: float = 1.0,
+        exp_adv_max: float = 100.0,
+        fino: bool = False,
+        flag_type: str = 'trun',
+        flag_threshold: float = 0.8,
+        scale_gradient: float = 4.0,
+        fino_knob: float = 0.1
+        
+    ):
+        super().__init__()
+        self._model = model
+        self._model_optimizer = model_optimizer
+
+        self._critic_1 = critic_1
+        self._critic_1_optimizer = critic_1_optimizer
+        self._target_critic_1 = deepcopy(critic_1)
+
+        self._critic_2 = critic_2
+        self._critic_2_optimizer = critic_2_optimizer
+        self._target_critic_2 = deepcopy(critic_2)
+
+        self._gamma = gamma
+        self._tau = tau
+        self._awac_lambda = awac_lambda
+        self._exp_adv_max = exp_adv_max
+        
+        self.fino = fino
+        self.flag_type = flag_type
+        self.flag_threshold = flag_threshold
+        self.scale_gradient = scale_gradient
+        self.fino_knob = fino_knob
+        
+        
+        
+
+    def _expand_dims(self,low_dim_vector,reference):
+        vector_matched_dim = expand_t_like_x(low_dim_vector,reference)
+        return vector_matched_dim
+    
+    def _c_linear(self,gamma):
+        return 1-gamma
+    
+    def _c_trun(self,interpolate,gamma):
+        
+
+        if not (0 < interpolate < 1):
+              raise ValueError(f"Interpolate must be in (0,1), got {interpolate}")
+
+        start = 1.0
+        ct = torch.minimum(start-(start-1)/(interpolate)*gamma, 1/(1-interpolate)-1/(1-interpolate)*gamma)
+        return ct
+
+    def _sample_gamma_and_noise(self,true_action):
+        
+        batch_size = true_action.shape[0]
+        device = true_action.device
+        dtype = true_action.dtype
+
+        gamma = torch.rand(batch_size, device=device, dtype=dtype)  
+        noise = torch.randn_like(true_action)
+        return gamma, noise
+    
+    def _mix_data_and_compute_target(self,gamma,noise,true_action):
+    
+        gamma = self._expand_dims(gamma,true_action)
+        noisy_action = gamma * (true_action) + (1 - gamma) * noise
+        target_gradient = noise-true_action
+        return noisy_action, target_gradient
+    
+    def _fino_mix_data_and_compute_target(self, gamma, noise, true_action, eta=0.1):
+           
+            """
+            FINO Noise Injection: Expands the learned action space by injecting 
+            a scheduled Gaussian noise and modifying the target vector.
+            """
+            gamma = self._expand_dims(gamma, true_action)
+
+            # 1. Standard interpolation
+            noisy_action = gamma * true_action + (1 - gamma) * noise
+
+            # 2. FINO Variance Schedule: alpha^2 = (eta^2 - 2*eta)*gamma^2 + 2*eta*gamma
+            alpha_sq = (eta**2 - 2*eta) * (gamma**2) + 2 * eta * gamma
+
+            # Clamp at 0 for numerical safety before taking the square root
+            alpha = torch.sqrt(torch.clamp(alpha_sq, min=0.0)) 
+
+            # 3. Inject the FINO noise into the state
+            fino_noise = torch.randn_like(true_action)
+            noisy_action_fino = noisy_action + (alpha * fino_noise)
+
+            # 4. Modified FINO Target Gradient
+            # Standard EqM is (noise - true_action). FINO scales the noise weight by (1-eta).
+            target_gradient = (1 - eta) * noise - true_action
+
+            return noisy_action_fino, target_gradient
+
+
+    
+    def _actor_loss(self, states, actions):
+        
+        """
+        B: Batch  Dimensions
+        A: Action Dimensions
+        S: State  Dimensions
+        K: Number of Samples
+        """
+        
+        with torch.no_grad():
+
+            gamma, noise = self._sample_gamma_and_noise(actions)
+                            
+            if self.flag_type=="trun":
+                ct = self._c_trun(interpolate=self.flag_threshold,gamma=gamma)
+            elif self.flag_type=="lin":
+                ct = self._c_linear(gamma=gamma)
+            else:
+                raise ValueError(f"\n Invalid Ct FlagType: {self.flag_type!r}. ""Expected either 'lin' or 'trun'. \n")
+
+            ct = self._expand_dims(low_dim_vector=ct,reference=actions)
+
+            
+            if self.fino:
+                noisy_action, target_gradient =  self._fino_mix_data_and_compute_target(gamma=gamma,noise=noise,true_action=actions,eta=self.fino_knob)
+            else:
+                noisy_action, target_gradient =  self._mix_data_and_compute_target(gamma=gamma,noise=noise,true_action=actions)
+            
+            scaled_target_grad =  self.scale_gradient * ct * target_gradient
+            
+            
+        pred_grad = self._model(noisy_action,states)
+        loss_per_sample_and_dim = F.mse_loss(pred_grad, scaled_target_grad, reduction='none') # Returns (B,A), loss for each sample and each action dimension 
+        loss_per_sample = loss_per_sample_and_dim.sum(dim=-1, keepdim=True) # Returns (B,1), loss for each gradient prediction
+        loss = loss_per_sample.mean() # Scalar Loss
+        
+        return loss
+
+    def _critic_loss(self, states, actions, rewards, dones, next_states):
+        with torch.no_grad():
+            next_actions, _ = self._model(next_states)
+
+            q_next = torch.min(
+                self._target_critic_1(next_states, next_actions),
+                self._target_critic_2(next_states, next_actions),
+            )
+            q_target = rewards + self._gamma * (1.0 - dones) * q_next
+
+        q1 = self._critic_1(states, actions)
+        q2 = self._critic_2(states, actions)
+
+        q1_loss = nn.functional.mse_loss(q1, q_target)
+        q2_loss = nn.functional.mse_loss(q2, q_target)
+        loss = q1_loss + q2_loss
+        return loss
+
+    def _update_critic(self, states, actions, rewards, dones, next_states):
+        loss = self._critic_loss(states, actions, rewards, dones, next_states)
+        self._critic_1_optimizer.zero_grad()
+        self._critic_2_optimizer.zero_grad()
+        loss.backward()
+        self._critic_1_optimizer.step()
+        self._critic_2_optimizer.step()
+        return loss.item()
+
+    def _update_actor(self, states, actions):
+        loss = self._actor_loss(states, actions)
+        self._model_optimizer.zero_grad()
+        loss.backward()
+        self._model_optimizer.step()
+        return loss.item()
+
+    def update(self, batch: TensorBatch) -> Dict[str, float]:
+        states, actions, rewards, next_states, truncations, terminals = batch
+        dones = terminals
+        #critic_loss = self._update_critic(states, actions, rewards, dones, next_states)
+        actor_loss = self._update_actor(states, actions)
+
+        #soft_update(self._target_critic_1, self._critic_1, self._tau)
+        soft_update(self._target_critic_2, self._critic_2, self._tau)
+        result = {"actor_loss": actor_loss}
+        #result = {"critic_loss": critic_loss, "actor_loss": actor_loss}
+        return result
+
+    def state_dict(self) -> Dict[str, Any]:
+        return {
+            "model": self._model.state_dict(),
+            "critic_1": self._critic_1.state_dict(),
+            "critic_2": self._critic_2.state_dict(),
+        }
+
+    def load_state_dict(self, state_dict: Dict[str, Any]):
+        self._model.load_state_dict(state_dict["model"])
+        self._critic_1.load_state_dict(state_dict["critic_1"])
+        self._critic_2.load_state_dict(state_dict["critic_2"])
+
+
+
+
+
+###################### CODE PARTS FROM AWAC ############################
+
+    # def _actor_loss(self, states, actions):
+    #     with torch.no_grad():
+    #         pi_action, _ = self._model(states)
+    #         v = torch.min(
+    #             self._critic_1(states, pi_action), self._critic_2(states, pi_action)
+    #         )
+
+    #         q = torch.min(
+    #             self._critic_1(states, actions), self._critic_2(states, actions)
+    #         )
+    #         adv = q - v
+    #         weights = torch.clamp_max(
+    #             torch.exp(adv / self._awac_lambda), self._exp_adv_max
+    #         )
+
+    #     action_log_prob = self._model.log_prob(states, actions)
+    #     loss = (-action_log_prob * weights).mean()
+    #     return loss
+

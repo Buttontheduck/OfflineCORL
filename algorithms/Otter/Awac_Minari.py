@@ -28,7 +28,7 @@ class TrainConfig:
     # wandb run name
     name: str = "AWAC"
     # training dataset and evaluation environment
-    env_name: str = "D4RL/pen/human-v2"  # "mujoco/hopper/medium-v0" #"mujoco/halfcheetah/medium-v0"  # "halfcheetah-medium-expert-v2"
+    env_name: str = "mujoco/halfcheetah/medium-v0"  # "mujoco/hopper/medium-v0" #"mujoco/halfcheetah/medium-v0"  # "halfcheetah-medium-expert-v2"
     # actor and critic hidden dim
     hidden_dim: int = 256
     # actor and critic learning rate
@@ -271,6 +271,8 @@ class AdvantageWeightedActorCritic:
             q = torch.min(
                 self._critic_1(states, actions), self._critic_2(states, actions)
             )
+            
+            # 7. Compute advantage and exponentiated weights (unchanged)
             adv = q - v
             weights = torch.clamp_max(
                 torch.exp(adv / self._awac_lambda), self._exp_adv_max

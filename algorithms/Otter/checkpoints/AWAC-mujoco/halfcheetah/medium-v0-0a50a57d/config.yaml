@@ -1,0 +1,20 @@
+awac_lambda: 1.0
+batch_size: 256
+buffer_size: 2000000
+checkpoints_path: /Users/batin13/Desktop/RL Projects/Experimental/EqM based/OfflineCORL/algorithms/Eagle/checkpoints/AWAC-mujoco/halfcheetah/medium-v0-0a50a57d
+deterministic_torch: false
+device: cpu
+env_name: mujoco/halfcheetah/medium-v0
+eval_frequency: 1000
+gamma: 0.99
+group: AWAC-D4RL
+hidden_dim: 256
+learning_rate: 0.0003
+n_test_episodes: 10
+name: AWAC-mujoco/halfcheetah/medium-v0-0a50a57d
+normalize_reward: false
+num_train_ops: 1000000
+project: CORL
+seed: 42
+tau: 0.005
+test_seed: 69
