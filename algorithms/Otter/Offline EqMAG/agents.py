@@ -37,13 +37,14 @@ class Otter(nn.Module):
         critic_2_optimizer: torch.optim.Optimizer,
         gamma: float = 0.99,
         tau: float = 5e-3,  # parameter for the soft target update,
-        awac_lambda: float = 1.0,
+        temperature: float = 1.0,
         exp_adv_max: float = 100.0,
         fino: bool = False,
         flag_type: str = 'trun',
         flag_threshold: float = 0.8,
         scale_gradient: float = 4.0,
-        fino_knob: float = 0.1
+        fino_knob: float = 0.1,
+        **kwargs 
         
     ):
         super().__init__()
@@ -60,7 +61,7 @@ class Otter(nn.Module):
 
         self._gamma = gamma
         self._tau = tau
-        self._awac_lambda = awac_lambda
+        self._temperature = temperature
         self._exp_adv_max = exp_adv_max
         
         self.fino = fino

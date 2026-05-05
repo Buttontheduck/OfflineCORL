@@ -7,16 +7,17 @@ from torch.nn import Module
 from torch.nn import Linear as lin 
 from torch.distributions import Normal
 import torch.nn.functional as F 
-from utils.networks import MLP
+
 
 
 
 class Actor(nn.Module):
-    def __init__(self, model, ebm, sampler, step_size, num_step, moment):
+    def __init__(self, model, action_dim, ebm, opt_type, step_size, num_step, moment):
         super().__init__()
         
         self.model = model
-        self.sampler = sampler
+        self.action_dim = action_dim
+        self.opt_type = opt_type
         self.step_size = step_size
         self.num_step = num_step
         self.moment = moment
@@ -43,7 +44,27 @@ class Actor(nn.Module):
         )[0]
         
         return pred_grad 
+    
+    def sample(self, state , device):
         
+
+        is_numpy = isinstance(state, np.ndarray)
+
+        if is_numpy:
+            # Convert to tensor and add batch dimension: (state_dim,) -> (1, state_dim)
+            state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
+            if state_tensor.dim() == 1:
+                state_tensor = state_tensor.unsqueeze(0)
+        else:
+            state_tensor = state
+        
+        batch_size = state_tensor.shape[0]
+        initial_noise = torch.rand((batch_size,self.action_dim),device=device)
+
+        predicted_actions = self.sample_implicit( x = initial_noise, state = state_tensor)
+
+        return predicted_actions.detach().cpu().numpy()[0]
+
 
     def sample_implicit(self, x , state):
 
@@ -51,12 +72,12 @@ class Actor(nn.Module):
         self.model.eval()
 
         with torch.no_grad():
-            if self.sampler == "gd":
+            if self.opt_type == "gd":
                 for _ in range(self.num_step):
                     grad = self.model(x,state)
                     x = x - self.step_size * grad
 
-            elif self.sampler == "nag":
+            elif self.opt_type == "nag":
                 m = torch.zeros_like(x)
                 for _ in range(self.num_step):
                     x_lookahead = x - self.step_size * m * self.moment
@@ -64,7 +85,7 @@ class Actor(nn.Module):
                     m = grad
                     x = x - self.step_size * m
             else:
-                raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.sampler}' \n ")
+                raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.opt_type}' \n ")
         
         if is_training:
             self.model.train()
@@ -77,7 +98,7 @@ class Actor(nn.Module):
             self.model.eval()
 
             with torch.no_grad():
-                if self.sampler == "gd":
+                if self.opt_type == "gd":
                     for i in range(self.num_step):
                         # 1. Get the deterministic gradient from the Implicit field
                         grad = self.model(x,state)
@@ -92,7 +113,7 @@ class Actor(nn.Module):
                         # 4. Update with gradient descent + thermal noise
                         x = x - self.step_size * grad + noise_scale * noise
 
-                elif self.sampler == "nag":
+                elif self.opt_type == "nag":
                     m = torch.zeros_like(x)
                     for i in range(self.num_step):
                         # 1. Nesterov momentum lookahead
@@ -110,7 +131,7 @@ class Actor(nn.Module):
                         # 4. Update with momentum + thermal noise
                         x = x - self.step_size * m + noise_scale * noise
                 else:
-                    raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.sampler}' \n ")
+                    raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.opt_type}' \n ")
             
             if is_training:
                 self.model.train()
@@ -123,12 +144,12 @@ class Actor(nn.Module):
             self.model.eval()
     
             with torch.no_grad():
-                if self.sampler == "gd":
+                if self.opt_type == "gd":
                     for _ in range(self.num_step):
                         grad = self.model(x,state)
                         x = x - self.step_size * grad
     
-                elif self.sampler == "nag":
+                elif self.opt_type == "nag":
                     m = torch.zeros_like(x)
                     for _ in range(self.num_step):
                         x_lookahead = x - self.step_size * m * self.moment
@@ -136,7 +157,7 @@ class Actor(nn.Module):
                         m = grad
                         x = x - self.step_size * m
                 else:
-                    raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.sampler}' \n ")
+                    raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.opt_type}' \n ")
               
                 # --- GeCO OOD Detection Metric ---
                 # Do one final forward pass at the settled location
@@ -160,7 +181,7 @@ class Actor(nn.Module):
             self.model.eval()
 
             with torch.no_grad():
-                if self.sampler == "gd":
+                if self.opt_type == "gd":
                     # Create a mask tracking which particles are still moving (True = Active)
                     active_mask = torch.ones(x.shape[0], dtype=torch.bool, device=x.device)
 
@@ -183,7 +204,7 @@ class Actor(nn.Module):
                         grad_update = grad * active_mask.unsqueeze(1).float()
                         x = x - self.step_size * grad_update
 
-                elif self.sampler == "nag":
+                elif self.opt_type == "nag":
                     m = torch.zeros_like(x)
                     active_mask = torch.ones(x.shape[0], dtype=torch.bool, device=x.device)
 
@@ -204,7 +225,7 @@ class Actor(nn.Module):
                         m_update = m * active_mask.unsqueeze(1).float()
                         x = x - self.step_size * m_update
                 else:
-                    raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.sampler}' \n ")
+                    raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.opt_type}' \n ")
 
 
             if is_training:
@@ -223,7 +244,7 @@ class Actor(nn.Module):
             self.model.eval()
 
             with torch.no_grad():
-                if self.sampler == "gd":
+                if self.opt_type == "gd":
                     # Create a mask tracking which particles are still moving (True = Active)
                     active_mask = torch.ones(x.shape[0], dtype=torch.bool, device=x.device)
 
@@ -245,7 +266,7 @@ class Actor(nn.Module):
                         grad_update = grad * active_mask.unsqueeze(1).float()
                         x = x - self.step_size * grad_update
 
-                elif self.sampler == "nag":
+                elif self.opt_type == "nag":
                     m = torch.zeros_like(x)
                     active_mask = torch.ones(x.shape[0], dtype=torch.bool, device=x.device)
 
@@ -266,7 +287,7 @@ class Actor(nn.Module):
                         m_update = m * active_mask.unsqueeze(1).float()
                         x = x - self.step_size * m_update
                 else:
-                    raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.sampler}' \n ")
+                    raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.opt_type}' \n ")
 
                 # --- GeCO OOD Detection Metric ---
                 # Do one final forward pass at the settled location to get final OOD scores
@@ -283,7 +304,7 @@ class Actor(nn.Module):
         is_training = self.model.training
         self.model.eval()
         with torch.enable_grad():     
-            if self.sampler == "gd":        
+            if self.opt_type == "gd":        
                 # Start with a clean, detached tensor
                 x = x.detach()
 
@@ -297,7 +318,7 @@ class Actor(nn.Module):
                     # 3. Update the state and immediately DETACH to prevent a memory leak
                     x = (x - self.step_size * grad).detach()
 
-            elif self.sampler == "nag":     
+            elif self.opt_type == "nag":     
                 x = x.detach()
                 m = torch.zeros_like(x)
 
@@ -317,7 +338,7 @@ class Actor(nn.Module):
                     # 5. Update the main state and detach
                     x = (x - self.step_size * m).detach()
             else:
-                raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.sampler}' \n ")
+                raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.opt_type}' \n ")
         
         if is_training:
             self.model.train()

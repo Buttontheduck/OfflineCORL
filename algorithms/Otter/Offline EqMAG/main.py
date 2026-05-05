@@ -8,14 +8,14 @@ import hydra
 import numpy as np
 import torch
 import torch.nn.functional
-from agent import AdvantageWeightedActorCritic
 from buffer import ReplayBuffer
 from minari_utils import get_ref_scores, minari_normalized_score, prepare_minari_data
 from actor_models import Actor
 from critic_models import Critic
-from agent import EagleAgent
+from agents import Otter
 from omegaconf import DictConfig, OmegaConf
 from tqdm import trange
+from utils.networks import ConditionalMLP
 
 import wandb
 
@@ -72,7 +72,7 @@ def eval_actor(
         done = False
         episode_reward = 0.0
         while not done:
-            action = actor.act(state, device)
+            action = actor.sample(state,device)
             state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             episode_reward += reward
@@ -166,33 +166,50 @@ def train(cfg: DictConfig):
     )
     replay_buffer.load_minari_dataset(dataset)
 
-    actor_critic_kwargs = {
-        "state_dim": state_dim,
-        "action_dim": action_dim,
-        "hidden_dim": cfg.hidden_dim,
+    model_kwargs = {
+        "input_dim" :        state_dim+action_dim,
+        "output_dim":        action_dim,
+        "hidden_dim":        cfg.hidden_dim,
+        "num_hidden_layers": cfg.num_hidden_layers
+    }
+    
+    critic_kwargs = {
+        "input_dim" :        state_dim+action_dim,
+        "output_dim":        1,
+        "hidden_dim":        cfg.hidden_dim,
+        "num_hidden_layers": cfg.num_hidden_layers
     }
 
-    actor = Actor(**actor_critic_kwargs)
-    actor.to(cfg.device)
-    actor_optimizer = torch.optim.Adam(actor.parameters(), lr=cfg.learning_rate)
-    critic_1 = Critic(**actor_critic_kwargs)
-    critic_2 = Critic(**actor_critic_kwargs)
+    model = ConditionalMLP(**model_kwargs)
+    model.to(cfg.device)
+    model_optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
+    critic_1 = ConditionalMLP(**critic_kwargs)
+    critic_2 = ConditionalMLP(**critic_kwargs)
     critic_1.to(cfg.device)
     critic_2.to(cfg.device)
     critic_1_optimizer = torch.optim.Adam(critic_1.parameters(), lr=cfg.learning_rate)
     critic_2_optimizer = torch.optim.Adam(critic_2.parameters(), lr=cfg.learning_rate)
 
-    awac = AdvantageWeightedActorCritic(
-        actor=actor,
-        actor_optimizer=actor_optimizer,
+    agent = Otter(
+        model=model,
+        model_optimizer=model_optimizer,
         critic_1=critic_1,
         critic_1_optimizer=critic_1_optimizer,
         critic_2=critic_2,
         critic_2_optimizer=critic_2_optimizer,
-        gamma=cfg.gamma,
-        tau=cfg.tau,
-        awac_lambda=cfg.awac_lambda,
-    )
+        **cfg.agent
+        )
+    
+    actor = Actor(
+        model      = agent._model,
+        action_dim = action_dim,
+        ebm        = cfg.actor.ebm,
+        opt_type   = cfg.actor.opt_type,
+        step_size  = cfg.actor.step_size, 
+        num_step   = cfg.actor.num_step,
+        moment     = cfg.actor.moment
+        )
+    
     wandb_init(OmegaConf.to_container(cfg, resolve=True))
 
     if getattr(cfg, "actual_checkpoints_path", None) is not None:
@@ -200,30 +217,30 @@ def train(cfg: DictConfig):
         with open(os.path.join(cfg.actual_checkpoints_path, "config.yaml"), "w") as f:
             # Save the fully resolved Hydra config
             OmegaConf.save(config=cfg, f=f)
-
-    for t in trange(cfg.num_train_ops, ncols=80):
-        batch = replay_buffer.sample(cfg.batch_size)
-        batch = [b.to(cfg.device) for b in batch]
-        update_result = awac.update(batch)
-        wandb.log(update_result, step=t)
-        if (t + 1) % cfg.eval_frequency == 0:
-            eval_scores = eval_actor(
-                env, actor, cfg.device, cfg.n_test_episodes, cfg.test_seed
-            )
-
-            wandb.log({"eval_score": eval_scores.mean()}, step=t)
-            normalized_eval_scores = minari_normalized_score(
-                eval_scores.mean(), ref_scores
-            )
-            wandb.log({"minari_normalized_score": normalized_eval_scores}, step=t)
-
-            if getattr(cfg, "actual_checkpoints_path", None) is not None:
-                torch.save(
-                    awac.state_dict(),
-                    os.path.join(cfg.actual_checkpoints_path, f"checkpoint_{t}.pt"),
+    try:
+        for t in trange(cfg.num_train_ops, ncols=80):
+            batch = replay_buffer.sample(cfg.batch_size)
+            batch = [b.to(cfg.device) for b in batch]
+            update_result = agent.update(batch)
+            wandb.log(update_result, step=t)
+            if (t + 1) % cfg.eval_frequency == 0:
+                eval_scores = eval_actor(
+                    env, actor, cfg.device, cfg.n_test_episodes, cfg.test_seed
                 )
 
-    wandb.finish()
+                wandb.log({"eval_score": eval_scores.mean()}, step=t)
+                normalized_eval_scores = minari_normalized_score(
+                    eval_scores.mean(), ref_scores
+                )
+                wandb.log({"minari_normalized_score": normalized_eval_scores}, step=t)
+
+                if getattr(cfg, "actual_checkpoints_path", None) is not None:
+                    torch.save(
+                        agent.state_dict(),
+                        os.path.join(cfg.actual_checkpoints_path, f"checkpoint_{t}.pt"),
+                    )
+    finally:
+        wandb.finish()
 
 
 if __name__ == "__main__":
