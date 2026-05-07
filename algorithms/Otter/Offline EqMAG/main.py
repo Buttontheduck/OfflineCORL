@@ -189,19 +189,9 @@ def train(cfg: DictConfig):
     critic_2.to(cfg.device)
     critic_1_optimizer = torch.optim.Adam(critic_1.parameters(), lr=cfg.learning_rate)
     critic_2_optimizer = torch.optim.Adam(critic_2.parameters(), lr=cfg.learning_rate)
-
-    agent = Otter(
-        model=model,
-        model_optimizer=model_optimizer,
-        critic_1=critic_1,
-        critic_1_optimizer=critic_1_optimizer,
-        critic_2=critic_2,
-        critic_2_optimizer=critic_2_optimizer,
-        **cfg.agent
-        )
     
     actor = Actor(
-        model      = agent._model,
+        model      = model,
         action_dim = action_dim,
         ebm        = cfg.actor.ebm,
         opt_type   = cfg.actor.opt_type,
@@ -210,6 +200,17 @@ def train(cfg: DictConfig):
         moment     = cfg.actor.moment
         )
     
+    agent = Otter(
+        model=model,
+        model_optimizer     = model_optimizer,
+        critic_1            = critic_1,
+        critic_1_optimizer  = critic_1_optimizer,
+        critic_2            = critic_2,
+        critic_2_optimizer  = critic_2_optimizer,
+        **cfg.agent
+        )
+    
+
     wandb_init(OmegaConf.to_container(cfg, resolve=True))
 
     if getattr(cfg, "actual_checkpoints_path", None) is not None:

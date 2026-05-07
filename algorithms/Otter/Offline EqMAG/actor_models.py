@@ -59,7 +59,7 @@ class Actor(nn.Module):
             state_tensor = state
         
         batch_size = state_tensor.shape[0]
-        initial_noise = torch.rand((batch_size,self.action_dim),device=device)
+        initial_noise = torch.randn((batch_size,self.action_dim),device=device)
 
         predicted_actions = self.sample_implicit( x = initial_noise, state = state_tensor)
 
