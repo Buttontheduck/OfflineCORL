@@ -77,17 +77,17 @@ class Otter(nn.Module):
         vector_matched_dim = expand_t_like_x(low_dim_vector,reference)
         return vector_matched_dim
     
-    def _c_linear(self,gamma):
-        return 1-gamma
+    def _c_linear(self,rho):
+        return 1-rho
     
-    def _c_trun(self,interpolate,gamma):
+    def _c_trun(self,interpolate,rho):
         
 
         if not (0 < interpolate < 1):
               raise ValueError(f"Interpolate must be in (0,1), got {interpolate}")
 
         start = 1.0
-        ct = torch.minimum(start-(start-1)/(interpolate)*gamma, 1/(1-interpolate)-1/(1-interpolate)*gamma)
+        ct = torch.minimum(start-(start-1)/(interpolate)*rho, 1/(1-interpolate)-1/(1-interpolate)*rho)
         return ct
 
     def _sample_gamma_and_noise(self,true_action):
@@ -96,30 +96,30 @@ class Otter(nn.Module):
         device = true_action.device
         dtype = true_action.dtype
 
-        gamma = torch.rand(batch_size, device=device, dtype=dtype)  
+        rho = torch.rand(batch_size, device=device, dtype=dtype)  
         noise = torch.randn_like(true_action)
-        return gamma, noise
+        return rho, noise
     
-    def _mix_data_and_compute_target(self,gamma,noise,true_action):
+    def _mix_data_and_compute_target(self,rho,noise,true_action):
     
-        gamma = self._expand_dims(gamma,true_action)
-        noisy_action = gamma * (true_action) + (1 - gamma) * noise
+        rho = self._expand_dims(rho,true_action)
+        noisy_action = rho * (true_action) + (1 - rho) * noise
         target_gradient = noise-true_action
         return noisy_action, target_gradient
     
-    def _fino_mix_data_and_compute_target(self, gamma, noise, true_action, eta=0.1):
+    def _fino_mix_data_and_compute_target(self, rho, noise, true_action, eta=0.1):
            
             """
             FINO Noise Injection: Expands the learned action space by injecting 
             a scheduled Gaussian noise and modifying the target vector.
             """
-            gamma = self._expand_dims(gamma, true_action)
+            rho = self._expand_dims(rho, true_action)
 
             # 1. Standard interpolation
-            noisy_action = gamma * true_action + (1 - gamma) * noise
+            noisy_action = rho * true_action + (1 - rho) * noise
 
-            # 2. FINO Variance Schedule: alpha^2 = (eta^2 - 2*eta)*gamma^2 + 2*eta*gamma
-            alpha_sq = (eta**2 - 2*eta) * (gamma**2) + 2 * eta * gamma
+            # 2. FINO Variance Schedule: alpha^2 = (eta^2 - 2*eta)*rho^2 + 2*eta*rho
+            alpha_sq = (eta**2 - 2*eta) * (rho**2) + 2 * eta * rho
 
             # Clamp at 0 for numerical safety before taking the square root
             alpha = torch.sqrt(torch.clamp(alpha_sq, min=0.0)) 
@@ -147,12 +147,12 @@ class Otter(nn.Module):
         
         with torch.no_grad():
 
-            gamma, noise = self._sample_gamma_and_noise(actions)
+            rho, noise = self._sample_gamma_and_noise(actions)
                             
             if self.flag_type=="trun":
-                ct = self._c_trun(interpolate=self.flag_threshold,gamma=gamma)
+                ct = self._c_trun(interpolate=self.flag_threshold,rho=rho)
             elif self.flag_type=="lin":
-                ct = self._c_linear(gamma=gamma)
+                ct = self._c_linear(rho=rho)
             else:
                 raise ValueError(f"\n Invalid Ct FlagType: {self.flag_type!r}. ""Expected either 'lin' or 'trun'. \n")
 
@@ -160,9 +160,9 @@ class Otter(nn.Module):
 
             
             if self.fino:
-                noisy_action, target_gradient =  self._fino_mix_data_and_compute_target(gamma=gamma,noise=noise,true_action=actions,eta=self.fino_knob)
+                noisy_action, target_gradient =  self._fino_mix_data_and_compute_target(rho=rho,noise=noise,true_action=actions,eta=self.fino_knob)
             else:
-                noisy_action, target_gradient =  self._mix_data_and_compute_target(gamma=gamma,noise=noise,true_action=actions)
+                noisy_action, target_gradient =  self._mix_data_and_compute_target(rho=rho,noise=noise,true_action=actions)
             
             scaled_target_grad =  self.scale_gradient * ct * target_gradient
             
