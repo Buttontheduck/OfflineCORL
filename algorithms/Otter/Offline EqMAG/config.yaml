@@ -2,7 +2,7 @@
 project: Debug
 group: T1
 name: Small_updates
-run_id: Small_updates_simple_debug
+run_id: Small_updates_simple_scale_six
 
 # environment and dataset
 env_name: mujoco/halfcheetah/simple-v0    #mujoco/halfcheetah/medium-v0 #mujoco/halfcheetah/simple-v0
@@ -15,7 +15,7 @@ num_train_ops: 1000000
 
 # Network Architecture Hyperparameters
 hidden_dim: 256
-num_hidden_layers: 2
+num_hidden_layers: 6
 buffer_size: 2_000_000
 batch_size: 256
 
@@ -43,7 +43,7 @@ agent:
   fino: false
   flag_type: 'trun'
   flag_threshold: 0.8
-  scale_gradient: 4.0
+  scale_gradient: 6.0
   fino_knob: 0.1
 
 actor: 

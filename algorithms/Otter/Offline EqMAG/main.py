@@ -193,6 +193,8 @@ def train(cfg: DictConfig):
     actor = Actor(
         model      = model,
         action_dim = action_dim,
+        min_action = env.action_space.low[0],
+        max_action = env.action_space.high[0],
         ebm        = cfg.actor.ebm,
         opt_type   = cfg.actor.opt_type,
         step_size  = cfg.actor.step_size, 

@@ -173,6 +173,7 @@ class Otter(nn.Module):
         loss = loss_per_sample.mean() # Scalar Loss
         
         return loss
+    
 
     def _critic_loss(self, states, actions, rewards, dones, next_states):
         with torch.no_grad():

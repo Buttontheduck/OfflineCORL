@@ -12,11 +12,13 @@ import torch.nn.functional as F
 
 
 class Actor(nn.Module):
-    def __init__(self, model, action_dim, ebm, opt_type, step_size, num_step, moment):
+    def __init__(self, model, action_dim, min_action, max_action, ebm, opt_type, step_size, num_step, moment):
         super().__init__()
         
         self.model = model
         self.action_dim = action_dim
+        self.min_action = min_action
+        self.max_action = max_action
         self.opt_type = opt_type
         self.step_size = step_size
         self.num_step = num_step
@@ -24,49 +26,41 @@ class Actor(nn.Module):
         self.ebm = ebm
 
 
-    def _compute_gradient(self, Xt, state):
-        # We assume Xt already has requires_grad_(True) when passed in
-        output = self.model(Xt,state)
-            
-        if self.ebm == 'dot':
-            E = torch.sum(output * Xt, dim=1)     
-        elif self.ebm == 'scalar':
-            E = output.squeeze(-1)       
-        elif self.ebm == 'l2':
-            E = -0.5 * torch.sum(output**2, dim=1)        
-        else:
-            raise ValueError("\n During Sampling - Type of EBM set incorrectly; chose one from: l2 , scalar , dot \n ") 
 
-        pred_grad = torch.autograd.grad(
-            outputs=[E.sum()],
-            inputs=[Xt],
-            create_graph=False
-        )[0]
+    def forward(self, state: torch.Tensor):
         
-        return pred_grad 
-    
-    def sample(self, state , device):
+        batch_size = state.shape[0]
+        device = state.device
+        initial_noise = torch.randn((batch_size,self.action_dim), device=device)
+        predicted_actions = self._implicit( x = initial_noise, state = state)
+
+        predicted_actions = torch.clamp(predicted_actions, min=self.min_action, max=self.max_action)
+
+        return predicted_actions
         
 
-        is_numpy = isinstance(state, np.ndarray)
 
-        if is_numpy:
-            # Convert to tensor and add batch dimension: (state_dim,) -> (1, state_dim)
-            state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
-            if state_tensor.dim() == 1:
-                state_tensor = state_tensor.unsqueeze(0)
-        else:
-            state_tensor = state
+    def sample(self, state: np.ndarray, device: str) -> np.ndarray:
         
+
+        state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
+
+        if state_tensor.dim() == 1:
+            state_tensor = state_tensor.unsqueeze(0)
+
         batch_size = state_tensor.shape[0]
         initial_noise = torch.randn((batch_size,self.action_dim),device=device)
 
-        predicted_actions = self.sample_implicit( x = initial_noise, state = state_tensor)
+        predicted_actions = self._implicit( x = initial_noise, state = state_tensor)
+
+        predicted_actions = torch.clamp(predicted_actions, min=self.min_action, max=self.max_action)
 
         return predicted_actions.detach().cpu().numpy()[0]
+    
 
 
-    def sample_implicit(self, x , state):
+
+    def _implicit(self, x , state):
 
         is_training = self.model.training
         self.model.eval()
@@ -92,7 +86,7 @@ class Actor(nn.Module):
         return x
     
 
-    def sample_implicit_langevin(self, x , state , initial_temperature=1.0, noise_decay=0.99):
+    def _implicit_langevin(self, x , state , initial_temperature=1.0, noise_decay=0.99):
 
             is_training = self.model.training
             self.model.eval()
@@ -138,7 +132,7 @@ class Actor(nn.Module):
             return x
 
 
-    def sample_implicit_ODD(self, x , state):
+    def _implicit_ODD(self, x , state):
             
             is_training = self.model.training
             self.model.eval()
@@ -172,7 +166,7 @@ class Actor(nn.Module):
                 self.model.train()
             return x, ood_scores
     
-    def sample_implicit_stop(self, x , state, tau_opt = 1.5):
+    def _implicit_stop(self, x , state, tau_opt = 1.5):
             """
             GeCO Adaptive Early Stopping: Particles individually stop updating 
             once their gradient norm falls below tau_opt.
@@ -233,7 +227,7 @@ class Actor(nn.Module):
             return x
     
 
-    def sample_implicit_ODD_stop(self, x , state, tau_opt=0.4):
+    def _implicit_ODD_stop(self, x , state, tau_opt=0.4):
             """
             Combined GeCO Sampler: 
             1. Adaptive Early Stopping (particles park when grad_norm < tau_opt)
@@ -298,8 +292,29 @@ class Actor(nn.Module):
                 self.model.train()
             return x, ood_scores
 
+    def _compute_gradient(self, Xt, state):
+        # We assume Xt already has requires_grad_(True) when passed in
+        output = self.model(Xt,state)
+            
+        if self.ebm == 'dot':
+            E = torch.sum(output * Xt, dim=1)     
+        elif self.ebm == 'scalar':
+            E = output.squeeze(-1)       
+        elif self.ebm == 'l2':
+            E = -0.5 * torch.sum(output**2, dim=1)        
+        else:
+            raise ValueError("\n During Sampling - Type of EBM set incorrectly; chose one from: l2 , scalar , dot \n ") 
 
-    def sample_explicit(self, x , state):
+        pred_grad = torch.autograd.grad(
+            outputs=[E.sum()],
+            inputs=[Xt],
+            create_graph=False
+        )[0]
+        
+        return pred_grad 
+    
+
+    def _explicit(self, x , state):
 
         is_training = self.model.training
         self.model.eval()
