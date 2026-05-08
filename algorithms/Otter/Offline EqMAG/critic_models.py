@@ -57,9 +57,9 @@ class DeterministicCritic(Module):
             num_hidden = self.num_hidden
             )
 
-    def forward(self,state,action):
+    def forward(self,state: torch.tensor , action: torch.tensor) -> torch.Tensor:
 
-        x = torch.cat([state,action],dim=1)
+        x = torch.cat([state,action],dim=-1)
 
         value = self.model(x)
 

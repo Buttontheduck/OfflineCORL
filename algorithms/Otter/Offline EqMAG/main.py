@@ -11,7 +11,7 @@ import torch.nn.functional
 from buffer import ReplayBuffer
 from minari_utils import get_ref_scores, minari_normalized_score, prepare_minari_data
 from actor_models import Actor
-from critic_models import Critic
+from critic_models import DeterministicCritic
 from agents import Otter
 from omegaconf import DictConfig, OmegaConf
 from tqdm import trange
@@ -174,8 +174,8 @@ def train(cfg: DictConfig):
     }
     
     critic_kwargs = {
-        "input_dim" :        state_dim+action_dim,
-        "output_dim":        1,
+        "state_dim" :        state_dim,
+        "action_dim":        action_dim,
         "hidden_dim":        cfg.hidden_dim,
         "num_hidden_layers": cfg.num_hidden_layers
     }
@@ -183,8 +183,8 @@ def train(cfg: DictConfig):
     model = ConditionalMLP(**model_kwargs)
     model.to(cfg.device)
     model_optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
-    critic_1 = ConditionalMLP(**critic_kwargs)
-    critic_2 = ConditionalMLP(**critic_kwargs)
+    critic_1 = DeterministicCritic(critic_kwargs)
+    critic_2 = DeterministicCritic(critic_kwargs)
     critic_1.to(cfg.device)
     critic_2.to(cfg.device)
     critic_1_optimizer = torch.optim.Adam(critic_1.parameters(), lr=cfg.learning_rate)
