@@ -183,8 +183,8 @@ def train(cfg: DictConfig):
     model = ConditionalMLP(**model_kwargs)
     model.to(cfg.device)
     model_optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
-    critic_1 = DeterministicCritic(critic_kwargs)
-    critic_2 = DeterministicCritic(critic_kwargs)
+    critic_1 = DeterministicCritic(**critic_kwargs)
+    critic_2 = DeterministicCritic(**critic_kwargs)
     critic_1.to(cfg.device)
     critic_2.to(cfg.device)
     critic_1_optimizer = torch.optim.Adam(critic_1.parameters(), lr=cfg.learning_rate)
@@ -203,8 +203,9 @@ def train(cfg: DictConfig):
         )
     
     agent = Otter(
-        model=model,
+        model               = model,
         model_optimizer     = model_optimizer,
+        actor               = actor,
         critic_1            = critic_1,
         critic_1_optimizer  = critic_1_optimizer,
         critic_2            = critic_2,

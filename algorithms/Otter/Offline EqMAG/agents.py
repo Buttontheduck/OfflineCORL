@@ -31,6 +31,7 @@ class Otter(nn.Module):
         self,
         model: nn.Module,
         model_optimizer: torch.optim.Optimizer,
+        actor: nn.Module,
         critic_1: nn.Module,
         critic_1_optimizer: torch.optim.Optimizer,
         critic_2: nn.Module,
@@ -50,6 +51,8 @@ class Otter(nn.Module):
         super().__init__()
         self._model = model
         self._model_optimizer = model_optimizer
+        
+        self._actor = actor
 
         self._critic_1 = critic_1
         self._critic_1_optimizer = critic_1_optimizer
@@ -177,7 +180,7 @@ class Otter(nn.Module):
 
     def _critic_loss(self, states, actions, rewards, dones, next_states):
         with torch.no_grad():
-            next_actions, _ = self._model(next_states)
+            next_actions = self._actor(next_states)
 
             q_next = torch.min(
                 self._target_critic_1(next_states, next_actions),
@@ -212,13 +215,13 @@ class Otter(nn.Module):
     def update(self, batch: TensorBatch) -> Dict[str, float]:
         states, actions, rewards, next_states, truncations, terminals = batch
         dones = terminals
-        #critic_loss = self._update_critic(states, actions, rewards, dones, next_states)
-        actor_loss = self._update_actor(states, actions)
+        critic_loss = self._update_critic(states, actions, rewards, dones, next_states)
+        actor_loss  = self._update_actor(states, actions)
 
-        #soft_update(self._target_critic_1, self._critic_1, self._tau)
+        soft_update(self._target_critic_1, self._critic_1, self._tau)
         soft_update(self._target_critic_2, self._critic_2, self._tau)
-        result = {"actor_loss": actor_loss}
-        #result = {"critic_loss": critic_loss, "actor_loss": actor_loss}
+        #result = {"actor_loss": actor_loss}
+        result = {"critic_loss": critic_loss, "actor_loss": actor_loss}
         return result
 
     def state_dict(self) -> Dict[str, Any]:

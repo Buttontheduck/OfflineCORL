@@ -1,8 +1,8 @@
 # wandb configuration
 project: Debug
 group: T1
-name: Small_updates
-run_id: Small_updates_simple_scale_six
+name: Small_updates_critic_implementation_r3
+run_id: Small_updates_simple_critic_implementation_r3
 
 # environment and dataset
 env_name: mujoco/halfcheetah/simple-v0    #mujoco/halfcheetah/medium-v0 #mujoco/halfcheetah/simple-v0
@@ -15,7 +15,7 @@ num_train_ops: 1000000
 
 # Network Architecture Hyperparameters
 hidden_dim: 256
-num_hidden_layers: 6
+num_hidden_layers: 4
 buffer_size: 2_000_000
 batch_size: 256
 
@@ -32,7 +32,7 @@ n_test_episodes: 10
 
 # saving and reproducibility
 checkpoints_path: "/Users/batin13/Desktop/RL Projects/Trained_Models/checkpoints/"
-device: cpu # or 'cuda'
+device: mps # or 'cuda'
 
 # Otter Agent Hyperparameters (Unpacked via **cfg.agent)
 agent:
