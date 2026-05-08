@@ -1,8 +1,8 @@
 # wandb configuration
 project: Debug
 group: T1
-name: Small_updates_critic_implementation_r3
-run_id: Small_updates_simple_critic_implementation_r3
+name: Small_updates_simple_weight_imp_syn_work
+run_id: Small_updates_simple_weight_imp_syn_work
 
 # environment and dataset
 env_name: mujoco/halfcheetah/simple-v0    #mujoco/halfcheetah/medium-v0 #mujoco/halfcheetah/simple-v0
@@ -27,7 +27,7 @@ temperature: 1.0
 
 # training flags and evaluation
 normalize_reward: false
-eval_frequency: 1000
+eval_frequency: 10000
 n_test_episodes: 10
 
 # saving and reproducibility

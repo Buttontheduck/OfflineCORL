@@ -227,7 +227,7 @@ def train(cfg: DictConfig):
             batch = [b.to(cfg.device) for b in batch]
             update_result = agent.update(batch)
             wandb.log(update_result, step=t)
-            if (t + 1) % cfg.eval_frequency == 0:
+            if (t) % cfg.eval_frequency == 0:
                 eval_scores = eval_actor(
                     env, actor, cfg.device, cfg.n_test_episodes, cfg.test_seed
                 )

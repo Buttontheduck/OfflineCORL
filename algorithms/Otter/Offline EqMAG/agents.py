@@ -171,11 +171,31 @@ class Otter(nn.Module):
             
             
         pred_grad = self._model(noisy_action,states)
+        
+        weights = self._offline_weights(states=states, actions= actions)
+
         loss_per_sample_and_dim = F.mse_loss(pred_grad, scaled_target_grad, reduction='none') # Returns (B,A), loss for each sample and each action dimension 
         loss_per_sample = loss_per_sample_and_dim.sum(dim=-1, keepdim=True) # Returns (B,1), loss for each gradient prediction
-        loss = loss_per_sample.mean() # Scalar Loss
+        weighted_loss_per_sample = loss_per_sample * weights # Returns (B,1)
+        loss = weighted_loss_per_sample.mean() # Scalar Loss
         
         return loss
+    
+    def _offline_weights(self,states, actions):
+        with torch.no_grad():
+            pi_actions = self._actor(states)
+
+            v = torch.min(
+                self._critic_1(states,pi_actions), self._critic_2(states,pi_actions)
+            )
+            q = torch.min(
+                self._critic_1(states,actions), self._critic_2(states,actions)
+            )  
+
+            adv = q - v
+            weights = torch.clamp_max( input = torch.exp(adv/self._temperature), max = self._exp_adv_max) 
+            
+        return weights
     
 
     def _critic_loss(self, states, actions, rewards, dones, next_states):
@@ -234,7 +254,7 @@ class Otter(nn.Module):
     def load_state_dict(self, state_dict: Dict[str, Any]):
         self._model.load_state_dict(state_dict["model"])
         self._critic_1.load_state_dict(state_dict["critic_1"])
-        self._critic_2.load_state_dict(state_dict["critic_2"])
+        self._critic_2.load_state_dict(state_dict["critic_2"]) 
 
 
 
