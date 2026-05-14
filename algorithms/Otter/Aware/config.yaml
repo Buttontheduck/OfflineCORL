@@ -5,7 +5,7 @@ name: Small_updates_simple_weight_imp_syn_work_stepsize_1
 run_id: Small_updates_simple_weight_imp_syn_work_stepsize_1
 
 # environment and dataset
-env_name: mujoco/halfcheetah/simple-v0    #mujoco/halfcheetah/medium-v0 #mujoco/halfcheetah/simple-v0
+env_name: halfcheetah-medium-v2
 
 seed: 42
 test_seed: 69
