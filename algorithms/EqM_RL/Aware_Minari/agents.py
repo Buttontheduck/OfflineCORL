@@ -179,6 +179,8 @@ class Otter(nn.Module):
         weighted_loss_per_sample = loss_per_sample * weights # Returns (B,1)
         loss = weighted_loss_per_sample.mean() # Scalar Loss
         
+        #loss= loss_per_sample.mean() # scalar loss for BC case.
+        
         return loss
     
     def _offline_weights(self,states, actions):

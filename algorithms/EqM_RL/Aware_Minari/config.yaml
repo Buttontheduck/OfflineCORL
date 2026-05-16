@@ -1,11 +1,11 @@
 # wandb configuration
 project: Debug
 group: T1
-name: Small_updates_simple_weight_imp_syn_work_stepsize_1
-run_id: Small_updates_simple_weight_imp_syn_work_stepsize_1
+name: BC_medium_20
+run_id: BC_medium_20
 
 # environment and dataset
-env_name: mujoco/halfcheetah/simple-v0    #mujoco/halfcheetah/medium-v0 #mujoco/halfcheetah/simple-v0
+env_name: mujoco/halfcheetah/medium-v0    #mujoco/halfcheetah/medium-v0 #mujoco/halfcheetah/simple-v0
 
 seed: 42
 test_seed: 69
@@ -49,6 +49,10 @@ agent:
 actor: 
   ebm: null
   opt_type: 'nag' # gd or nag
-  step_size: 0.05
-  num_step: 5
+  step_size: 0.01
+  num_step: 20
   moment: 0.3
+  sampler_type: 'implicit' #implicit #implicit_OOD #implicit_stop #implicit_stop_OOD
+  ood_threshold: 1.8
+  early_stop: 1.0
+  num_actions: 10

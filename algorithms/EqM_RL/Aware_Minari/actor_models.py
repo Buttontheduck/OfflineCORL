@@ -28,6 +28,10 @@ class Actor(nn.Module):
 
 
     def forward(self, state: torch.Tensor):
+
+        """
+           Generate Actions for training.
+        """
         
         batch_size = state.shape[0]
         device = state.device
@@ -41,6 +45,10 @@ class Actor(nn.Module):
 
 
     def sample(self, state: np.ndarray, device: str) -> np.ndarray:
+        
+        """
+           Sampling for evaluation to pass gymnasium env
+        """
         
 
         state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
