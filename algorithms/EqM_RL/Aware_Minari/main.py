@@ -191,15 +191,21 @@ def train(cfg: DictConfig):
     critic_2_optimizer = torch.optim.Adam(critic_2.parameters(), lr=cfg.learning_rate)
     
     actor = Actor(
-        model      = model,
-        action_dim = action_dim,
-        min_action = env.action_space.low[0],
-        max_action = env.action_space.high[0],
-        ebm        = cfg.actor.ebm,
-        opt_type   = cfg.actor.opt_type,
-        step_size  = cfg.actor.step_size, 
-        num_step   = cfg.actor.num_step,
-        moment     = cfg.actor.moment
+        model         = model,
+        critic_1      = critic_1,
+        critic_2      = critic_2,        
+        action_dim    = action_dim,
+        min_action    = env.action_space.low[0],
+        max_action    = env.action_space.high[0],
+        ebm           = cfg.actor.ebm,
+        opt_type      = cfg.actor.opt_type,
+        step_size     = cfg.actor.step_size, 
+        num_step      = cfg.actor.num_step,
+        moment        = cfg.actor.moment,
+        sampler_type  = cfg.actor.sampler_type,
+        ood_threshold = cfg.actor.ood_threshold,
+        early_stop    = cfg.actor.early_stop,
+        num_actions   = cfg.actor.num_actions
         )
     
     agent = Otter(

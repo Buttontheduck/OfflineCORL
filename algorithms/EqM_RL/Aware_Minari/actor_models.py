@@ -1,5 +1,5 @@
 from typing import Tuple
-
+from utils.helper import *
 import numpy as np
 import torch
 import torch.nn as nn
@@ -8,14 +8,13 @@ from torch.nn import Linear as lin
 from torch.distributions import Normal
 import torch.nn.functional as F 
 
-
-
-
 class Actor(nn.Module):
-    def __init__(self, model, action_dim, min_action, max_action, ebm, opt_type, step_size, num_step, moment):
+    def __init__(self, model, critic_1, critic_2, action_dim, min_action, max_action, ebm, opt_type, step_size, num_step, moment, sampler_type, ood_threshold, early_stop):
         super().__init__()
         
         self.model = model
+        self.critic_1 = critic_1
+        self.critic_2 = critic_2
         self.action_dim = action_dim
         self.min_action = min_action
         self.max_action = max_action
@@ -24,19 +23,19 @@ class Actor(nn.Module):
         self.num_step = num_step
         self.moment = moment
         self.ebm = ebm
+        self.sampler_type = sampler_type
+        self.ood_threshold = ood_threshold
+        self.early_stop = early_stop
 
 
 
-    def forward(self, state: torch.Tensor):
+    def forward(self, state: torch.Tensor, num_actions: int = 1):
 
         """
            Generate Actions for training.
         """
         
-        batch_size = state.shape[0]
-        device = state.device
-        initial_noise = torch.randn((batch_size,self.action_dim), device=device)
-        predicted_actions = self._implicit( x = initial_noise, state = state)
+        predicted_actions, _ = self._sample_actions_for_training(state , num_actions)
 
         predicted_actions = torch.clamp(predicted_actions, min=self.min_action, max=self.max_action)
 
@@ -44,28 +43,133 @@ class Actor(nn.Module):
         
 
 
-    def sample(self, state: np.ndarray, device: str) -> np.ndarray:
+    def _sample_actions_for_training(self, state_tensor: torch.Tensor, num_actions: int = 1):
         
-        """
-           Sampling for evaluation to pass gymnasium env
-        """
-        
+            assert num_actions >= 1, "Number of candidate actions must be greater than 0."
 
+            device = state_tensor.device
+
+            
+            if self.sampler_type == 'implicit_OOD':
+                num_samples = num_actions * 2
+            else:
+                num_samples = num_actions
+
+            state_repeated = state_tensor.unsqueeze(0).repeat(num_samples, 1, 1)
+            prepared_state = flatten_repeated_states(state_repeated)
+
+            batch_size_total = prepared_state.shape[0]
+            x = torch.randn((batch_size_total, self.action_dim), device=device)
+
+            ood_scores = None
+
+            if self.sampler_type == 'implicit':
+                if self.early_stop is not None:
+                    flat_all_actions = self._implicit_stop(x=x, state=prepared_state, tau_opt=self.early_stop)
+                else:
+                    flat_all_actions = self._implicit(x=x, state=prepared_state)
+
+                predicted_actions = unflatten_repeated_tensor(flat_all_actions, num_samples)
+
+            elif self.sampler_type == 'implicit_OOD':
+              
+                if self.early_stop is not None:
+                    flat_all_actions, flat_ood_scores = self._implicit_OOD_stop(x=x, state=prepared_state, tau_opt=self.early_stop)
+                else:
+                    flat_all_actions, flat_ood_scores = self._implicit_OOD(x=x, state=prepared_state)
+
+                ood_scores = unflatten_repeated_tensor(flat_ood_scores, num_samples)
+                all_actions = unflatten_repeated_tensor(flat_all_actions, num_samples)
+
+                
+                predicted_actions = select_lowest_ood_actions(all_actions, ood_scores)
+
+            else:
+                raise ValueError(f"Sampler must be 'implicit' or 'implicit_OOD', got '{self.sampler_type}'")
+
+            return predicted_actions, ood_scores
+        
+    @torch.no_grad()
+    def _reject_and_rank(self, actions: torch.Tensor, ood_scores: torch.Tensor, state_tensor: torch.Tensor) -> torch.Tensor:
+        """
+        Internal method. Evaluates Q-values, rejects actions above the OOD threshold, 
+        and returns the best action. Falls back to the most ID action if all are rejected.
+        """
+        N, B, A = actions.shape
+        
+       
+        flat_actions = actions.reshape(N * B, A)
+        flat_states = state_tensor.unsqueeze(0).repeat(N, 1, 1).reshape(N * B, -1)
+
+     
+        q1 = self.critic_1(flat_states, flat_actions).reshape(N, B, 1)
+        q2 = self.critic_2(flat_states, flat_actions).reshape(N, B, 1)
+        q_values = torch.min(q1, q2)
+
+
+        valid_mask = ood_scores <= self.ood_threshold
+
+
+        masked_q_values = torch.where(valid_mask, q_values, torch.tensor(-float('inf'), device=q_values.device))
+
+        best_q_indices = torch.argmax(masked_q_values, dim=0)
+
+        has_valid_action = valid_mask.any(dim=0)
+        safest_indices = torch.argmin(ood_scores, dim=0)
+        
+        final_indices = torch.where(has_valid_action, best_q_indices, safest_indices)
+
+
+        final_indices_expanded = final_indices.unsqueeze(0).expand(1, B, A)
+        best_action_tensor = torch.gather(actions, dim=0, index=final_indices_expanded).squeeze(0)
+        
+        return best_action_tensor
+
+    @torch.no_grad()
+    def sample(self, state: np.ndarray, num_actions_inference: int = 10) -> np.ndarray:
+        """
+        Evaluation method. Expected to be called by Gym/Gymnasium.
+        Generates actions, forcefully filters OOD, and ranks via Critics.
+        """
+
+        self.eval() 
+        self.critic_1.eval()
+        self.critic_2.eval()
+        
+        if state.ndim == 1:
+            state = np.expand_dims(state, axis=0)
+
+        device = next(self.model.parameters()).device
         state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
 
-        if state_tensor.dim() == 1:
-            state_tensor = state_tensor.unsqueeze(0)
 
-        batch_size = state_tensor.shape[0]
-        initial_noise = torch.randn((batch_size,self.action_dim),device=device)
+        state_repeated = state_tensor.unsqueeze(0).repeat(num_actions_inference, 1, 1)
+        prepared_state = flatten_repeated_states(state_repeated)
+            
+        batch_size_total = prepared_state.shape[0]
+        x = torch.randn((batch_size_total, self.action_dim), device=device)
+        
 
-        predicted_actions = self._implicit( x = initial_noise, state = state_tensor)
+        if self.early_stop is not None:
+            flat_actions, flat_ood_scores = self._implicit_OOD_stop(x=x, state=prepared_state, tau_opt=self.early_stop)
+        else:
+            flat_actions, flat_ood_scores = self._implicit_OOD(x=x, state=prepared_state)
 
-        predicted_actions = torch.clamp(predicted_actions, min=self.min_action, max=self.max_action)
+        actions = unflatten_repeated_tensor(flat_actions, num_actions_inference)
+        ood_scores = unflatten_repeated_tensor(flat_ood_scores, num_actions_inference)
+  
 
-        return predicted_actions.detach().cpu().numpy()[0]
-    
 
+        best_action_tensor = self._reject_and_rank(actions, ood_scores, state_tensor)
+        
+
+        best_action_tensor = torch.clamp(best_action_tensor, min=self.min_action, max=self.max_action)
+
+        self.train()
+        self.critic_1.train()
+        self.critic_2.train()
+
+        return best_action_tensor.cpu().numpy()
 
 
     def _implicit(self, x , state):
@@ -87,60 +191,14 @@ class Actor(nn.Module):
                     m = grad
                     x = x - self.step_size * m
             else:
-                raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.opt_type}' \n ")
+                raise ValueError(f"\n Action Gradient optimizer must be 'gd' or 'nag', got '{self.opt_type}' \n ")
         
         if is_training:
             self.model.train()
         return x
     
 
-    def _implicit_langevin(self, x , state , initial_temperature=1.0, noise_decay=0.99):
-
-            is_training = self.model.training
-            self.model.eval()
-
-            with torch.no_grad():
-                if self.opt_type == "gd":
-                    for i in range(self.num_step):
-                        # 1. Get the deterministic gradient from the Implicit field
-                        grad = self.model(x,state)
-
-                        # 2. Anneal the temperature based on the current step
-                        current_temp = initial_temperature * (noise_decay ** i)
-
-                        # 3. Calculate Langevin noise scale: sqrt(2 * step_size * Temperature)
-                        noise_scale = np.sqrt(2 * self.step_size * current_temp)
-                        noise = torch.randn_like(x)
-
-                        # 4. Update with gradient descent + thermal noise
-                        x = x - self.step_size * grad + noise_scale * noise
-
-                elif self.opt_type == "nag":
-                    m = torch.zeros_like(x)
-                    for i in range(self.num_step):
-                        # 1. Nesterov momentum lookahead
-                        x_lookahead = x - self.step_size * m * self.moment
-                        grad = self.model(x_lookahead,state)
-                        m = grad
-
-                        # 2. Anneal the temperature
-                        current_temp = initial_temperature * (noise_decay ** i)
-
-                        # 3. Calculate Langevin noise
-                        noise_scale = np.sqrt(2 * self.step_size * current_temp)
-                        noise = torch.randn_like(x)
-
-                        # 4. Update with momentum + thermal noise
-                        x = x - self.step_size * m + noise_scale * noise
-                else:
-                    raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.opt_type}' \n ")
-            
-            if is_training:
-                self.model.train()
-            return x
-
-
-    def _implicit_ODD(self, x , state):
+    def _implicit_OOD(self, x , state):
             
             is_training = self.model.training
             self.model.eval()
@@ -159,15 +217,13 @@ class Actor(nn.Module):
                         m = grad
                         x = x - self.step_size * m
                 else:
-                    raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.opt_type}' \n ")
+                    raise ValueError(f"\n Action Gradient optimizer must be 'gd' or 'nag', got '{self.opt_type}' \n ")
               
-                # --- GeCO OOD Detection Metric ---
-                # Do one final forward pass at the settled location
+
                 final_grad = self.model(x,state)
                 
-                # Calculate the L2 Norm of the final gradient for every particle
-                # Shape will be [batch_size]
-                ood_scores = torch.norm(final_grad, p=2, dim=1)
+                
+                ood_scores = torch.norm(final_grad, p=2, dim=1, keepdim=True)
             
 
             if is_training:
@@ -227,7 +283,7 @@ class Actor(nn.Module):
                         m_update = m * active_mask.unsqueeze(1).float()
                         x = x - self.step_size * m_update
                 else:
-                    raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.opt_type}' \n ")
+                    raise ValueError(f"\n Action Gradient optimizer must be 'gd' or 'nag', got '{self.opt_type}' \n ")
 
 
             if is_training:
@@ -235,14 +291,14 @@ class Actor(nn.Module):
             return x
     
 
-    def _implicit_ODD_stop(self, x , state, tau_opt=0.4):
+    def _implicit_OOD_stop(self, x , state, tau_opt=0.4):
             """
             Combined GeCO Sampler: 
             1. Adaptive Early Stopping (particles park when grad_norm < tau_opt)
             2. OOD Detection (returns the final gradient norms for anomaly filtering)
             """
 
-            is_training = self.model.trainig
+            is_training = self.model.training
             self.model.eval()
 
             with torch.no_grad():
@@ -289,17 +345,61 @@ class Actor(nn.Module):
                         m_update = m * active_mask.unsqueeze(1).float()
                         x = x - self.step_size * m_update
                 else:
-                    raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.opt_type}' \n ")
+                    raise ValueError(f"\n Action Gradient optimizer must be 'gd' or 'nag', got '{self.opt_type}' \n ")
 
-                # --- GeCO OOD Detection Metric ---
-                # Do one final forward pass at the settled location to get final OOD scores
                 final_grad = self.model(x,state)
-                ood_scores = torch.norm(final_grad, p=2, dim=1)
+                ood_scores = torch.norm(final_grad, p=2, dim=1, keepdim=True)
 
             if is_training:
                 self.model.train()
             return x, ood_scores
 
+
+    def _implicit_langevin(self, x , state , initial_temperature=1.0, noise_decay=0.99):
+
+            is_training = self.model.training
+            self.model.eval()
+
+            with torch.no_grad():
+                if self.opt_type == "gd":
+                    for i in range(self.num_step):
+                       
+                        grad = self.model(x,state)
+
+                       
+                        current_temp = initial_temperature * (noise_decay ** i)
+
+                        
+                        noise_scale = np.sqrt(2 * self.step_size * current_temp)
+                        noise = torch.randn_like(x)
+
+                        
+                        x = x - self.step_size * grad + noise_scale * noise
+
+                elif self.opt_type == "nag":
+                    m = torch.zeros_like(x)
+                    for i in range(self.num_step):
+                       
+                        x_lookahead = x - self.step_size * m * self.moment
+                        grad = self.model(x_lookahead,state)
+                        m = grad
+
+                       
+                        current_temp = initial_temperature * (noise_decay ** i)
+
+                  
+                        noise_scale = np.sqrt(2 * self.step_size * current_temp)
+                        noise = torch.randn_like(x)
+
+                        x = x - self.step_size * m + noise_scale * noise
+                else:
+                    raise ValueError(f"\n Action Gradient optimizer must be 'gd' or 'nag', got '{self.opt_type}' \n ")
+            
+            if is_training:
+                self.model.train()
+            return x
+        
+        
     def _compute_gradient(self, Xt, state):
         # We assume Xt already has requires_grad_(True) when passed in
         output = self.model(Xt,state)
@@ -361,7 +461,7 @@ class Actor(nn.Module):
                     # 5. Update the main state and detach
                     x = (x - self.step_size * m).detach()
             else:
-                raise ValueError(f"\n Sampler must be 'gd' or 'nag', got '{self.opt_type}' \n ")
+                raise ValueError(f"\n Action Gradient optimizer must be 'gd' or 'nag', got '{self.opt_type}' \n ")
         
         if is_training:
             self.model.train()

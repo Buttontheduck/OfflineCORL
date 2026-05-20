@@ -1,8 +1,8 @@
 # wandb configuration
 project: Debug
 group: T1
-name: BC_medium_20
-run_id: BC_medium_20
+name: Test
+run_id: Test
 
 # environment and dataset
 env_name: mujoco/halfcheetah/medium-v0    #mujoco/halfcheetah/medium-v0 #mujoco/halfcheetah/simple-v0
@@ -28,7 +28,7 @@ temperature: 1.0
 # training flags and evaluation
 normalize_reward: false
 eval_frequency: 10000
-n_test_episodes: 10
+n_test_episodes: 1
 
 # saving and reproducibility
 checkpoints_path: "/Users/batin13/Desktop/RL Projects/Trained_Models/checkpoints/"
@@ -49,10 +49,10 @@ agent:
 actor: 
   ebm: null
   opt_type: 'nag' # gd or nag
-  step_size: 0.01
-  num_step: 20
+  step_size: 0.05
+  num_step: 5
   moment: 0.3
-  sampler_type: 'implicit' #implicit #implicit_OOD #implicit_stop #implicit_stop_OOD
+  sampler_type: 'implicit_OOD' #implicit #implicit_OOD #implicit_stop #implicit_stop_OOD
   ood_threshold: 1.8
   early_stop: 1.0
   num_actions: 10
