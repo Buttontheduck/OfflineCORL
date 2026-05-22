@@ -9,7 +9,8 @@ from torch.distributions import Normal
 import torch.nn.functional as F 
 
 class Actor(nn.Module):
-    def __init__(self, model, critic_1, critic_2, action_dim, min_action, max_action, ebm, opt_type, step_size, num_step, moment, sampler_type, ood_threshold, early_stop):
+    def __init__(self, model, critic_1, critic_2, action_dim, min_action, max_action, ebm,
+                 opt_type, step_size, num_step, moment, sampler_type, ood_threshold, early_stop):
         super().__init__()
         
         self.model = model
@@ -89,6 +90,61 @@ class Actor(nn.Module):
 
             return predicted_actions, ood_scores
         
+
+
+    @torch.no_grad()
+    def sample(self, state: np.ndarray, num_actions_inference: int = 10) -> np.ndarray:
+        """
+        Evaluation method. Expected to be called by Gym/Gymnasium.
+        Generates actions, forcefully filters OOD, and ranks via Critics.
+        """
+        actor_was_training = self.training
+        model_was_training = self.model.training
+        critic_1_was_training = self.critic_1.training
+        critic_2_was_training = self.critic_2.training
+
+        try:
+            self.eval()
+            self.critic_1.eval()
+            self.critic_2.eval()
+
+            if state.ndim == 1:
+                state = np.expand_dims(state, axis=0)
+
+            device = next(self.model.parameters()).device
+            state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
+
+            state_repeated = state_tensor.unsqueeze(0).repeat(num_actions_inference, 1, 1)
+            prepared_state = flatten_repeated_states(state_repeated)
+
+            batch_size_total = prepared_state.shape[0]
+            x = torch.randn((batch_size_total, self.action_dim), device=device)
+
+            if self.early_stop is not None:
+                flat_actions, flat_ood_scores = self._implicit_OOD_stop(
+                    x=x,
+                    state=prepared_state,
+                    tau_opt=self.early_stop,
+                )
+            else:
+                flat_actions, flat_ood_scores = self._implicit_OOD(x=x, state=prepared_state)
+
+            actions = unflatten_repeated_tensor(flat_actions, num_actions_inference)
+            ood_scores = unflatten_repeated_tensor(flat_ood_scores, num_actions_inference)
+
+            best_action_tensor = self._reject_and_rank(actions, ood_scores, state_tensor)
+            best_action_tensor = torch.clamp(
+                best_action_tensor,
+                min=self.min_action,
+                max=self.max_action,
+            )
+            return best_action_tensor.cpu().numpy()
+        finally:
+            self.train(actor_was_training)
+            self.model.train(model_was_training)
+            self.critic_1.train(critic_1_was_training)
+            self.critic_2.train(critic_2_was_training)
+
     @torch.no_grad()
     def _reject_and_rank(self, actions: torch.Tensor, ood_scores: torch.Tensor, state_tensor: torch.Tensor) -> torch.Tensor:
         """
@@ -124,54 +180,7 @@ class Actor(nn.Module):
         best_action_tensor = torch.gather(actions, dim=0, index=final_indices_expanded).squeeze(0)
         
         return best_action_tensor
-
-    @torch.no_grad()
-    def sample(self, state: np.ndarray, num_actions_inference: int = 10) -> np.ndarray:
-        """
-        Evaluation method. Expected to be called by Gym/Gymnasium.
-        Generates actions, forcefully filters OOD, and ranks via Critics.
-        """
-
-        self.eval() 
-        self.critic_1.eval()
-        self.critic_2.eval()
-        
-        if state.ndim == 1:
-            state = np.expand_dims(state, axis=0)
-
-        device = next(self.model.parameters()).device
-        state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
-
-
-        state_repeated = state_tensor.unsqueeze(0).repeat(num_actions_inference, 1, 1)
-        prepared_state = flatten_repeated_states(state_repeated)
-            
-        batch_size_total = prepared_state.shape[0]
-        x = torch.randn((batch_size_total, self.action_dim), device=device)
-        
-
-        if self.early_stop is not None:
-            flat_actions, flat_ood_scores = self._implicit_OOD_stop(x=x, state=prepared_state, tau_opt=self.early_stop)
-        else:
-            flat_actions, flat_ood_scores = self._implicit_OOD(x=x, state=prepared_state)
-
-        actions = unflatten_repeated_tensor(flat_actions, num_actions_inference)
-        ood_scores = unflatten_repeated_tensor(flat_ood_scores, num_actions_inference)
-  
-
-
-        best_action_tensor = self._reject_and_rank(actions, ood_scores, state_tensor)
-        
-
-        best_action_tensor = torch.clamp(best_action_tensor, min=self.min_action, max=self.max_action)
-
-        self.train()
-        self.critic_1.train()
-        self.critic_2.train()
-
-        return best_action_tensor.cpu().numpy()
-
-
+             
     def _implicit(self, x , state):
 
         is_training = self.model.training

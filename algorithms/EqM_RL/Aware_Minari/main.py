@@ -60,28 +60,6 @@ def wrap_env(
     env = gym.wrappers.TransformObservation(env, normalize_state, new_obs_space)
     return env
 
-
-@torch.no_grad()
-def eval_actor(
-    env: gym.Env, actor: Actor, device: str, n_episodes: int, seed: int
-) -> np.ndarray:
-    actor.eval()
-    episode_rewards = []
-    for i in range(n_episodes):
-        state, _ = env.reset(seed=seed + i)
-        done = False
-        episode_reward = 0.0
-        while not done:
-            action = actor.sample(state,device)
-            state, reward, terminated, truncated, _ = env.step(action)
-            done = terminated or truncated
-            episode_reward += reward
-        episode_rewards.append(episode_reward)
-
-    actor.train()
-    return np.asarray(episode_rewards)
-
-
 def return_reward_range(dataset, max_episode_steps):
     returns, lengths = [], []
     ep_ret, ep_len = 0.0, 0
@@ -204,8 +182,7 @@ def train(cfg: DictConfig):
         moment        = cfg.actor.moment,
         sampler_type  = cfg.actor.sampler_type,
         ood_threshold = cfg.actor.ood_threshold,
-        early_stop    = cfg.actor.early_stop,
-        num_actions   = cfg.actor.num_actions
+        early_stop    = cfg.actor.early_stop
         )
     
     agent = Otter(
@@ -218,6 +195,28 @@ def train(cfg: DictConfig):
         critic_2_optimizer  = critic_2_optimizer,
         **cfg.agent
         )
+
+    @torch.no_grad()
+    def eval_actor(env: gym.Env, n_episodes: int, seed: int) -> np.ndarray:
+        actor.eval()
+        episode_rewards = []
+        for i in range(n_episodes):
+            state, _ = env.reset(seed=seed + i)
+            done = False
+            episode_reward = 0.0
+            while not done:
+                action = actor.sample(
+                    state,
+                    num_actions_inference=cfg.num_actions_inference,
+                )
+                action = np.squeeze(action, axis=0)
+                state, reward, terminated, truncated, _ = env.step(action)
+                done = terminated or truncated
+                episode_reward += reward
+            episode_rewards.append(episode_reward)
+
+        actor.train()
+        return np.asarray(episode_rewards)
     
 
     wandb_init(OmegaConf.to_container(cfg, resolve=True))
@@ -234,9 +233,7 @@ def train(cfg: DictConfig):
             update_result = agent.update(batch)
             wandb.log(update_result, step=t)
             if (t) % cfg.eval_frequency == 0:
-                eval_scores = eval_actor(
-                    env, actor, cfg.device, cfg.n_test_episodes, cfg.test_seed
-                )
+                eval_scores = eval_actor(env, cfg.n_test_episodes, cfg.test_seed)
 
                 wandb.log({"eval_score": eval_scores.mean()}, step=t)
                 normalized_eval_scores = minari_normalized_score(

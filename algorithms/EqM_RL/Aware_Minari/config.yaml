@@ -29,6 +29,7 @@ temperature: 1.0
 normalize_reward: false
 eval_frequency: 10000
 n_test_episodes: 1
+num_actions_inference: 10
 
 # saving and reproducibility
 checkpoints_path: "/Users/batin13/Desktop/RL Projects/Trained_Models/checkpoints/"
@@ -45,6 +46,7 @@ agent:
   flag_threshold: 0.8
   scale_gradient: 6.0
   fino_knob: 0.1
+  num_actions: 10
 
 actor: 
   ebm: null
@@ -55,4 +57,3 @@ actor:
   sampler_type: 'implicit_OOD' #implicit #implicit_OOD #implicit_stop #implicit_stop_OOD
   ood_threshold: 1.8
   early_stop: 1.0
-  num_actions: 10

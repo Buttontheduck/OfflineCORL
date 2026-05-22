@@ -44,6 +44,7 @@ class Otter(nn.Module):
         flag_type: str = 'trun',
         flag_threshold: float = 0.8,
         scale_gradient: float = 4.0,
+        num_actions: int = 10,
         fino_knob: float = 0.1,
         **kwargs 
         
@@ -72,6 +73,8 @@ class Otter(nn.Module):
         self.flag_threshold = flag_threshold
         self.scale_gradient = scale_gradient
         self.fino_knob = fino_knob
+
+        self.num_actions = num_actions
         
         
         
@@ -172,7 +175,7 @@ class Otter(nn.Module):
             
         pred_grad = self._model(noisy_action,states)
         
-        weights = self._offline_weights(states=states, actions= actions)
+        weights = self._offline_weights(states=states, actions= actions, num_actions=self.num_actions)
 
         loss_per_sample_and_dim = F.mse_loss(pred_grad, scaled_target_grad, reduction='none') # Returns (B,A), loss for each sample and each action dimension 
         loss_per_sample = loss_per_sample_and_dim.sum(dim=-1, keepdim=True) # Returns (B,1), loss for each gradient prediction
@@ -183,26 +186,40 @@ class Otter(nn.Module):
         
         return loss
     
-    def _offline_weights(self,states, actions):
-        with torch.no_grad():
-            pi_actions = self._actor(states)
-
-            v = torch.min(
-                self._critic_1(states,pi_actions), self._critic_2(states,pi_actions)
-            )
-            q = torch.min(
-                self._critic_1(states,actions), self._critic_2(states,actions)
-            )  
-
-            adv = q - v
-            weights = torch.clamp_max( input = torch.exp(adv/self._temperature), max = self._exp_adv_max) 
-            
-        return weights
+    def _offline_weights(self, states, actions, num_actions):
+            with torch.no_grad():
+                # pi_actions shape: [num_actions, batch_size, action_dim]
+                pi_actions = self._actor(states, num_actions=num_actions)
+                N, B, A = pi_actions.shape
+    
+                # Repeat states and flatten both to [N * B, dim] for the critic
+                repeated_states = states.unsqueeze(0).repeat(N, 1, 1)
+                flat_states = repeated_states.reshape(N * B, -1)
+                flat_pi_actions = pi_actions.reshape(N * B, A)
+    
+                # Evaluate Q(s, a_pi) and unflatten back to [N, B, 1]
+                flat_q1 = self._critic_1(flat_states, flat_pi_actions)
+                flat_q2 = self._critic_2(flat_states, flat_pi_actions)
+                
+                q1_pi = flat_q1.reshape(N, B, -1)
+                q2_pi = flat_q2.reshape(N, B, -1)
+    
+                # Take min across critics, then average across actions to get V(s)
+                q_pi = torch.min(q1_pi, q2_pi)
+                v = q_pi.mean(dim=0) # shape: [B, 1]
+    
+                # Evaluate dataset actions [B, action_dim] with states [B, state_dim]
+                q = torch.min(self._critic_1(states, actions), self._critic_2(states, actions))  
+    
+                adv = q - v
+                weights = torch.clamp_max(input=torch.exp(adv/self._temperature), max=self._exp_adv_max) 
+                
+            return weights
     
 
     def _critic_loss(self, states, actions, rewards, dones, next_states):
         with torch.no_grad():
-            next_actions = self._actor(next_states)
+            next_actions = self._actor(next_states).squeeze(0)
 
             q_next = torch.min(
                 self._target_critic_1(next_states, next_actions),
@@ -282,4 +299,3 @@ class Otter(nn.Module):
     #     action_log_prob = self._model.log_prob(states, actions)
     #     loss = (-action_log_prob * weights).mean()
     #     return loss
-
