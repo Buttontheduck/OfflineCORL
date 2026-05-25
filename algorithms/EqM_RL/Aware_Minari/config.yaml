@@ -1,8 +1,8 @@
 # wandb configuration
 project: Debug
 group: T1
-name: Test
-run_id: Test
+name: Test_OOD
+run_id: Test_OOD_re
 
 # environment and dataset
 env_name: mujoco/halfcheetah/medium-v0    #mujoco/halfcheetah/medium-v0 #mujoco/halfcheetah/simple-v0
@@ -44,16 +44,17 @@ agent:
   fino: false
   flag_type: 'trun'
   flag_threshold: 0.8
-  scale_gradient: 6.0
-  fino_knob: 0.1
+  scale_gradient: 4.0
   num_actions: 10
+  fino_knob: 0.1
+
 
 actor: 
   ebm: null
   opt_type: 'nag' # gd or nag
-  step_size: 0.05
-  num_step: 5
+  step_size: 0.01
+  num_step: 20
   moment: 0.3
   sampler_type: 'implicit_OOD' #implicit #implicit_OOD #implicit_stop #implicit_stop_OOD
-  ood_threshold: 1.8
-  early_stop: 1.0
+  ood_threshold: 2.0
+  early_stop: null
