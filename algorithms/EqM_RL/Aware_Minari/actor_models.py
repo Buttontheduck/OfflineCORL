@@ -7,6 +7,7 @@ from torch.nn import Module
 from torch.nn import Linear as lin 
 from torch.distributions import Normal
 import torch.nn.functional as F 
+from collections import deque
 
 class Actor(nn.Module):
     def __init__(self, model, critic_1, critic_2, action_dim, min_action, max_action, ebm,
@@ -362,7 +363,59 @@ class Actor(nn.Module):
             if is_training:
                 self.model.train()
             return x, ood_scores
+        
+    def _implicit_OOD_moving_avg(self, x , state):
+            
+            is_training = self.model.training
+            self.model.eval()
+    
+            with torch.no_grad():
+                if self.opt_type == "nag":
+                    m = torch.zeros_like(x)
+                    window_length = 5
+                    score_window = deque(maxlen=window_length)
+                    
+                    for _ in range(self.num_step):
+                        x_lookahead = x - self.step_size * m * self.moment
+                        grad = self.model(x_lookahead,state)
+                        m = grad 
+                        ood_moving_avg_score, score_window = self._ood_moving_average(grad, score_window)
+                        x = x - self.step_size * m
+                else:
+                    raise ValueError(f"\n Action Gradient optimizer must be 'nag', got '{self.opt_type}' \n ")
+              
 
+            if is_training:
+                self.model.train()
+            return x, ood_moving_avg_score
+
+    def _implicit_OOD_leaky_bucket(self, x, state):
+        is_training = self.model.training
+        self.model.eval()
+
+        tau = 0.5
+        lambda_decay = 0.0
+
+
+        with torch.no_grad():
+            if self.opt_type == "nag":
+                m = torch.zeros_like(x)
+                ood_score_bucket = torch.zeros(x.size(0), 1, dtype=x.dtype, device=x.device)
+                
+                for _ in range(self.num_step):
+                    x_lookahead = x - self.step_size * m * self.moment
+                    grad = self.model(x_lookahead, state)
+                    m = grad 
+                    ood_score_bucket = self._ood_leaky_bucket(grad, ood_score_bucket, tau, lambda_decay)
+
+                    x = x - self.step_size * m
+            else:
+                raise ValueError(f"\n Action Gradient optimizer must be 'nag', got '{self.opt_type}' \n ")
+          
+        if is_training:
+            self.model.train()
+            
+        return x, ood_score_bucket
 
     def _implicit_langevin(self, x , state , initial_temperature=1.0, noise_decay=0.99):
 
@@ -475,71 +528,16 @@ class Actor(nn.Module):
         if is_training:
             self.model.train()
         return x
-    
+
+    def _ood_moving_average(self, grad, score_window):
+        score = torch.linalg.norm(grad, dim=1, keepdim=True)
+        score_window.append(score)
+        score_mean = torch.stack(list(score_window), dim=0).mean(dim=0)
+        return score_mean, score_window
 
 
-    ###############################################
-    ###############################################
-    ###############################################
-    ###############################################
-    ###############################################
-    ###############################################
-    ###############################################
-
-
-# class Actor(nn.Module):
-#     def __init__(
-#         self,
-#         state_dim: int,
-#         action_dim: int,
-#         hidden_dim: int,
-#         min_log_std: float = -20.0,
-#         max_log_std: float = 2.0,
-#         min_action: float = -1.0,
-#         max_action: float = 1.0,
-#     ):
-#         super().__init__()
-#         self._mlp = nn.Sequential(
-#             nn.Linear(state_dim, hidden_dim),
-#             nn.ReLU(),
-#             nn.Linear(hidden_dim, hidden_dim),
-#             nn.ReLU(),
-#             nn.Linear(hidden_dim, hidden_dim),
-#             nn.ReLU(),
-#             nn.Linear(hidden_dim, action_dim),
-#         )
-#         self._log_std = nn.Parameter(torch.zeros(action_dim, dtype=torch.float32))
-#         self._min_log_std = min_log_std
-#         self._max_log_std = max_log_std
-#         self._min_action = min_action
-#         self._max_action = max_action
-
-#     def _get_policy(self, state: torch.Tensor) -> torch.distributions.Distribution:
-#         mean = self._mlp(state)
-#         log_std = self._log_std.clamp(self._min_log_std, self._max_log_std)
-#         policy = torch.distributions.Normal(mean, log_std.exp())
-#         return policy
-
-#     def log_prob(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-#         policy = self._get_policy(state)
-#         log_prob = policy.log_prob(action).sum(-1, keepdim=True)
-#         return log_prob
-
-#     def forward(self, state: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-#         policy = self._get_policy(state)
-#         action = policy.rsample()
-#         action.clamp_(self._min_action, self._max_action)
-#         log_prob = policy.log_prob(action).sum(-1, keepdim=True)
-#         return action, log_prob
-
-#     def act(self, state: np.ndarray, device: str) -> np.ndarray:
-#         state_t = torch.tensor(state[None], dtype=torch.float32, device=device)
-#         policy = self._get_policy(state_t)
-#         if self._mlp.training:
-#             action_t = policy.sample()
-#         else:
-#             action_t = policy.mean
-#         # Use .detach() to break the tensor off the gradient graph
-#         action = action_t[0].detach().cpu().numpy()
-
-#         return action
+    def _ood_leaky_bucket(self, grad, ood_score_bucket, tau=0.5, lambda_decay=0.0):
+        score = torch.linalg.norm(grad, dim=1, keepdim=True)
+        excess = torch.relu(score - tau)
+        ood_score_bucket = torch.relu((1.0 - lambda_decay) * ood_score_bucket + excess)
+        return ood_score_bucket

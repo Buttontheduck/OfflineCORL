@@ -1,11 +1,11 @@
 # wandb configuration
 project: Debug
 group: T1
-name: Test_OOD
-run_id: Test_OOD_re
+name: Test
+run_id: Test_95959492295942952
 
 # environment and dataset
-env_name: mujoco/halfcheetah/medium-v0    #mujoco/halfcheetah/medium-v0 #mujoco/halfcheetah/simple-v0
+env_name: mujoco/halfcheetah/simple-v0   #mujoco/halfcheetah/medium-v0 #mujoco/halfcheetah/simple-v0
 
 seed: 42
 test_seed: 69
@@ -29,7 +29,7 @@ temperature: 1.0
 normalize_reward: false
 eval_frequency: 10000
 n_test_episodes: 1
-num_actions_inference: 10
+num_actions_inference: 20
 
 # saving and reproducibility
 checkpoints_path: "/Users/batin13/Desktop/RL Projects/Trained_Models/checkpoints/"
@@ -44,8 +44,8 @@ agent:
   fino: false
   flag_type: 'trun'
   flag_threshold: 0.8
-  scale_gradient: 4.0
-  num_actions: 10
+  scale_gradient: 6.0
+  num_actions: 5
   fino_knob: 0.1
 
 
@@ -53,8 +53,8 @@ actor:
   ebm: null
   opt_type: 'nag' # gd or nag
   step_size: 0.01
-  num_step: 20
+  num_step: 5
   moment: 0.3
   sampler_type: 'implicit_OOD' #implicit #implicit_OOD #implicit_stop #implicit_stop_OOD
-  ood_threshold: 2.0
+  ood_threshold: 0.01
   early_stop: null
