@@ -16,7 +16,7 @@ from agents import Otter
 from omegaconf import DictConfig, OmegaConf
 from tqdm import trange
 from utils.networks import ConditionalMLP
-
+from logger import global_logger as gl
 import wandb
 
 
@@ -231,15 +231,19 @@ def train(cfg: DictConfig):
             batch = replay_buffer.sample(cfg.batch_size)
             batch = [b.to(cfg.device) for b in batch]
             update_result = agent.update(batch)
-            wandb.log(update_result, step=t)
+            for key, val in update_result.items():
+                gl.log(f"train/{key}", val)
+            gl.dump(step=t)
             if (t) % cfg.eval_frequency == 0:
                 eval_scores = eval_actor(env, cfg.n_test_episodes, cfg.test_seed)
 
-                wandb.log({"eval_score": eval_scores.mean()}, step=t)
+                gl.log("eval/score", eval_scores.mean())
                 normalized_eval_scores = minari_normalized_score(
                     eval_scores.mean(), ref_scores
                 )
-                wandb.log({"minari_normalized_score": normalized_eval_scores}, step=t)
+                gl.log("minari_normalized_score", normalized_eval_scores)
+                
+                gl.dump(step=t)
 
                 if getattr(cfg, "actual_checkpoints_path", None) is not None:
                     torch.save(

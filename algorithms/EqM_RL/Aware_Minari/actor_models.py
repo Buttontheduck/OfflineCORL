@@ -529,6 +529,7 @@ class Actor(nn.Module):
             self.model.train()
         return x
 
+
     def _ood_moving_average(self, grad, score_window):
         score = torch.linalg.norm(grad, dim=1, keepdim=True)
         score_window.append(score)

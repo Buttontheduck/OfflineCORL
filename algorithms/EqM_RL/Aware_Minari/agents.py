@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from logger import global_logger as gl
 
 TensorBatch = List[torch.Tensor]
 
@@ -212,6 +212,10 @@ class Otter(nn.Module):
                 q = torch.min(self._critic_1(states, actions), self._critic_2(states, actions))  
     
                 adv = q - v
+                
+                gl.log("train/q_value", q.mean().item())
+                gl.log("train/v_value", v.mean().item())
+                gl.log("train/adv",     adv.mean().item()) 
                 weights = torch.clamp_max(input=torch.exp(adv/self._temperature), max=self._exp_adv_max) 
                 
             return weights
