@@ -78,7 +78,7 @@ class Actor(nn.Module):
                 if self.early_stop is not None:
                     flat_all_actions, flat_ood_scores = self._implicit_OOD_stop(x=x, state=prepared_state, tau_opt=self.early_stop)
                 else:
-                    flat_all_actions, flat_ood_scores = self._implicit_OOD(x=x, state=prepared_state)
+                    flat_all_actions, flat_ood_scores = self._implicit_OOD_moving_avg(x=x, state=prepared_state)
 
                 ood_scores = unflatten_repeated_tensor(flat_ood_scores, num_samples)
                 all_actions = unflatten_repeated_tensor(flat_all_actions, num_samples)
@@ -94,7 +94,7 @@ class Actor(nn.Module):
 
 
     @torch.no_grad()
-    def sample(self, state: np.ndarray, num_actions_inference: int = 10) -> np.ndarray:
+    def sample2(self, state: np.ndarray, num_actions_inference: int = 10) -> np.ndarray:
         """
         Evaluation method. Expected to be called by Gym/Gymnasium.
         Generates actions, forcefully filters OOD, and ranks via Critics.
@@ -128,7 +128,7 @@ class Actor(nn.Module):
                     tau_opt=self.early_stop,
                 )
             else:
-                flat_actions, flat_ood_scores = self._implicit_OOD(x=x, state=prepared_state)
+                flat_actions, flat_ood_scores = self._implicit_OOD_leaky_bucket(x=x, state=prepared_state)
 
             actions = unflatten_repeated_tensor(flat_actions, num_actions_inference)
             ood_scores = unflatten_repeated_tensor(flat_ood_scores, num_actions_inference)
@@ -145,6 +145,54 @@ class Actor(nn.Module):
             self.model.train(model_was_training)
             self.critic_1.train(critic_1_was_training)
             self.critic_2.train(critic_2_was_training)
+
+    @torch.no_grad()
+    def sample(self, state: np.ndarray) -> np.ndarray:
+        """
+        Evaluation method. Expected to be called by Gym/Gymnasium.
+
+        Generates exactly one action per state using _implicit.
+        No multiple action sampling.
+        No OOD score.
+        No reject-and-rank.
+        No critic evaluation.
+        """
+        actor_was_training = self.training
+        model_was_training = self.model.training
+
+        try:
+            self.eval()
+            self.model.eval()
+
+            if state.ndim == 1:
+                state = np.expand_dims(state, axis=0)
+
+            device = next(self.model.parameters()).device
+            state_tensor = torch.tensor(state, dtype=torch.float32, device=device)
+
+            batch_size = state_tensor.shape[0]
+
+            # One random initial action per state
+            x = torch.randn(
+                (batch_size, self.action_dim),
+                device=device,
+                dtype=torch.float32,
+            )
+
+            # Use only the implicit sampler
+            action_tensor = self._implicit(x=x, state=state_tensor)
+
+            action_tensor = torch.clamp(
+                action_tensor,
+                min=self.min_action,
+                max=self.max_action,
+            )
+
+            return action_tensor.cpu().numpy()
+
+        finally:
+            self.train(actor_was_training)
+            self.model.train(model_was_training)
 
     @torch.no_grad()
     def _reject_and_rank(self, actions: torch.Tensor, ood_scores: torch.Tensor, state_tensor: torch.Tensor) -> torch.Tensor:

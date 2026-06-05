@@ -213,10 +213,19 @@ class Otter(nn.Module):
     
                 adv = q - v
                 
-                gl.log("train/q_value", q.mean().item())
-                gl.log("train/v_value", v.mean().item())
-                gl.log("train/adv",     adv.mean().item()) 
+
                 weights = torch.clamp_max(input=torch.exp(adv/self._temperature), max=self._exp_adv_max) 
+                gl.log("value/q_value",        q.mean().item())
+                gl.log("value/v_value",        v.mean().item())
+                gl.log("value/adv",            adv.mean().item()) 
+                gl.log("value/weight_mean",    weights.mean().item())
+                gl.log("value/weight_max",     weights.max().item())
+                gl.log("value/weight_min",     weights.min().item())
+                gl.log("value/weight_mean",    weights.mean().item())
+                gl.log("value/weights_var",    weights.var(unbiased=False).item())
+                gl.log("value/weights_median", weights.median().item())
+                
+                
                 
             return weights
     

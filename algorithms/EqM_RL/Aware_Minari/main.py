@@ -205,10 +205,7 @@ def train(cfg: DictConfig):
             done = False
             episode_reward = 0.0
             while not done:
-                action = actor.sample(
-                    state,
-                    num_actions_inference=cfg.num_actions_inference,
-                )
+                action = actor.sample(state)
                 action = np.squeeze(action, axis=0)
                 state, reward, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
