@@ -78,7 +78,7 @@ class Actor(nn.Module):
                 if self.early_stop is not None:
                     flat_all_actions, flat_ood_scores = self._implicit_OOD_stop(x=x, state=prepared_state, tau_opt=self.early_stop)
                 else:
-                    flat_all_actions, flat_ood_scores = self._implicit_OOD_moving_avg(x=x, state=prepared_state)
+                    flat_all_actions, flat_ood_scores = self._implicit_OOD_leaky_bucket(x=x, state=prepared_state)
 
                 ood_scores = unflatten_repeated_tensor(flat_ood_scores, num_samples)
                 all_actions = unflatten_repeated_tensor(flat_all_actions, num_samples)
