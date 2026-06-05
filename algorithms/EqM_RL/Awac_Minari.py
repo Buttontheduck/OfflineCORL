@@ -28,7 +28,7 @@ class TrainConfig:
     # wandb run name
     name: str = "AWAC"
     # training dataset and evaluation environment
-    env_name: str = "mujoco/halfcheetah/medium-v0"  # "mujoco/hopper/medium-v0" #"mujoco/halfcheetah/medium-v0"  # "halfcheetah-medium-expert-v2"
+    env_name: str = "mujoco/halfcheetah/simple-v0"  # "mujoco/hopper/medium-v0" #"mujoco/halfcheetah/medium-v0"  # "halfcheetah-medium-expert-v2"
     # actor and critic hidden dim
     hidden_dim: int = 256
     # actor and critic learning rate
@@ -277,10 +277,20 @@ class AdvantageWeightedActorCritic:
             weights = torch.clamp_max(
                 torch.exp(adv / self._awac_lambda), self._exp_adv_max
             )
+            v_metrics = {
+            "actor/q_mean": q.mean().item(),
+            "actor/v_mean": v.mean().item(),
+            "actor/adv_mean": adv.mean().item(),
+            "actor/weights_mean": weights.mean().item(),
+            "actor/weights_max": weights.max().item(),
+            "actor/weights_min": weights.min().item(),
+            "actor/weights_var": weights.var(unbiased=False).item(),
+            "actor/weights_median": weights.median().item(),
+            }
 
         action_log_prob = self._actor.log_prob(states, actions)
         loss = (-action_log_prob * weights).mean()
-        return loss
+        return loss, v_metrics
 
     def _critic_loss(self, states, actions, rewards, dones, next_states):
         with torch.no_grad():
@@ -310,22 +320,22 @@ class AdvantageWeightedActorCritic:
         return loss.item()
 
     def _update_actor(self, states, actions):
-        loss = self._actor_loss(states, actions)
+        loss, v_metrics = self._actor_loss(states, actions)
         self._actor_optimizer.zero_grad()
         loss.backward()
         self._actor_optimizer.step()
-        return loss.item()
+        return loss.item(), v_metrics
 
     def update(self, batch: TensorBatch) -> Dict[str, float]:
         states, actions, rewards, next_states, truncations, terminals = batch
         dones = terminals
         critic_loss = self._update_critic(states, actions, rewards, dones, next_states)
-        actor_loss = self._update_actor(states, actions)
+        actor_loss, v_metrics = self._update_actor(states, actions)
 
         soft_update(self._target_critic_1, self._critic_1, self._tau)
         soft_update(self._target_critic_2, self._critic_2, self._tau)
 
-        result = {"critic_loss": critic_loss, "actor_loss": actor_loss}
+        result = {"critic_loss": critic_loss, "actor_loss": actor_loss, **v_metrics}
         return result
 
     def state_dict(self) -> Dict[str, Any]:
