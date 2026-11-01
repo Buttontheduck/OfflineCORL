@@ -16,7 +16,7 @@ from agents import Otter
 from omegaconf import DictConfig, OmegaConf
 from tqdm import trange
 from utils.networks import ConditionalMLP
-
+from logger import global_logger as gl
 import wandb
 
 
@@ -48,32 +48,11 @@ def wrap_env(
     state_std: Union[np.ndarray, float] = 1.0,
 ) -> gym.Env:
     def normalize_state(state):
+        # Ensure the state matches the 32-bit float dtype standard in RL
         return ((state - state_mean) / state_std).astype(np.float32)
 
     env = gym.wrappers.TransformObservation(env, normalize_state)
     return env
-
-
-@torch.no_grad()
-def eval_actor(
-    env: gym.Env, actor: Actor, device: str, n_episodes: int, seed: int
-) -> np.ndarray:
-    env.seed(seed)
-    actor.eval()
-    episode_rewards = []
-    for _ in range(n_episodes):
-        state, done = env.reset(), False
-        done = False
-        episode_reward = 0.0
-        while not done:
-            action = actor.sample(state, device)
-            state, reward, done, _ = env.step(action)
-            episode_reward += reward
-        episode_rewards.append(episode_reward)
-
-    actor.train()
-    return np.asarray(episode_rewards)
-
 
 def return_reward_range(dataset, max_episode_steps):
     returns, lengths = [], []
@@ -131,10 +110,10 @@ def train(cfg: DictConfig):
     OmegaConf.set_struct(cfg, True)
 
     env = gym.make(cfg.env_name)
+    dataset = d4rl.qlearning_dataset(env)
     set_seed(cfg.seed, env, deterministic_torch=cfg.deterministic_torch)
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
-    dataset = d4rl.qlearning_dataset(env)
 
     if getattr(cfg, "normalize_reward", False):
         modify_reward(dataset, cfg.env_name)
@@ -180,15 +159,20 @@ def train(cfg: DictConfig):
     critic_2_optimizer = torch.optim.Adam(critic_2.parameters(), lr=cfg.learning_rate)
     
     actor = Actor(
-        model      = model,
-        action_dim = action_dim,
-        min_action = env.action_space.low[0],
-        max_action = env.action_space.high[0],
-        ebm        = cfg.actor.ebm,
-        opt_type   = cfg.actor.opt_type,
-        step_size  = cfg.actor.step_size, 
-        num_step   = cfg.actor.num_step,
-        moment     = cfg.actor.moment
+        model         = model,
+        critic_1      = critic_1,
+        critic_2      = critic_2,        
+        action_dim    = action_dim,
+        min_action    = env.action_space.low[0],
+        max_action    = env.action_space.high[0],
+        ebm           = cfg.actor.ebm,
+        opt_type      = cfg.actor.opt_type,
+        step_size     = cfg.actor.step_size, 
+        num_step      = cfg.actor.num_step,
+        moment        = cfg.actor.moment,
+        sampler_type  = cfg.actor.sampler_type,
+        ood_threshold = cfg.actor.ood_threshold,
+        early_stop    = cfg.actor.early_stop
         )
     
     agent = Otter(
@@ -201,6 +185,26 @@ def train(cfg: DictConfig):
         critic_2_optimizer  = critic_2_optimizer,
         **cfg.agent
         )
+
+    @torch.no_grad()
+    def eval_actor(env: gym.Env, n_episodes: int, seed: int) -> np.ndarray:
+        actor.eval()
+        episode_rewards = []
+        for i in range(n_episodes):
+            # Old gym API (D4RL): seed before reset; step returns 4 values
+            env.seed(seed + i)
+            state = env.reset()
+            done = False
+            episode_reward = 0.0
+            while not done:
+                action = actor.sample(state)
+                action = np.squeeze(action, axis=0)
+                state, reward, done, _ = env.step(action)
+                episode_reward += reward
+            episode_rewards.append(episode_reward)
+
+        actor.train()
+        return np.asarray(episode_rewards)
     
 
     wandb_init(OmegaConf.to_container(cfg, resolve=True))
@@ -215,18 +219,17 @@ def train(cfg: DictConfig):
             batch = replay_buffer.sample(cfg.batch_size)
             batch = [b.to(cfg.device) for b in batch]
             update_result = agent.update(batch)
-            wandb.log(update_result, step=t)
+            for key, val in update_result.items():
+                gl.log(f"train/{key}", val)
+            gl.dump(step=t)
             if (t) % cfg.eval_frequency == 0:
-                eval_scores = eval_actor(
-                    env, actor, cfg.device, cfg.n_test_episodes, cfg.test_seed
-                )
+                eval_scores = eval_actor(env, cfg.n_test_episodes, cfg.test_seed)
 
-                wandb.log({"eval_score": eval_scores.mean()}, step=t)
-                if hasattr(env, "get_normalized_score"):
-                    normalized_eval_scores = env.get_normalized_score(eval_scores) * 100.0
-                    wandb.log(
-                        {"d4rl_normalized_score": normalized_eval_scores.mean()}, step=t
-                    )
+                gl.log("eval/score", eval_scores.mean())
+                normalized_eval_scores = env.get_normalized_score(eval_scores.mean()) * 100.0
+                gl.log("eval/normalized_score", normalized_eval_scores)
+                
+                gl.dump(step=t)
 
                 if getattr(cfg, "actual_checkpoints_path", None) is not None:
                     torch.save(

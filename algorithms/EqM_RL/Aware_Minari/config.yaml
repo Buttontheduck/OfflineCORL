@@ -1,7 +1,7 @@
 # wandb configuration
 project: E
 group: test_halfcheetah_simple_v0
-name: run_1
+name: run_2
 run_id: simple
 
 # environment and dataset
@@ -11,7 +11,7 @@ seed: 42
 test_seed: 69
 deterministic_torch: false
 
-num_train_ops: 1000000
+num_train_ops: 100001
 
 # Network Architecture Hyperparameters
 hidden_dim: 256
