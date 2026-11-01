@@ -238,7 +238,7 @@ def train(cfg: DictConfig):
                 normalized_eval_scores = minari_normalized_score(
                     eval_scores.mean(), ref_scores
                 )
-                gl.log("minari_normalized_score", normalized_eval_scores)
+                gl.log("eval/normalized_score", normalized_eval_scores)
                 
                 gl.dump(step=t)
 

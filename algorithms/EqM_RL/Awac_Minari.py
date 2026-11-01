@@ -22,9 +22,9 @@ TensorBatch = List[torch.Tensor]
 @dataclass
 class TrainConfig:
     # wandb project name
-    project: str = "CORL"
+    project: str = "E"
     # wandb group name
-    group: str = "AWAC-D4RL"
+    group: str = "AWAC_halfcheetah_simple_v0"
     # wandb run name
     name: str = "AWAC"
     # training dataset and evaluation environment
@@ -277,15 +277,23 @@ class AdvantageWeightedActorCritic:
             weights = torch.clamp_max(
                 torch.exp(adv / self._awac_lambda), self._exp_adv_max
             )
+            std = self._actor._log_std.clamp(self._actor._min_log_std, self._actor._max_log_std).exp()
+            mean_err = (self._actor._mlp(states) - actions).pow(2).mean().sqrt() 
             v_metrics = {
-            "actor/q_mean": q.mean().item(),
-            "actor/v_mean": v.mean().item(),
-            "actor/adv_mean": adv.mean().item(),
-            "actor/weights_mean": weights.mean().item(),
-            "actor/weights_max": weights.max().item(),
-            "actor/weights_min": weights.min().item(),
-            "actor/weights_var": weights.var(unbiased=False).item(),
-            "actor/weights_median": weights.median().item(),
+            "weighting/q_mean": q.mean().item(),
+            "weighting/v_mean": v.mean().item(),
+            "weighting/adv_mean": adv.mean().item(),
+            "weighting/adv_std":  adv.std(unbiased=False).item(),
+            "weighting/weights_mean": weights.mean().item(),
+            "weighting/weights_max": weights.max().item(),
+            "weighting/weights_min": weights.min().item(),
+            "weighting/weights_var": weights.var(unbiased=False).item(),
+            "weighting/weights_median": weights.median().item(),
+            "weighting/weights_clip_frac": (weights >= self._exp_adv_max).float().mean().item(),
+            "weighting/policy_std_mean": std.mean().item(),
+            "weighting/policy_std_max": std.max().item(),
+            "weighting/policy_std_min": std.min().item(),
+            "weighting/mean_err": mean_err.item(),
             }
 
         action_log_prob = self._actor.log_prob(states, actions)
@@ -335,7 +343,7 @@ class AdvantageWeightedActorCritic:
         soft_update(self._target_critic_1, self._critic_1, self._tau)
         soft_update(self._target_critic_2, self._critic_2, self._tau)
 
-        result = {"critic_loss": critic_loss, "actor_loss": actor_loss, **v_metrics}
+        result = {"train/critic_loss": critic_loss, "train/actor_loss": actor_loss, **v_metrics}
         return result
 
     def state_dict(self) -> Dict[str, Any]:
@@ -524,11 +532,11 @@ def train(config: TrainConfig):
                 env, actor, config.device, config.n_test_episodes, config.test_seed
             )
 
-            wandb.log({"eval_score": eval_scores.mean()}, step=t)
+            wandb.log({"eval/score": eval_scores.mean()}, step=t)
             normalized_eval_scores = minari_normalized_score(
                 eval_scores.mean(), ref_scores
             )
-            wandb.log({"minari_normalized_score": normalized_eval_scores}, step=t)
+            wandb.log({"eval/normalized_score": normalized_eval_scores}, step=t)
 
             if config.checkpoints_path is not None:
                 torch.save(
