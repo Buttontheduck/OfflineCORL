@@ -2,7 +2,7 @@
 project: E
 group: test_halfcheetah_simple_v0
 name: run_2
-run_id: simple
+run_id: null   # null = new random id per run, so parallel runs never share a W&B run or checkpoint folder
 
 # environment and dataset
 env_name: mujoco/halfcheetah/simple-v0    #mujoco/halfcheetah/medium-v0 #mujoco/halfcheetah/simple-v0

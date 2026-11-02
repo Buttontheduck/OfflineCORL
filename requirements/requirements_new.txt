@@ -1,8 +1,13 @@
-# Snapshot of the `eagle` conda env (Python 3.10.0, macOS / Apple Silicon, torch with MPS, no CUDA).
+# Snapshot of the `eagle` conda env (Python 3.10.0), with torch bumped to 2.12.1 for the GPU server
+# (the local Mac env was made with torch 2.11.0; the code runs on both).
 # Recreate with:
 #   conda create -n eagle python=3.10.0 -y
 #   conda activate eagle
 #   pip install -r requirements/requirements_new.txt
+# torch==2.12.1 from PyPI is the CUDA 13.0 build on Linux (needs NVIDIA driver >= 580, see `nvidia-smi`)
+# and the MPS build on macOS. If the server driver is older than 580, install the CUDA 12.6 build first:
+#   pip install torch==2.12.1 --index-url https://download.pytorch.org/whl/cu126
+# Check: python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available())"
 # Note: d4rl / gym / mujoco-py are NOT in this env, so the D4RL scripts
 # (algorithms/offline/*, algorithms/EqM_RL/Aware/) won't run with it; the Minari ones will.
 absl-py==2.4.0
@@ -126,7 +131,7 @@ smmap==5.0.3
 sympy==1.14.0
 tensorflow-probability==0.25.0
 toolz==1.1.0
-torch==2.11.0
+torch==2.12.1
 tqdm==4.64.0
 typer==0.24.1
 typing_extensions==4.15.0

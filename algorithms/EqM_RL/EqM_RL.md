@@ -143,22 +143,69 @@ clip a to the action bounds
 - AWAC drops the per-state normalizer `Z(s)`. This changes only how much each *state* counts in the loss, not which actions are preferred within a state.
 
 ### Current implementation
-- **Code:** `Aware_Minari/`
-  - `agents.py`: `Otter` agent with the EqM-AWAC losses.
-  - `actor_models.py`: EqM samplers.
-  - `config.yaml`: hyperparameters.
-- **Data:** Minari datasets, currently `mujoco/halfcheetah/simple-v0`.
+- **Code:** `Aware_Minari/` (Minari data) and `Aware/` (D4RL data), same algorithm; see *Code structure* below.
+- **Data:** Minari datasets, currently `mujoco/halfcheetah/simple-v0`; D4RL `halfcheetah-medium-v2` for server runs.
 - **Gaussian AWAC reference:** `Awac_Minari.py` and `Offline Awac/`.
 - **Defaults at time of writing:**
   - Field schedule: truncated c with `a₀ = 0.8`, `λ = 8`.
   - Weights: `T = 1.0`, `w_max = 100`.
   - Sampler: Nesterov, `η = 0.01`, `K = 20`, momentum 0.3.
-  - Training: 4×512 MLPs, batch 256, lr 3e-4, target τ = 5e-3, 1M steps.
+  - Training: 4×256 MLPs, batch 256, lr 3e-4, target τ = 5e-3, 1M steps.
 - **Options already in the code:**
   - FINO noise injection.
   - Early-stopping samplers.
   - OOD-aware sampling: pick the candidate with the lowest final `‖f‖`, with moving-average or leaky-bucket scoring.
   - Reject-and-rank at evaluation: drop candidates above an OOD threshold, then pick by Q.
+
+### Code structure: `Aware/` and `Aware_Minari/`
+Both folders implement the **same algorithm** (Aware = EqM-AWAC). Only data loading and the environment API differ.
+
+**Files and responsibilities**
+
+| File | Responsible for | Same in both? |
+|---|---|---|
+| `main.py` | Entry point (Hydra): load data and env, normalize states, build networks, training loop, evaluation, W&B logging, checkpoints | **differs** (data/env only) |
+| `config.yaml` | All hyperparameters: W&B names, dataset, network sizes, optimization; `agent:` → `Otter`, `actor:` → `Actor` | **differs** (dataset, W&B names) |
+| `agents.py` | `Otter`, the learning algorithm: EqM loss (noise mixing, truncated `c(ρ)`, weighted MSE), advantage weights (`_offline_weights`), critic TD loss, soft target update, `update()`, checkpoint state | same |
+| `actor_models.py` | `Actor`: turns the EqM field into actions. `forward` (training: actions for V(s) and TD targets), `sample` (evaluation: 1 action via `_implicit`), `sample2` (N candidates + OOD filter + Q ranking). Samplers: `_implicit` (GD/NAG), `_implicit_stop`, `_implicit_OOD*`, `_implicit_langevin`, `_explicit` (energy-based) | same |
+| `critic_models.py` | `DeterministicCritic`: Q(s, a) MLP with Mish (the one used); `Critic`, `GaussianCritic` unused | same |
+| `buffer.py` | `ReplayBuffer`: whole dataset on the device; `load_minari_dataset` / `load_d4rl_dataset`; `sample()` returns `(s, a, r, s', truncations, terminals)` | same |
+| `logger.py` | `global_logger`: collects metrics during a step, averages them, one `wandb.log` per step | same |
+| `utils/networks.py` | `MLP` and `ConditionalMLP`, the EqM field f_θ(a\|s): input `[a, s]`, output in action space | same |
+| `utils/helper.py` | Reshaping for N candidate actions per state; `select_lowest_ood_actions` | same |
+| `minari_utils.py` | Minari only: download/load the dataset, recover the env, build transitions, reference scores | Minari only |
+
+**Plan of the code (one run)**
+```
+main.py
+ ├─ load data      Minari: prepare_minari_data()   |  D4RL: gym.make() + d4rl.qlearning_dataset()
+ ├─ normalize states, wrap env with the same normalization, fill ReplayBuffer
+ ├─ build  ConditionalMLP (EqM field) · 2× DeterministicCritic · Actor (sampler) · Otter (agent)
+ └─ for t = 0 … num_train_ops:
+      ├─ batch = buffer.sample()
+      ├─ Otter.update(batch)
+      │    ├─ critic:  a' = Actor(s')  (EqM sampling)  →  y = r + γ(1−d)·min Q̄(s', a')  →  MSE
+      │    ├─ actor:   V(s) from Actor(s);  w = exp((Q(s,a) − V(s)) / T)  →  weighted EqM loss on f_θ
+      │    └─ soft update of the target critics
+      ├─ logger.dump(t)  →  W&B: train/*, weighting/*
+      └─ every eval_frequency:  Actor.sample() at each env step  →  eval/score, eval/normalized_score
+```
+
+**Differences between the two folders**
+
+| | `Aware_Minari/` | `Aware/` |
+|---|---|---|
+| Data | Minari, via `minari_utils.prepare_minari_data` | D4RL, via `d4rl.qlearning_dataset` |
+| Environment | Gymnasium `HalfCheetah-v5` (new MuJoCo bindings) | old gym `halfcheetah-*-v2` (mujoco-py) |
+| Env API | `reset(seed=…)`; `step` returns 5 values | `env.seed()` + `reset()`; `step` returns 4 values |
+| Episode ends | `terminations`; truncations kept separately | `terminals`; timeouts already dropped by `qlearning_dataset` |
+| Normalized score | hard-coded D4RL references (fallback), **not comparable to papers** | D4RL's own `env.get_normalized_score`, **comparable to papers** |
+| Dependencies | `gymnasium`, `minari`, `mujoco` | `gym ≤ 0.23`, `d4rl`, `mujoco-py` + MuJoCo 2.1 |
+| Default dataset | `mujoco/halfcheetah/simple-v0` | `halfcheetah-medium-v2` |
+
+**Keeping them in sync:** an algorithm change must go into both folders. `agents.py`, `actor_models.py`, `critic_models.py`, `buffer.py`, `logger.py` and `utils/` must stay identical; check with `diff -q`.
+
+**Related files in `EqM_RL/`:** `Awac_Minari.py` (Gaussian AWAC baseline on Minari, single file, same W&B keys as Aware), `Offline Awac/` (older AWAC version), `play.py` (loads a Gaussian AWAC checkpoint).
 
 ### Side note: Minari vs D4RL datasets
 Minari is the maintained successor of D4RL, which is deprecated. Minari MuJoCo datasets are **regenerated, not copied** from D4RL, so their names and scores don't map one to one.
