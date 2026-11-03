@@ -411,7 +411,7 @@ At K = 100, the endpoints fall outside the action box for 11% (simple λ = 8), 8
 
 Order: #0, then #1–#3 together, then #4. All with 3 seeds.
 
-**Status (2026-11-03):** #0–#4 done; results in the next section. Two follow-up controls on D4RL medium-expert are prepared (`sweeps/exp3_d4rl_me_controls.yaml`) but not started.
+**Status (2026-11-03):** #0–#4 done, plus two follow-up controls on D4RL medium-expert (`sweeps/exp3_d4rl_me_controls.yaml`). Results in the next section.
 
 ### Experiment 3: results (3 seeds, 2026-11-03)
 > **Scope.** #1–#4 are done.
@@ -472,6 +472,36 @@ Order: #0, then #1–#3 together, then #4. All with 3 seeds.
 - **Still rising at 151k:** only Aware on medium-expert. AWAC is within ≈ 3% of its final score by 100k, and medium-replay has plateaued for both since ≈ 50k.
 - **The two columns differ in protocol** (temperature, depth, eval action; see Setup). CORL's `awac.py` logs no Q or weight statistics, so it has no row in the critic table below.
 
+**Follow-up: medium-expert controls** (W&B group `exp3_d4rl_me_controls`; Aware as in `exp3_d4rl_aware`, i.e. λ = 8, K = 20, η = 0.01; 151k steps, 3 seeds, 10 eval episodes; 6 runs in parallel, 72–75 min each)
+
+| run on `medium-expert-v2` | normalized score (raw) | seeds | Q / implied | notes |
+|---|---|---|---|---|
+| Aware, BC weights (all 1) | 50.1 ± 0.6 (5,937) | 49.8 / 49.6 / 50.9 | 1.3 | flat from 20k (5,701) to 150k (5,878) |
+| Aware, T = 1/3 | 53.4 ± 4.1 (6,350) | 51.7 / 59.1 / 49.5 | 1.9 | weights median ≈ 0, 4.3% at the cap |
+| Aware, T = 1 (#4) | 59.5 ± 8.0 (7,109) | 49.8 / 59.3 / 69.5 | 1.7 | still rising at 151k |
+| Gaussian AWAC, λ = 1/3 (#4) | **93.4 ± 0.2** (11,313) | 93.1 / 93.6 / 93.4 | – | |
+
+Reference points:
+- **Dataset halves:** medium 4,770 ± 356 (40.7); expert 10,656 ± 442 (88.1). The first 1,000 episodes are the medium policy, the last 1,000 the expert.
+- **CORL after 1M steps:** Gaussian BC 56.0 ± 7.4; "10% BC" (BC on the 10% best trajectories) 90.1 ± 2.5.
+
+**Sampler endpoints outside the action box vs the data at its bounds** (`sampler/clip_frac`, late training: share of action dimensions beyond [−1, 1] *before* clipping, on 256 dataset states × 8 samples. The data column is the share of dataset action dimensions with |a| ≥ 0.99, so the ratio is a proxy.)
+
+| run | result | endpoints outside the box | data at its bounds | ratio | Q / implied |
+|---|---|---|---|---|---|
+| Minari simple, λ = 2, η = 0.04 | good | 6.9% | 6–8% (Exp 2) | ≈ 1 | 1.0 |
+| Minari simple, BC weights | good | 3.7% | 6–8% (Exp 2) | ≈ 0.5 | 1.0 |
+| Minari medium, BC weights | good | 3.7% | 6–8% (Exp 2) | ≈ 0.5 | 1.05 |
+| Minari medium, λ = 4, K = 40 | fails | 12.3% | 6–8% (Exp 2) | ≈ 1.7 | 5.3 |
+| Minari medium, λ = 4, η = 0.02 | fails | 12.6% | 6–8% (Exp 2) | ≈ 1.8 | 4.6 |
+| D4RL medium-replay | good | 14.3% | 12.7% | 1.1 | 0.8 |
+| D4RL medium-expert, T = 1 | weak | 12.3% | 6.4% | 1.9 | 1.7 |
+| D4RL medium-expert, T = 1/3 | weak | 11.7% | 6.4% | 1.8 | 1.9 |
+| D4RL medium-expert, BC weights | BC level | 3.7% | 6.4% | 0.6 | 1.3 |
+
+- **Collapse is the same in good and bad runs.** The per-state sample spread is 0.059–0.068 in all three medium-expert runs, BC included, so collapse alone does not separate them.
+- **Leaving the box separates them.** With the same sampler settings (λ = 8, K = 20, η = 0.01 in all medium-expert runs), the weighted fields put about twice as many endpoint dimensions outside the box as the data has at its bounds. The BC field puts about half as many.
+
 **Critic and weights** (late training: mean over seeds of the last-20-eval means. The "effective batch share" of the weights is `mean² / (mean² + var)`; BC = 100%. BC runs still log the AWAC weights, but the loss doesn't use them.)
 
 | run | return | Q at dataset actions | Q implied by the eval return | Q / implied | weights median | effective batch share |
@@ -487,6 +517,8 @@ Order: #0, then #1–#3 together, then #4. All with 3 seeds.
 | medium, Gaussian AWAC | 7,207 | 1,216 | 721 | 1.7 | 0.61 | 16% |
 | D4RL medium-expert, Aware | 7,109 | 1,163 | 711 | 1.7 | 0.14 | **3.6%** |
 | D4RL medium-replay, Aware | 5,542 | 427 | 554 | 0.8 | 0.58 | 4.3% |
+| D4RL medium-expert, Aware, BC weights | 5,937 | 747 | 594 | 1.3 | – | 100% |
+| D4RL medium-expert, Aware, T = 1/3 | 6,350 | 1,195 | 635 | 1.9 | 0.00 | 6.6% (4.3% at the cap) |
 
 - **Per-state sample spread** (new log from #0): 0.07–0.14 in every Aware run, vs the datasets' ≈ 0.25–0.29 (Exp 2, diagnostic B). The collapse persists, and it is narrowest on D4RL medium-expert (0.068).
 
@@ -523,6 +555,24 @@ Order: #0, then #1–#3 together, then #4. All with 3 seeds.
    - **Collapse alone does not explain medium-expert.**
      - AWAC is evaluated with its Gaussian mean, so it also outputs one action per state, and it still scores 93.4.
      - What differs is where the weighted fit lands: AWAC's lands on the expert behavior, Aware's ends between the medium and expert returns.
+7. **Medium-expert controls: the gap is in the weighting, not in imitation.**
+   - **BC weights: 50.1.** That is close to CORL's Gaussian BC (56.0 ± 7.4, though after 1M steps), between the medium (40.7) and expert (88.1) halves of the data, nearer the medium half. Imitation accounts for at most a few points of the gap to AWAC.
+   - **What the weighting adds:** +9 points for Aware (50.1 → 59.5), vs ≈ +37 for the Gaussian (CORL BC 56.0 → AWAC 93.4).
+   - **T = 1/3: 53.4,** no better than T = 1 (59.5; the difference is not significant with 3 seeds).
+     - With T = 1/3, most weights are ≈ 0, so Aware copies the few samples per batch its critic ranks highest.
+     - Gaussian AWAC uses the same formula and temperature and reaches 93.4. Sharp weighting works when the ranking is right, so Aware's ranking picks out the wrong actions.
+8. **Open: is the critic the root cause, or the sampler (tangential drift / off-support endpoints)?**
+   - **The critic's ranking is the proximate cause.** Every failing run overestimates, and BC weights, which ignore the ranking, avoid the failure.
+   - **But the sampler endpoints track the failures too.** In every failing or weak run, the endpoints leave the action box ≈ 2× as often as the data sits at its bounds. In every good run the rate is ≤ 1.1× (table above).
+     - V(s) and the TD targets query the critic at exactly these endpoints, so off-support samples could be what makes it overestimate.
+     - The overestimated values then sharpen the weights onto the wrong actions, which reshapes the field. That is a possible feedback loop.
+   - **What existing data says about "too many / too big steps":**
+     - On Minari (Exp 2, diagnostic A/B), more steps never hurt (flat from K = 20 to 1000; movement → 0).
+     - But Minari has one behavior policy per dataset, and medium-expert is the first per-state multimodal data, where the low-dimensional caveat predicts drift and cancellation to bite. So drift is untested exactly where it matters.
+   - **How to separate the two:** evaluate the medium-expert checkpoints with different step budgets (next steps).
+     - If off-box endpoints and Q at the sampler's outputs grow with `η·K`, and fewer or smaller steps help, the sampler is the driver.
+     - If the endpoints are already off-support at moderate K, it is the learned field.
+     - If neither holds, it is the critic itself.
 
 **Answers to the Experiment 3 questions**
 - **#1, does the weighting help?** A little on simple (+300–400). On medium it is what breaks Aware: BC 11,916 vs weighted λ = 8 1,280.
@@ -531,14 +581,21 @@ Order: #0, then #1–#3 together, then #4. All with 3 seeds.
 - **#3, does a Gaussian policy inherit the flips?** Still open. `Awac_Minari.py` logs only the mean of the 10 episodes, so the checkpoints in `/workspace/Trained_Models/checkpoints/AWAC_env_namemedium-v0_*` need a re-evaluation with the diagnostic C rollout code.
 - **#4, does EqM's expressiveness matter, and does collapse cost return?**
   - Not on these datasets: EqM loses to the Gaussian on medium-expert (59.5 vs 93.4) and wins slightly on medium-replay (46.9 vs 45.2).
-  - Both policies output one action per state at evaluation, so the medium-expert gap points to Aware's weighting and critic rather than to collapse. The controls below test this.
+  - Both policies output one action per state at evaluation, so collapse alone does not explain the medium-expert gap.
+  - The controls put the gap in the weighting, not in imitation: BC weights 50.1, T = 1/3 53.4.
+  - Open: whether the weighting fails because of the critic itself or because the sampler's off-support endpoints feed the critic (interpretation 8).
 
 **Next steps**
-- **Two controls on D4RL medium-expert.** Prepared and smoke-tested, not started: `sweeps/exp3_d4rl_me_controls.yaml`, group `exp3_d4rl_me_controls`, 6 runs, otherwise as `exp3_d4rl_aware`.
-  - **Aware with BC weights (all 1):** separates the actor from the weighting.
-    - Near CORL's BC (56): the EqM actor imitates as well as a Gaussian, and the gap to AWAC belongs to the weighting.
-    - Clearly below: the EqM actor itself struggles with the bimodal data.
-  - **Aware with T = 1/3**, CORL AWAC's tuned temperature: rules out the temperature difference between the two columns.
+- **Critic vs sampler drift on medium-expert** (diagnostics only, no retraining).
+  - Port `diagnostics/diag.py` to D4RL (`Aware/`, `hawk` env) and run it on the 9 medium-expert checkpoints (T = 1, T = 1/3, BC weights).
+  - Measure against K and η at fixed `η·K` and at larger `η·K`:
+    - return;
+    - endpoints outside the box;
+    - movement per step after convergence;
+    - distance to the nearest dataset action for the same state;
+    - Q at the sampler's outputs vs at dataset actions.
+- **IQL-style critic for Aware:** V(s) from dataset actions only (expectile regression), TD targets from V(s'), so the critic never queries EqM samples. If Aware then approaches AWAC on medium-v0 and medium-expert, the coupling between the critic and the sampler is the cause.
+- **EqM "10% BC" on medium-expert:** BC weights on the 10% best trajectories, with no critic. About 90 (CORL's Gaussian 10% BC: 90.1) would show the EqM actor and sampler can reproduce expert behavior on their own. Needs a small data-filtering option.
 - **Count flips** for Gaussian AWAC and for Aware with BC weights on medium (diagnostic C).
 - **Fix the weighting on medium.** BC works, and the weighting is what fails. Candidates:
   - softer weights (higher T);
