@@ -1,0 +1,21 @@
+# Experiment 3 follow-up (EqM_RL.md, "Experiment 3: results", next steps). Aware on D4RL
+# halfcheetah-medium-expert-v2, two controls for its gap to Gaussian AWAC (59.5 vs 93.4):
+#  - BC weights (all 1): is the EqM actor or the advantage weighting the problem?
+#    About 56 (CORL BC) points to the weighting.
+#  - temperature 1/3: CORL AWAC's tuned value; Aware's default is 1.
+# Otherwise as exp3_d4rl_aware.yaml (lambda 8, K 20, eta 0.01), 3 seeds, 151k steps,
+# 10 eval episodes. 6 runs, hawk env.
+#   python run_sweep.py sweeps/exp3_d4rl_me_controls.yaml
+target: aware
+parallel: 6
+
+fixed:
+  env_name: halfcheetah-medium-expert-v2
+  num_train_ops: 151000
+  n_test_episodes: 10
+
+grid:
+  - agent.weighting: bc
+    seed: [1, 2, 3]
+  - temperature: 0.3333
+    seed: [1, 2, 3]

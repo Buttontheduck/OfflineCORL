@@ -411,23 +411,24 @@ At K = 100, the endpoints fall outside the action box for 11% (simple λ = 8), 8
 
 Order: #0, then #1–#3 together, then #4. All with 3 seeds.
 
-**Status (2026-11-03):** #0–#3 done; #4 done for Aware, AWAC re-run pending. Results in the next section.
+**Status (2026-11-03):** #0–#4 done; results in the next section. Two follow-up controls on D4RL medium-expert are prepared (`sweeps/exp3_d4rl_me_controls.yaml`) but not started.
 
 ### Experiment 3: results (3 seeds, 2026-11-03)
-> **Scope.** #1–#3 and the Aware half of #4 are done.
-> - **The AWAC half of #4 (`exp3_d4rl_awac`) crashed at start-up in all 6 runs**, before training.
+> **Scope.** #1–#4 are done.
+> - **The AWAC half of #4 (`exp3_d4rl_awac`) first crashed at start-up in all 6 runs**, before training, and was re-run after a fix.
 >   - Cause: CORL's `algorithms/offline/awac.py` called `wandb.run.save()` with no argument, which wandb 0.26 rejects (`Run.save() missing 1 required positional argument: 'glob_str'`).
 >   - The earlier smoke test missed it because it ran without W&B.
->   - The line is now removed (the other CORL scripts still have it). The re-run is pending; it takes ≈ 50 min with the 6 runs in parallel on an otherwise idle GPU.
+>   - Fix: the line is removed from `awac.py` (the other CORL scripts still have it). The re-run took 46–47 min with the 6 runs in parallel on an otherwise idle GPU.
 > - **Exp 2 rows are for reference only.** They used 120k steps and **1** eval episode; Experiment 3 uses 151k steps and 10 eval episodes.
 
-**Setup** (W&B project `E`; groups `exp3_minari`, `exp3_awac_minari`, `exp3_d4rl_aware`; sweep files `sweeps/exp3_*.yaml`)
+**Setup** (W&B project `E`; groups `exp3_minari`, `exp3_awac_minari`, `exp3_d4rl_aware`, `exp3_d4rl_awac`; sweep files `sweeps/exp3_*.yaml`)
 
 | | |
 |---|---|
-| Code | #1, #2: `Aware_Minari/`; #3: `Awac_Minari.py` (both `eagle` env); #4: `Aware/` (`hawk` env); all run with `run_sweep.py` |
+| Code | #1, #2: `Aware_Minari/`; #3: `Awac_Minari.py` (both `eagle` env); #4: `Aware/` and CORL's `algorithms/offline/awac.py` (both `hawk` env); all run with `run_sweep.py` |
 | Fixed | 151k steps; eval every 1k steps with **10 episodes**; 3 seeds; everything else at the config defaults, as in Exp 2 |
-| Wall-clock | #1–#3: 21 runs at once; #1/#2 took 98–101 min (K = 40: 136–139 min), #3 took 78–79 min. #4 Aware: 69–72 min |
+| #4 AWAC | CORL's tuned HalfCheetah temperature λ = 1/3 (Aware: T = 1); 3×256 MLPs (Aware: 4×256); evaluates with the Gaussian mean (Aware: one EqM sample from fresh noise); buffer 2M |
+| Wall-clock | #1–#3: 21 runs at once; #1/#2 took 98–101 min (K = 40: 136–139 min), #3 took 78–79 min. #4: Aware 69–72 min (GPU shared with the three K = 40 runs of #2 for the first ≈ 38 min), AWAC 46–47 min (GPU to itself) |
 
 **Results: Minari HalfCheetah** (eval return: mean of the last 20 evals, 131k–151k, then mean ± std over seeds)
 
@@ -446,18 +447,30 @@ Order: #0, then #1–#3 together, then #4. All with 3 seeds.
 - **At equal steps (100k)**, simple λ = 2 with η = 0.04 and Exp 2's simple λ = 8 both score 7,371. On medium λ = 4, the converged-sampler runs score 1,124 (K = 40) and 1,399 (η = 0.02), vs 1,764 for Exp 2's K = 20.
 - **Still rising at 151k:** medium λ = 4 with a converged sampler (≈ 1,100–1,400 at 100k, ≈ 3,000–3,300 at 150k). Everything else on Minari has plateaued.
 
-**Results: D4RL HalfCheetah, Aware only** (D4RL normalized score; dataset statistics computed from the local hdf5 files; CORL numbers are the README's "Last Scores" after 1M steps)
+**Results: D4RL HalfCheetah (#4)** (D4RL normalized score, raw return in brackets: mean of the last 20 evals, then mean ± std over seeds. Dataset statistics computed from the local hdf5 files; CORL numbers are the README's "Last Scores" after 1M steps.)
 
-| dataset | Aware (151k) | raw return | dataset average | best dataset episode | CORL AWAC (1M) | CORL BC (1M) |
+| dataset | Aware (151k) | Gaussian AWAC (151k) | dataset average | best dataset episode | CORL AWAC (1M) | CORL BC (1M) |
 |---|---|---|---|---|---|---|
-| `medium-expert-v2` | 59.5 ± 8.0 | 7,109 ± 998 | 64.4 | 92.9 | 95.0 ± 0.6 | 56.0 ± 7.4 |
-| `medium-replay-v2` | **46.9 ± 0.3** | 5,542 ± 36 | 27.2 | 42.4 | 45.1 ± 0.9 | 35.7 ± 2.3 |
+| `medium-expert-v2` | 59.5 ± 8.0 (7,109) | **93.4 ± 0.2** (11,313) | 64.4 | 92.9 | 95.0 ± 0.6 | 56.0 ± 7.4 |
+| `medium-replay-v2` | **46.9 ± 0.3** (5,542) | 45.2 ± 0.3 (5,336) | 27.2 | 42.4 | 45.1 ± 0.9 | 35.7 ± 2.3 |
+
+**Learning curves** (raw return: mean of the evals in the 5k steps up to each point, mean over seeds; last column: std over the last 20 evals, i.e. eval-to-eval noise)
+
+| | 20k | 50k | 100k | 150k | eval noise |
+|---|---|---|---|---|---|
+| medium-expert, Aware | 734 | 4,390 | 5,820 | 7,480 | 1,128 |
+| medium-expert, AWAC | 7,783 | 10,205 | 11,013 | 11,297 | 228 |
+| medium-replay, Aware | 4,886 | 5,394 | 5,537 | 5,538 | 93 |
+| medium-replay, AWAC | 5,043 | 5,216 | 5,321 | 5,333 | 56 |
 
 - **The datasets:**
   - `medium-expert`: 2,000 episodes; returns 7,713 ± 2,970, median 5,246, p95 10,906 (bimodal: medium and expert episodes).
   - `medium-replay`: 202 episodes; returns 3,093 ± 1,681, best 4,985.
-- **Seeds and episodes:** medium-expert seeds give 5,904 / 7,077 / 8,347, and within one eval the 10 episodes spread widely (std 2,342, min 2,765). medium-replay is tight (episode std 121).
-- **Learning curves:** medium-expert is still rising (5,820 at 100k → 7,480 at 150k); medium-replay has plateaued since ≈ 50k.
+- **Seeds:**
+  - Aware: medium-expert 5,904 / 7,077 / 8,347, and within one eval the 10 episodes spread widely (std 2,342, min 2,765). medium-replay is tight (episode std 121).
+  - AWAC: normalized 93.1 / 93.6 / 93.4 on medium-expert and 45.0 / 45.0 / 45.7 on medium-replay. `awac.py` logs only the mean over the 10 episodes.
+- **Still rising at 151k:** only Aware on medium-expert. AWAC is within ≈ 3% of its final score by 100k, and medium-replay has plateaued for both since ≈ 50k.
+- **The two columns differ in protocol** (temperature, depth, eval action; see Setup). CORL's `awac.py` logs no Q or weight statistics, so it has no row in the critic table below.
 
 **Critic and weights** (late training: mean over seeds of the last-20-eval means. The "effective batch share" of the weights is `mean² / (mean² + var)`; BC = 100%. BC runs still log the AWAC weights, but the loss doesn't use them.)
 
@@ -472,8 +485,8 @@ Order: #0, then #1–#3 together, then #4. All with 3 seeds.
 | medium, λ = 4, K = 20 (Exp 2) | 1,969 | 695 | 197 | 3.5 | 18.0 | 49% (39% at the cap) |
 | medium, λ = 8, K = 20 (Exp 2) | 1,280 | 1,435 | 128 | **14** | 0.32 | **2.9%** |
 | medium, Gaussian AWAC | 7,207 | 1,216 | 721 | 1.7 | 0.61 | 16% |
-| D4RL medium-expert | 7,109 | 1,163 | 711 | 1.7 | 0.14 | **3.6%** |
-| D4RL medium-replay | 5,542 | 427 | 554 | 0.8 | 0.58 | 4.3% |
+| D4RL medium-expert, Aware | 7,109 | 1,163 | 711 | 1.7 | 0.14 | **3.6%** |
+| D4RL medium-replay, Aware | 5,542 | 427 | 554 | 0.8 | 0.58 | 4.3% |
 
 - **Per-state sample spread** (new log from #0): 0.07–0.14 in every Aware run, vs the datasets' ≈ 0.25–0.29 (Exp 2, diagnostic B). The collapse persists, and it is narrowest on D4RL medium-expert (0.068).
 
@@ -497,22 +510,35 @@ Order: #0, then #1–#3 together, then #4. All with 3 seeds.
    - **medium:** it reaches only 7,207 (60% of the data). Its critic overestimates too (1.7×), but its weights keep a larger effective batch (16%).
    - Its evals swing widely: std over the last 20 evals is 1,797, and each seed's best eval is 9,805–11,814.
    - So the weighting problem on medium is not specific to EqM. The EqM actor is hit much harder by it, yet the EqM actor with BC weights beats Gaussian AWAC by ≈ 4,700.
-6. **D4RL (#4, Aware half):**
-   - **medium-replay is a success.** 46.9 is above the best dataset episode (42.4), and at 15% of the steps it matches CORL AWAC's 1M-step score (45.1).
-   - **medium-expert is weak.** 59.5 is below the dataset average (64.4), at the level of CORL's BC (56.0), and far below CORL AWAC (95.0).
-   - medium-expert shows medium-v0's signature: 1.7× overestimation, ≈ 3.6% effective batch, the sharpest weights of all runs (median 0.14), and large seed and episode variance.
-   - It is still improving at 151k.
-   - Whether expressiveness or collapse costs return can't be judged until the AWAC runs finish (same data and steps).
+6. **D4RL (#4): Gaussian AWAC wins clearly on medium-expert; Aware wins slightly on medium-replay.**
+   - **The baseline is sound.** After 151k steps, AWAC (93.4 and 45.2) already matches CORL's published 1M-step scores (95.0 and 45.1).
+   - **medium-expert: AWAC 93.4 vs Aware 59.5.**
+     - AWAC reaches the best dataset episode (92.9), i.e. it imitates the expert half of the data.
+     - Aware ends between CORL's BC (56.0) and the dataset average (64.4).
+     - Aware also learns far more slowly (734 vs 7,783 at 20k), varies more across seeds (std 8.0 vs 0.2), its evals swing ≈ 5× more, and it is still rising at 151k.
+   - **medium-replay: Aware 46.9 vs AWAC 45.2.** The gap is small but consistent across seeds (std 0.3 each). Both are above the best dataset episode (42.4), and Aware matches CORL AWAC's 1M-step score at 15% of the steps.
+   - **The gap follows Aware's critic, as on Minari medium.**
+     - Where it overestimates, Aware loses. On medium-expert: 1.7×, ≈ 3.6% effective batch, and the sharpest weights of all runs (median 0.14).
+     - Where it is calibrated, Aware matches or beats AWAC. On medium-replay: 0.8×.
+   - **Collapse alone does not explain medium-expert.**
+     - AWAC is evaluated with its Gaussian mean, so it also outputs one action per state, and it still scores 93.4.
+     - What differs is where the weighted fit lands: AWAC's lands on the expert behavior, Aware's ends between the medium and expert returns.
 
 **Answers to the Experiment 3 questions**
 - **#1, does the weighting help?** A little on simple (+300–400). On medium it is what breaks Aware: BC 11,916 vs weighted λ = 8 1,280.
 - **#2, does the `η·λ·K` rule hold in training?** Yes.
 - **#2, does a converged critic help medium?** No.
 - **#3, does a Gaussian policy inherit the flips?** Still open. `Awac_Minari.py` logs only the mean of the 10 episodes, so the checkpoints in `/workspace/Trained_Models/checkpoints/AWAC_env_namemedium-v0_*` need a re-evaluation with the diagnostic C rollout code.
-- **#4:** waiting for the AWAC re-run.
+- **#4, does EqM's expressiveness matter, and does collapse cost return?**
+  - Not on these datasets: EqM loses to the Gaussian on medium-expert (59.5 vs 93.4) and wins slightly on medium-replay (46.9 vs 45.2).
+  - Both policies output one action per state at evaluation, so the medium-expert gap points to Aware's weighting and critic rather than to collapse. The controls below test this.
 
 **Next steps**
-- **Re-run `exp3_d4rl_awac`** with the fixed `awac.py`. First delete the 6 crashed runs from W&B group `exp3_d4rl_awac`.
+- **Two controls on D4RL medium-expert.** Prepared and smoke-tested, not started: `sweeps/exp3_d4rl_me_controls.yaml`, group `exp3_d4rl_me_controls`, 6 runs, otherwise as `exp3_d4rl_aware`.
+  - **Aware with BC weights (all 1):** separates the actor from the weighting.
+    - Near CORL's BC (56): the EqM actor imitates as well as a Gaussian, and the gap to AWAC belongs to the weighting.
+    - Clearly below: the EqM actor itself struggles with the bimodal data.
+  - **Aware with T = 1/3**, CORL AWAC's tuned temperature: rules out the temperature difference between the two columns.
 - **Count flips** for Gaussian AWAC and for Aware with BC weights on medium (diagnostic C).
 - **Fix the weighting on medium.** BC works, and the weighting is what fails. Candidates:
   - softer weights (higher T);
