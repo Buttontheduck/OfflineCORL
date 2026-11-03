@@ -1,0 +1,29 @@
+# Experiment 3, steps #1 and #2 (EqM_RL.md). Aware on Minari HalfCheetah, 3 seeds, 151k steps,
+# 10 eval episodes. 15 runs, eagle env. Run together with exp3_awac_minari.yaml (#3).
+#   python run_sweep.py sweeps/exp3_minari.yaml
+target: aware_minari
+parallel: 15
+
+fixed:
+  num_train_ops: 151000
+  n_test_episodes: 10
+
+grid:
+  # #2: train with a converged sampler (eta * lambda * K = 1.6, like lambda 8 / K 20)
+  - env_name: mujoco/halfcheetah/medium-v0
+    agent.scale_gradient: 4.0
+    actor.num_step: 40
+    seed: [1, 2, 3]
+  - env_name: mujoco/halfcheetah/medium-v0
+    agent.scale_gradient: 4.0
+    actor.step_size: 0.02
+    seed: [1, 2, 3]
+  - env_name: mujoco/halfcheetah/simple-v0
+    agent.scale_gradient: 2.0
+    actor.step_size: 0.04
+    seed: [1, 2, 3]
+  # #1: BC ablation (all advantage weights 1), lambda 8, K 20
+  - env_name: [mujoco/halfcheetah/simple-v0, mujoco/halfcheetah/medium-v0]
+    agent.scale_gradient: 8.0
+    agent.weighting: bc
+    seed: [1, 2, 3]

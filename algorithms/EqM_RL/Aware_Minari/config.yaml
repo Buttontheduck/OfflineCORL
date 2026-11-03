@@ -28,8 +28,10 @@ temperature: 1.0
 # training flags and evaluation
 normalize_reward: false
 eval_frequency: 1000
-n_test_episodes: 1
+n_test_episodes: 10       # eval episodes, run side by side (batched sampler), so 10 cost about as much as 1
 num_actions_inference: 1
+diag_states: 256          # dataset states for the sampler/* logs at each eval (0 = off)
+diag_samples: 8           # samples per state for those logs
 
 # saving and reproducibility
 checkpoints_path: "/workspace/Trained_Models/checkpoints/"   # null = no checkpoints
@@ -47,6 +49,7 @@ agent:
   scale_gradient: 8.0
   num_actions: 1
   fino_knob: 0.1
+  weighting: 'awac'   # 'awac' = exp(A/T) weights; 'bc' = all weights 1 (behavior cloning ablation)
 
 
 actor: 

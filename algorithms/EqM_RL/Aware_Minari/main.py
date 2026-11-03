@@ -136,6 +136,20 @@ def train(cfg: DictConfig):
         dataset["next_observations"], state_mean, state_std
     )
     env = wrap_env(env, state_mean=state_mean, state_std=state_std)
+    # One env per eval episode, so the episodes run side by side (see eval_actor)
+    eval_envs = [env] + [
+        wrap_env(minari_dataset.recover_environment(), state_mean=state_mean, state_std=state_std)
+        for _ in range(cfg.n_test_episodes - 1)
+    ]
+
+    # Fixed dataset states for the sampler/* logs at each eval
+    diag_idx = np.random.default_rng(0).choice(
+        len(dataset["observations"]), size=min(cfg.diag_states, len(dataset["observations"])), replace=False
+    )
+    diag_states = torch.tensor(dataset["observations"][diag_idx], dtype=torch.float32, device=cfg.device)
+    diag_actions = torch.tensor(dataset["actions"][diag_idx], dtype=torch.float32, device=cfg.device)
+    diag_generator = torch.Generator(device=cfg.device).manual_seed(0)
+
     replay_buffer = ReplayBuffer(
         state_dim,
         action_dim,
@@ -197,23 +211,24 @@ def train(cfg: DictConfig):
         )
 
     @torch.no_grad()
-    def eval_actor(env: gym.Env, n_episodes: int, seed: int) -> np.ndarray:
+    def eval_actor(envs: list, seed: int) -> np.ndarray:
+        """One episode per env (seeds seed, seed+1, ...), run side by side: at every step the
+        sampler gets the states of all unfinished episodes as one batch, so 10 episodes cost
+        about as much as one."""
         actor.eval()
-        episode_rewards = []
-        for i in range(n_episodes):
-            state, _ = env.reset(seed=seed + i)
-            done = False
-            episode_reward = 0.0
-            while not done:
-                action = actor.sample(state)
-                action = np.squeeze(action, axis=0)
-                state, reward, terminated, truncated, _ = env.step(action)
-                done = terminated or truncated
-                episode_reward += reward
-            episode_rewards.append(episode_reward)
+        states = [e.reset(seed=seed + i)[0] for i, e in enumerate(envs)]
+        episode_rewards = np.zeros(len(envs))
+        done = np.zeros(len(envs), dtype=bool)
+        while not done.all():
+            active = np.flatnonzero(~done)
+            actions = actor.sample(np.stack([states[i] for i in active]))
+            for action, i in zip(actions, active):
+                states[i], reward, terminated, truncated, _ = envs[i].step(action)
+                episode_rewards[i] += reward
+                done[i] = terminated or truncated
 
         actor.train()
-        return np.asarray(episode_rewards)
+        return episode_rewards
     
 
     wandb_init(OmegaConf.to_container(cfg, resolve=True))
@@ -232,14 +247,22 @@ def train(cfg: DictConfig):
                 gl.log(f"train/{key}", val)
             gl.dump(step=t)
             if (t) % cfg.eval_frequency == 0:
-                eval_scores = eval_actor(env, cfg.n_test_episodes, cfg.test_seed)
+                eval_scores = eval_actor(eval_envs, cfg.test_seed)
 
                 gl.log("eval/score", eval_scores.mean())
+                gl.log("eval/score_std", eval_scores.std())
+                gl.log("eval/score_min", eval_scores.min())
                 normalized_eval_scores = minari_normalized_score(
                     eval_scores.mean(), ref_scores
                 )
                 gl.log("eval/normalized_score", normalized_eval_scores)
-                
+                if cfg.diag_states > 0:
+                    sampler_stats = actor.diagnostics(
+                        diag_states, diag_actions, n_samples=cfg.diag_samples, generator=diag_generator
+                    )
+                    for key, val in sampler_stats.items():
+                        gl.log(f"sampler/{key}", val)
+
                 gl.dump(step=t)
 
                 if getattr(cfg, "actual_checkpoints_path", None) is not None:

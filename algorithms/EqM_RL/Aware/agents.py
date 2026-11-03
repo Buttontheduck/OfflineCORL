@@ -46,8 +46,9 @@ class Otter(nn.Module):
         scale_gradient: float = 4.0,
         num_actions: int = 10,
         fino_knob: float = 0.1,
-        **kwargs 
-        
+        weighting: str = "awac",
+        **kwargs
+
     ):
         super().__init__()
         self._model = model
@@ -75,7 +76,13 @@ class Otter(nn.Module):
         self.fino_knob = fino_knob
 
         self.num_actions = num_actions
-        
+
+        # 'awac': weights exp(A/T) clipped at exp_adv_max. 'bc': every weight is 1 (behavior
+        # cloning ablation); the advantage statistics are still computed and logged.
+        if weighting not in ("awac", "bc"):
+            raise ValueError(f"weighting must be 'awac' or 'bc', got {weighting!r}")
+        self.weighting = weighting
+
         
         
 
@@ -176,6 +183,8 @@ class Otter(nn.Module):
         pred_grad = self._model(noisy_action,states)
         
         weights = self._offline_weights(states=states, actions= actions, num_actions=self.num_actions)
+        if self.weighting == "bc":
+            weights = torch.ones_like(weights)
 
         loss_per_sample_and_dim = F.mse_loss(pred_grad, scaled_target_grad, reduction='none') # Returns (B,A), loss for each sample and each action dimension 
         loss_per_sample = loss_per_sample_and_dim.sum(dim=-1, keepdim=True) # Returns (B,1), loss for each gradient prediction

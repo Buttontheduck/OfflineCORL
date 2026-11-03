@@ -1,0 +1,13 @@
+# Experiment 3, step #3 (EqM_RL.md). Gaussian AWAC (Awac_Minari.py) on Minari HalfCheetah
+# simple-v0 and medium-v0, 3 seeds, 151k steps, 10 eval episodes. 6 runs, eagle env.
+#   python run_sweep.py sweeps/exp3_awac_minari.yaml
+target: awac_minari
+parallel: 6
+
+fixed:
+  num_train_ops: 151000
+  n_test_episodes: 10
+
+grid:
+  env_name: [mujoco/halfcheetah/simple-v0, mujoco/halfcheetah/medium-v0]
+  seed: [1, 2, 3]

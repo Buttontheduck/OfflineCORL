@@ -195,6 +195,38 @@ class Actor(nn.Module):
             self.model.train(model_was_training)
 
     @torch.no_grad()
+    def diagnostics(self, states: torch.Tensor, actions: torch.Tensor, n_samples: int = 8,
+                    generator: torch.Generator = None) -> dict:
+        """
+        Convergence and collapse check of the eval sampler (_implicit) on fixed dataset states.
+        Draws n_samples actions per state from fresh noise (from `generator`, so the global
+        RNG and therefore training are not affected) and returns:
+          f_norm_final: mean ||f|| at the sampler's endpoints (about 0 once converged)
+          f_norm_data:  mean ||f|| at the dataset actions (about 0 only if data are equilibria)
+          spread:       per-dim std across one state's samples, averaged (about 0 = collapse)
+          clip_frac:    fraction of action dims outside the bounds before clipping
+        """
+        model_was_training = self.model.training
+        self.model.eval()
+        try:
+            n_states = states.shape[0]
+            states_rep = states.repeat_interleave(n_samples, dim=0)
+            x0 = torch.randn((n_states * n_samples, self.action_dim), device=states.device,
+                             generator=generator)
+            x = self._implicit(x=x0, state=states_rep)
+            outside = (x < self.min_action) | (x > self.max_action)
+            x_clipped = torch.clamp(x, min=self.min_action, max=self.max_action)
+            spread = x_clipped.view(n_states, n_samples, -1).std(dim=1).mean()
+            return {
+                "f_norm_final": self.model(x, states_rep).norm(dim=-1).mean().item(),
+                "f_norm_data": self.model(actions, states).norm(dim=-1).mean().item(),
+                "spread": spread.item(),
+                "clip_frac": outside.float().mean().item(),
+            }
+        finally:
+            self.model.train(model_was_training)
+
+    @torch.no_grad()
     def _reject_and_rank(self, actions: torch.Tensor, ood_scores: torch.Tensor, state_tensor: torch.Tensor) -> torch.Tensor:
         """
         Internal method. Evaluates Q-values, rejects actions above the OOD threshold, 

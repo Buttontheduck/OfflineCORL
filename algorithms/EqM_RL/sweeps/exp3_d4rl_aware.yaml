@@ -1,0 +1,15 @@
+# Experiment 3, step #4 (EqM_RL.md). Aware on D4RL HalfCheetah mixed-policy data
+# (medium-expert = medium + expert policies; medium-replay = a SAC training run's replay buffer),
+# config defaults (lambda 8, K 20, eta 0.01: a converged sampler), 3 seeds, 151k steps,
+# 10 eval episodes. 6 runs, hawk env. Compare with exp3_d4rl_awac.yaml.
+#   python run_sweep.py sweeps/exp3_d4rl_aware.yaml
+target: aware
+parallel: 6
+
+fixed:
+  num_train_ops: 151000
+  n_test_episodes: 10
+
+grid:
+  env_name: [halfcheetah-medium-expert-v2, halfcheetah-medium-replay-v2]
+  seed: [1, 2, 3]

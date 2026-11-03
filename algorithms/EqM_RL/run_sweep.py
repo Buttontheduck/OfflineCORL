@@ -43,6 +43,9 @@ TARGETS = {
     # Gaussian AWAC baseline on Minari (pyrallis command line)
     "awac_minari": dict(script=HERE / "Awac_Minari.py", conda_env="eagle",
                         style="pyrallis", data="minari", name_prefix="AWAC"),
+    # CORL's Gaussian AWAC on D4RL (algorithms/offline/awac.py, pyrallis command line)
+    "awac_d4rl": dict(script=HERE.parent / "offline" / "awac.py", conda_env="hawk",
+                      style="pyrallis", data="d4rl", name_prefix="AWAC"),
 }
 SWEEP_KEYS = {"target", "parallel", "stagger", "conda_env", "fixed", "grid"}
 MUJOCO_BIN = Path.home() / ".mujoco" / "mujoco210" / "bin"

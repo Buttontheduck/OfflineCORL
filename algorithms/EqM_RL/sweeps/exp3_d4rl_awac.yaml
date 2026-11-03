@@ -1,0 +1,19 @@
+# Experiment 3, step #4 (EqM_RL.md). CORL's Gaussian AWAC (algorithms/offline/awac.py) on the
+# same D4RL data as exp3_d4rl_aware.yaml, with CORL's tuned HalfCheetah lambda
+# (configs/offline/awac/halfcheetah/*.yaml), 3 seeds, 151k steps, 10 eval episodes. 6 runs, hawk env.
+#   python run_sweep.py sweeps/exp3_d4rl_awac.yaml
+target: awac_d4rl
+parallel: 6
+
+fixed:
+  project: E                      # awac.py defaults to project CORL
+  num_train_ops: 151000
+  n_test_episodes: 10
+  awac_lambda: 0.3333             # CORL's tuned value for HalfCheetah
+  buffer_size: 2000000            # CORL's config uses 10M; medium-expert has 2M transitions
+  deterministic_torch: false      # true needs CUBLAS_WORKSPACE_CONFIG on CUDA
+  checkpoints_path: /workspace/Trained_Models/checkpoints/
+
+grid:
+  env_name: [halfcheetah-medium-expert-v2, halfcheetah-medium-replay-v2]
+  seed: [1, 2, 3]
