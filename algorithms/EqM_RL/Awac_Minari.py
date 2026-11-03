@@ -41,7 +41,7 @@ class TrainConfig:
     # between behaviour cloning and Q-value maximization
     awac_lambda: float = 1.0
     # total number of gradient updated during training
-    num_train_ops: int = 1_000_000
+    num_train_ops: int = 120_000
     # training batch size
     batch_size: int = 256
     # maximum size of the replay buffer
@@ -54,9 +54,7 @@ class TrainConfig:
     # number of episodes to run during evaluation
     n_test_episodes: int = 10
     # path for checkpoints saving, optional
-    checkpoints_path: Optional[str] = (
-        "/Users/batin13/Desktop/RL Projects/Experimental/EqM based/OfflineCORL/algorithms/Eagle/checkpoints/"
-    )
+    checkpoints_path: Optional[str] = "/workspace/Trained_Models/checkpoints/"
     # configure PyTorch to use deterministic algorithms instead
     # of nondeterministic ones
     deterministic_torch: bool = False
@@ -65,10 +63,11 @@ class TrainConfig:
     # evaluation random seed
     test_seed: int = 69
     # training device
-    device: str = "cpu"
+    device: str = "cuda"
 
     def __post_init__(self):
-        self.name = f"{self.name}-{self.env_name}-{str(uuid.uuid4())[:8]}"
+        safe_env_name = self.env_name.replace("/", "_")  # one checkpoint folder, not nested ones
+        self.name = f"{self.name}-{safe_env_name}-{str(uuid.uuid4())[:8]}"
         if self.checkpoints_path is not None:
             self.checkpoints_path = os.path.join(self.checkpoints_path, self.name)
 

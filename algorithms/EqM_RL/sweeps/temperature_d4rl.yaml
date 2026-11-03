@@ -1,0 +1,13 @@
+# Aware on D4RL halfcheetah-medium-v2: advantage temperature T, 3 seeds.
+# Runs in the hawk env. 3 x 3 = 9 runs.
+#   python run_sweep.py sweeps/temperature_d4rl.yaml
+target: aware
+parallel: 16
+
+fixed:
+  env_name: halfcheetah-medium-v2
+  num_train_ops: 120001
+
+grid:
+  temperature: [0.3, 1.0, 3.0]
+  seed: [1, 2, 3]

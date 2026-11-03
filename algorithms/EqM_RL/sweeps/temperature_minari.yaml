@@ -1,0 +1,13 @@
+# Aware on Minari HalfCheetah simple-v0: advantage temperature T, 3 seeds.
+# Runs in the eagle env. 3 x 3 = 9 runs.
+#   python run_sweep.py sweeps/temperature_minari.yaml
+target: aware_minari
+parallel: 16
+
+fixed:
+  env_name: mujoco/halfcheetah/simple-v0
+  num_train_ops: 120001
+
+grid:
+  temperature: [0.3, 1.0, 3.0]
+  seed: [1, 2, 3]

@@ -11,7 +11,7 @@ seed: 42
 test_seed: 69
 deterministic_torch: false
 
-num_train_ops: 100001
+num_train_ops: 120001   # 120k updates; the extra 1 makes the last eval happen at step 120000
 
 # Network Architecture Hyperparameters
 hidden_dim: 256
@@ -32,8 +32,8 @@ n_test_episodes: 1
 num_actions_inference: 1
 
 # saving and reproducibility
-checkpoints_path: "/Users/batin13/Desktop/RL Projects/Trained_Models/checkpoints/"
-device: mps # or 'cuda'
+checkpoints_path: "/workspace/Trained_Models/checkpoints/"   # null = no checkpoints
+device: cuda # or 'mps' (Mac) / 'cpu'
 
 # Otter Agent Hyperparameters (Unpacked via **cfg.agent)
 agent:

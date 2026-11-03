@@ -1,0 +1,12 @@
+# Gaussian AWAC baseline (Awac_Minari.py) on Minari HalfCheetah simple-v0, 3 seeds.
+# Runs in the eagle env.
+#   python run_sweep.py sweeps/awac_baseline_minari.yaml
+target: awac_minari
+parallel: 16
+
+fixed:
+  env_name: mujoco/halfcheetah/simple-v0
+  num_train_ops: 120000      # Awac_Minari evaluates at (t + 1) % eval_frequency, so no +1 here
+
+grid:
+  seed: [1, 2, 3]
