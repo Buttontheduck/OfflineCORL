@@ -411,7 +411,7 @@ At K = 100, the endpoints fall outside the action box for 11% (simple λ = 8), 8
 
 Order: #0, then #1–#3 together, then #4. All with 3 seeds.
 
-**Status (2026-11-03):** #0–#4 done, plus two follow-up controls on D4RL medium-expert (`sweeps/exp3_d4rl_me_controls.yaml`). Results in the next section.
+**Status (2026-11-03):** #0–#4 done, plus two follow-up controls on D4RL medium-expert (`sweeps/exp3_d4rl_me_controls.yaml`) and the sampler-drift diagnostics. Results in the next two sections.
 
 ### Experiment 3: results (3 seeds, 2026-11-03)
 > **Scope.** #1–#4 are done.
@@ -573,6 +573,7 @@ Reference points:
      - If off-box endpoints and Q at the sampler's outputs grow with `η·K`, and fewer or smaller steps help, the sampler is the driver.
      - If the endpoints are already off-support at moderate K, it is the learned field.
      - If neither holds, it is the critic itself.
+   - **Answered by the drift diagnostics** (next section): neither. Extra or smaller steps change nothing once the sampler has converged, and both critics agree on the actions at dataset states. The weighted policy fails in closed loop: it flips.
 
 **Answers to the Experiment 3 questions**
 - **#1, does the weighting help?** A little on simple (+300–400). On medium it is what breaks Aware: BC 11,916 vs weighted λ = 8 1,280.
@@ -583,17 +584,10 @@ Reference points:
   - Not on these datasets: EqM loses to the Gaussian on medium-expert (59.5 vs 93.4) and wins slightly on medium-replay (46.9 vs 45.2).
   - Both policies output one action per state at evaluation, so collapse alone does not explain the medium-expert gap.
   - The controls put the gap in the weighting, not in imitation: BC weights 50.1, T = 1/3 53.4.
-  - Open: whether the weighting fails because of the critic itself or because the sampler's off-support endpoints feed the critic (interpretation 8).
+  - The drift diagnostics (next section) show that the weighting does reach the expert gait, but the weighted policy flips in ≈ 60% of episodes.
 
 **Next steps**
-- **Critic vs sampler drift on medium-expert** (diagnostics only, no retraining).
-  - Port `diagnostics/diag.py` to D4RL (`Aware/`, `hawk` env) and run it on the 9 medium-expert checkpoints (T = 1, T = 1/3, BC weights).
-  - Measure against K and η at fixed `η·K` and at larger `η·K`:
-    - return;
-    - endpoints outside the box;
-    - movement per step after convergence;
-    - distance to the nearest dataset action for the same state;
-    - Q at the sampler's outputs vs at dataset actions.
+- **Done: critic vs sampler drift on medium-expert.** See the next section, which also lists the next steps that follow from it.
 - **IQL-style critic for Aware:** V(s) from dataset actions only (expectile regression), TD targets from V(s'), so the critic never queries EqM samples. If Aware then approaches AWAC on medium-v0 and medium-expert, the coupling between the critic and the sampler is the cause.
 - **EqM "10% BC" on medium-expert:** BC weights on the 10% best trajectories, with no critic. About 90 (CORL's Gaussian 10% BC: 90.1) would show the EqM actor and sampler can reproduce expert behavior on their own. Needs a small data-filtering option.
 - **Count flips** for Gaussian AWAC and for Aware with BC weights on medium (diagnostic C).
@@ -601,6 +595,109 @@ Reference points:
   - softer weights (higher T);
   - normalizing the advantage per batch;
   - an in-sample V(s) (IQL expectile) instead of V from EqM samples, which is the IQL-critic alternative listed under *Later phases*.
+
+### Experiment 3 follow-up: sampler drift vs critic on medium-expert (3 seeds, 2026-11-03)
+> **Scope.** A re-evaluation of the final checkpoints; nothing was retrained. Changing the sampler at evaluation keeps the field and the critic that training produced with K = 20, η = 0.01, momentum 0.3.
+> - **Runs:** 12 Aware checkpoints, 3 seeds each: medium-expert with T = 1, T = 1/3 and BC weights, plus medium-replay with T = 1 (the control where Aware works).
+> - **Reference:** the CORL Gaussian AWAC run of the same seed; its policy, and its critic as an independent judge.
+> - **Code:** `diagnostics/drift.py` and `diagnostics/summarize_drift.py`; commands in [`diagnostics/README.md`](diagnostics/README.md).
+
+**Setup**
+
+| | |
+|---|---|
+| Rollouts | Sampler grid: η ∈ {0.0025, 0.005, 0.01, 0.02, 0.04, 0.08} × K ∈ {1, 2, 5, …, 1280} × momentum ∈ {0, 0.3, 0.6}. 20 episodes per setting, with the same start states for every setting (seeds 69–88), so 3,960 episodes per checkpoint, run side by side. |
+| Measured per episode | return; flip (body angle `obs[1]` beyond 2 rad); speed `obs[8]`; action dimensions outside the box before clipping; the critic's Q(s_t, a_t) vs the discounted return actually collected (first 500 steps). Every 100 steps: the distance of the visited state to the nearest dataset state, and of the executed action to the actions of the 32 nearest dataset states (both as ratios to the same distances for dataset states; 1 = as close as data). Also the share of those neighbours that come from the expert half (the "expert region"). |
+| Dataset states | 2,048 dataset states × 32 samples, tracked up to K = 2,560 for every (η, momentum): field norm, movement per step, outside the box, nearest-neighbour action distance (ratio), and Q(sample) − Q(data action) by Aware's critic and by the AWAC critic. |
+| Wall-clock | ≈ 25–28 min per checkpoint, 6 at a time. Each job holds 3,960 MuJoCo envs (≈ 20 GB RAM), and the container's 143 GB limit killed 6 of the first 12 parallel jobs, which then ran as a second wave. |
+
+**The data.**
+- **Medium and expert states don't overlap.** The 32 nearest neighbours of a medium state are 0.5% expert, and those of an expert state are 99.2% expert. So per state the data has one behavior, and there is no per-state multimodality for drift or cancellation to act on.
+- **Expert half:** 10,656 ± 442 return, 11.0 m/s, 3.0% of action dimensions at the bounds (|a| ≥ 0.99).
+- **Medium half:** 4,770, 5.2 m/s, 9.8% at the bounds.
+- **Flipped states are rare:** 0.25% of expert states and 0.61% of medium states.
+
+**Results: the trained sampler setting** (η = 0.01, K = 20, momentum 0.3; 3 seeds × 20 episodes per row; final checkpoints, so the returns differ somewhat from the training evals' last-20 means, e.g. 7,109 for T = 1)
+
+| run | return | flips | speed (m/s) | outside the box | critic Q / actual return | visited-state distance | expert region |
+|---|---|---|---|---|---|---|---|
+| Aware, T = 1 | 6,555 ± 1,467 | **57%** | 6.9 | 15.2% | 1.34 | 1.98 | 84% |
+| Aware, T = 1/3 | 6,040 ± 1,294 | **63%** | 6.4 | 15.5% | 1.46 | 2.13 | 78% |
+| Aware, BC weights | 5,858 ± 348 | 2% | 6.3 | 3.7% | 0.82 | 0.85 | 19% |
+| Gaussian AWAC (mean action) | **11,203 ± 275** | 2% | 11.6 | 1.3% | 0.90 | 0.71 | 94% |
+| *medium-replay:* Aware, T = 1 | 5,454 ± 88 | 2% | 5.9 | 15.9% | 0.96 | 0.66 | – |
+
+**Episodes by flip** (trained setting):
+- **T = 1:** the 26 episodes without a flip reach 9,718 at 10.2 m/s, 92% of the time in the expert region, close to the expert half (10,656, 11.0 m/s). The 34 with a flip average 4,136 at 4.4 m/s.
+- **T = 1/3:** 8,979 without a flip (22 episodes), 4,338 with one (38 episodes).
+
+**Results: more steps** (η = 0.01, momentum 0.3; return / flip rate)
+
+| K | 5 | 10 | **20** | 40 | 80 | 160 | 320 | 640 | 1280 |
+|---|---|---|---|---|---|---|---|---|---|
+| T = 1 | 279 / 7% | 3,242 / 3% | **6,555 / 57%** | 6,056 / 70% | 6,198 / 70% | 6,224 / 57% | 6,294 / 63% | 6,541 / 67% | 6,074 / 63% |
+| BC weights | 269 / 7% | 2,527 / 2% | **5,858 / 2%** | 5,591 / 0% | 5,646 / 0% | 6,209 / 2% | 5,429 / 7% | 5,421 / 0% | 5,861 / 0% |
+
+**Results: step size at the same budget, η·K = 0.2** (T = 1, momentum 0.3; return / flip rate)
+
+| η (K) | 0.0025 (80) | 0.005 (40) | **0.01 (20)** | 0.02 (10) | 0.04 (5) | 0.08 (any K ≥ 5) |
+|---|---|---|---|---|---|---|
+| T = 1 | 7,812 / 40% | 6,766 / 58% | **6,555 / 57%** | 7,562 / 43% | 6,989 / 58% | 4,171–5,732 / 28–45% |
+
+- **η = 0.08 never converges:** ‖f‖ ≈ 13 at the endpoints and 1.5 movement per step, i.e. oscillation. It costs every run, including BC (≈ 4.3k) and medium-replay (≈ 4.6k).
+- **Best sampler setting for T = 1 in the whole grid:** η = 0.02, K = 10, momentum 0.6 gives 8,294 with 32% flips. For T = 1/3: 7,169 with 35% flips.
+
+**Results: dataset states** (η = 0.01, momentum 0.3. nn ratio: distance to the nearest neighbour action divided by the same distance for the data action. ΔQ: Q(sample) − Q(data action), by Aware's critic / by the AWAC critic.)
+
+| run | K | ‖f‖ | movement / step | outside the box | nn ratio | ΔQ Aware / AWAC critic |
+|---|---|---|---|---|---|---|
+| T = 1 | 20 | 2.70 | 0.030 | 14.4% | 1.00 | +3.9 / +4.4 |
+| T = 1 | 80 | 0.03 | 0.0003 | 21.3% | 0.96 | +4.0 / +4.6 |
+| T = 1 | 2,560 | 0.00 | 0.0000 | 21.3% | 0.96 | +4.0 / +4.6 |
+| BC weights | 20 | 2.30 | 0.025 | 2.8% | 0.80 | +0.4 / +0.4 |
+| BC weights | 2,560 | 0.00 | 0.0000 | 4.6% | 0.77 | +0.4 / +0.5 |
+| Gaussian AWAC (mean action) | – | – | – | 2.6% | 0.84 | +1.9 / +3.2 |
+
+T = 1/3 behaves like T = 1: 17.2% outside the box at convergence, nn ratio 0.95, ΔQ +4.5 / +4.6.
+
+**Interpretation**
+1. **Too many steps are ruled out.**
+   - On dataset states the sampler converges and stops: ‖f‖ → 0 and movement → 0 by K ≈ 80–160. After that the endpoints don't change (outside the box, nn ratio and ΔQ are flat up to K = 2,560).
+   - In rollouts, K = 40–1,280 gives the same returns and flip rates as K = 20, within noise.
+   - So there is no tangential drift that continues with more steps.
+2. **Too large steps hurt only at η = 0.08,** where the sampler oscillates. That costs every run, including BC and medium-replay. The trained η = 0.01 is in the stable range: η = 0.0025–0.04 behave alike once `η·K` ≥ 0.2. Sampler tuning helps a little (best: 8,294) but leaves the gap to AWAC (11,203).
+3. **The critic's ranking on dataset states is not the problem.**
+   - Converged samples are on the data's support (nn ratio 0.96–1.0).
+   - Both Aware's critic and the independent AWAC critic score them ≈ +4 above the data action. That is more than the AWAC critic gives the AWAC policy's own action (+3.2).
+4. **The failure is in closed loop: flips.**
+   - The weighted policy reaches the expert gait: episodes without a flip score 9,718 at 10.2 m/s, in the expert region 92% of the time. But it flips in 57–63% of episodes.
+   - With BC weights it almost never flips (2%), but it stays in the medium region (19%) at 6.3 m/s.
+   - Gaussian AWAC runs the expert gait (11.6 m/s) without flips (2%).
+   - Sharper weights mean more flips: BC 2% → T = 1 57% → T = 1/3 63%.
+   - This matches Minari medium-v0 (Exp 2, diagnostic C), where the weighted policy also flipped on the fast gait.
+5. **What sets the flipping policies apart: saturated actions.**
+   - The weighted fields converge to actions with 21% (T = 1) or 17% (T = 1/3) of dimensions beyond the box. That compares with 4.6% for BC weights and 2.6% for AWAC on the same states, and 3.0% for the expert data. On visited states the share is 15–19%, 5–6× the expert data's.
+   - Each weighted endpoint is as far from the neighbouring actions as a single data sample (nn ratio ≈ 1), while BC-Aware (0.77) and AWAC (0.84) produce smoother, averaged actions.
+   - This fits **mode-seeking**: EqM's sampler converges to the *mode* of the advantage-weighted action distribution, which sits at extreme, high-advantage actions. Gaussian AWAC regresses to its *weighted mean*.
+   - It is the collapse half of the low-dimensional caveat (point 3: samples collapse toward the densest modes of the advantage-weighted distribution). But it happens *within* the trained step budget, as soon as the sampler converges, not through extra steps.
+   - **Not shown:** that saturation *causes* the flips. Across the 198 settings, flip rate and saturation correlate (Spearman 0.54–0.65 for the weighted runs). But on medium-replay, Aware saturates as much (16%, data 12.5%) on a slow gait (5.9 m/s) and does not flip. So saturation seems to matter on the fast, near-unstable expert gait.
+6. **The critic doesn't see the flips coming.**
+   - On visited states it overestimates the weighted policies (1.34–1.46; 1.46–1.56 on episodes with a flip), while it is calibrated for BC (0.82), medium-replay (0.96) and AWAC's own critic (0.90).
+   - The data contains almost no flipped states (0.25–0.6%), so no critic can learn to avoid flips from it. AWAC's policy just doesn't flip.
+7. **Under-converged sampling avoids flips but is slow.** At `η·K` = 0.1, flips drop to 0–10%, but the return drops to ≈ 3.2k. The sampler's unconverged noise damps the gait along with the flips.
+
+**Answer to interpretation 8.**
+- Neither sampler drift from too many or too large steps, nor a wrong critic ranking at dataset states.
+- The problem is on the actor side, in where the weighted field's sampler converges: saturated, mode-seeking actions that make the fast expert gait flip.
+- The critic contributes by not foreseeing flips, as any critic trained on this data would fail to.
+
+**Next steps**
+- **Saturation test (evaluation only, cheap):** roll out the same checkpoints with the converged actions shrunk or clipped inward (e.g. 0.9·a, or clipped at ±0.9). Fewer flips and a higher return would show that saturation causes the flips.
+- **Training-side, if saturation is causal:**
+  - softer weights (T = 2–5) or a lower weight cap;
+  - averaging the weighted targets so the fixed point moves toward the weighted mean;
+  - a bounded action parameterization (e.g. tanh-squashed), so fixed points cannot leave the box. That one is a low-dimensionality-style change, so it needs the owner's approval.
+- **Count flips on Minari medium-v0** for Gaussian AWAC and Aware with BC weights (Experiment 3 #3, still open). `drift.py` and `common.py` support Minari runs, but `drift.py` has only been run on D4RL so far.
 
 ## Later phases
 - **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.
