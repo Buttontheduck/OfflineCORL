@@ -150,7 +150,7 @@ clip a to the action bounds
   - Field schedule: truncated c with `a₀ = 0.8`, `λ = 8`.
   - Weights: `T = 1.0`, `w_max = 100`.
   - Sampler: Nesterov, `η = 0.01`, `K = 20`, momentum 0.3.
-  - Training: 4×256 MLPs, batch 256, lr 3e-4, target τ = 5e-3, 1M steps.
+  - Training: 4×256 MLPs, batch 256, lr 3e-4, target τ = 5e-3, 120k steps (`num_train_ops: 120001`), `device: cuda`.
 - **Options already in the code:**
   - FINO noise injection.
   - Early-stopping samplers.
@@ -205,7 +205,13 @@ main.py
 
 **Keeping them in sync:** an algorithm change must go into both folders. `agents.py`, `actor_models.py`, `critic_models.py`, `buffer.py`, `logger.py` and `utils/` must stay identical; check with `diff -q`.
 
-**Related files in `EqM_RL/`:** `Awac_Minari.py` (Gaussian AWAC baseline on Minari, single file, same W&B keys as Aware), `Offline Awac/` (older AWAC version), `play.py` (loads a Gaussian AWAC checkpoint).
+**Related files in `EqM_RL/`:** `Awac_Minari.py` (Gaussian AWAC baseline on Minari, single file, same W&B keys as Aware), `Offline Awac/` (older AWAC version), `play.py` (loads a Gaussian AWAC checkpoint), `run_sweep.py` + `sweeps/` (parallel hyperparameter sweeps, below).
+
+### Running sweeps (GPU server)
+`sweeps/` holds one YAML file per sweep: a `target` (`aware` = D4RL in the `hawk` env, `aware_minari` / `awac_minari` = Minari in the `eagle` env), `fixed` settings and a `grid` whose combinations become runs. `python run_sweep.py sweeps/<file>.yaml` trains them in parallel on one GPU, picks the right conda env per target, and writes logs and a status table to `sweep_runs/`. Format and details: [`sweeps/README.md`](sweeps/README.md).
+
+- **Start CUDA MPS first** (`nvidia-cuda-mps-control -d`). On the RTX 4090, one Aware run trains at ~43 steps/s. 16 parallel runs keep that speed with MPS (≈ 690 steps/s in total) but drop to ~14 steps/s each without it.
+- **Environments:** `hawk` (Python 3.10, d4rl, gym 0.23, mujoco-py + MuJoCo 2.1 in `~/.mujoco/mujoco210`) runs `Aware/`. `eagle` (`requirements/requirements_new.txt`) runs `Aware_Minari/` and `Awac_Minari.py`.
 
 ### Side note: Minari vs D4RL datasets
 Minari is the maintained successor of D4RL, which is deprecated. Minari MuJoCo datasets are **regenerated, not copied** from D4RL, so their names and scores don't map one to one.
@@ -289,11 +295,108 @@ Reference: the `simple-v0` dataset averages 6927 ± 413 per episode, and its bes
 **Next steps**
 - **BC ablation:** Aware with weights fixed at 1 (the commented line in `agents.py`). If it also reaches ~7,470, the advantage weighting isn't contributing here.
 - **Harder data:** Minari `medium-v0` (std 3,009), and a mixed simple + medium + expert dataset. Multimodal data is where an EqM actor should beat a single Gaussian.
-- **Fair protocol:** the same number of eval episodes (10) for both, the same network depth, 3–5 seeds, and the full 1M steps.
+- **Fair protocol:** the same number of eval episodes (10) for both, the same network depth, 3–5 seeds, and the same number of steps (120k for now).
 - **Tuning:** a lower `T` to make the advantage weighting sharper.
 
+### Experiment 2: λ sweep on Minari simple-v0 and medium-v0 (3 seeds, 2026-11-03)
+> **Scope.** 3 seeds per setting, 120k steps, RTX 4090 server. The follow-up diagnostics re-evaluate the **final checkpoints** with other sampler settings; nothing was retrained. Those checkpoints' critics and weights were trained with the default sampler (K = 20).
+
+**Setup** (W&B project `E`, group `scale_minari_simple_medium`; sweep file `sweeps/scale_minari_simple_medium.yaml`)
+
+| | |
+|---|---|
+| Code | `Aware_Minari/`, `eagle` env, run with `run_sweep.py` (15 runs in parallel under CUDA MPS, ≈ 58 min each) |
+| Grid | `simple-v0`: λ (`agent.scale_gradient`) ∈ {2, 4, 8} × seed ∈ {1, 2, 3} (9 runs) |
+| | `medium-v0`: λ ∈ {4, 8} × seed ∈ {1, 2, 3} (6 runs) |
+| Fixed (config defaults) | truncated c with `a₀ = 0.8`; `T = 1`, `w_max = 100`; NAG sampler `η = 0.01`, `K = 20`, momentum 0.3; 4×256 MLPs; batch 256; lr 3e-4; 120k steps; eval every 1k steps with **1 episode** |
+
+**Results: training runs** (eval return; mean of the last 20 evals, 100k–120k, then mean ± std over seeds)
+
+| | λ = 2 | λ = 4 | λ = 8 | dataset average |
+|---|---|---|---|---|
+| `simple-v0` | 305 ± 46 | 3,272 ± 55 | **7,389 ± 32** | 6,927 |
+| `medium-v0` | – | 1,966 ± 135 | 1,273 ± 617 | 12,089 |
+
+- **Eval noise within a run** (std over the last 20 evals): 114 for simple λ = 8, but 810 (λ = 4) and 1,055 (λ = 8) on medium.
+- **Critic (late training):** Q at dataset actions vs the Q the actual return implies (return per step / (1 − γ)):
+
+| | simple λ=2 | simple λ=4 | simple λ=8 | medium λ=4 | medium λ=8 |
+|---|---|---|---|---|---|
+| Q at dataset actions | 198 | 476 | 745 | 695 | 1,434 |
+| Q implied by the eval return | 30 | 327 | 739 | 197 | 127 |
+| weights median / share at the 100 cap | 9.0 / 35% | 3.2 / 17% | 0.73 / 0% | 17.5 / 39% | 0.31 / 0.4% |
+
+Only simple λ = 8 has a calibrated critic and mild weights.
+
+**Diagnostic A: return vs sampler steps K** (final checkpoints; same NAG sampler, `η = 0.01`; mean of 3 seeds × 5 episodes; training and evals used K = 20)
+
+| | K=10 | **K=20** | K=40 | K=100 | K=300 | K=1000 |
+|---|---|---|---|---|---|---|
+| simple, λ=2 | −245 | **301** | 3,158 | 7,181 | 7,066 | 6,902 |
+| simple, λ=4 | 356 | **3,370** | 7,239 | 7,280 | 7,291 | 7,263 |
+| simple, λ=8 | 3,321 | **7,441** | 7,446 | 7,449 | 7,450 | 7,452 |
+| medium, λ=4 | 115 | **1,949** | 9,671 | 10,160 | 9,913 | 10,660 |
+| medium, λ=8 | 1,128 | **1,376** | 1,691 | 2,102 | 1,396 | 987 |
+
+**Diagnostic B: sampled actions on dataset states** (2,048 random dataset states × 32 samples each, tracked over K)
+
+| | simple, λ=8 | medium, λ=4 |
+|---|---|---|
+| spread across one state's samples (per-dim std), K = 20 / 100 / 3000 | 0.087 / 0.029 / 0.022 | 0.32 / 0.052 / 0.026 |
+| dataset's conditional spread (nearest-neighbour estimate) | ≈ 0.25 | ≈ 0.29 |
+| field norm ‖f‖: at dataset actions / at uniform random actions / at sampler endpoints (K = 100) | 5.8 / 26.0 / 0.055 | 2.9 / 12.2 / 0.18 |
+| movement per step block, K = 1000 → 3000 | 0.000 | 0.002 |
+
+At K = 100, the endpoints fall outside the action box for 11% (simple λ = 8), 8% (medium λ = 4) and **21%** (medium λ = 8) of action dimensions before clipping. The datasets have 6–8% of action dimensions at the bounds.
+
+**Diagnostic C: the datasets, and rollouts with flips** (a flip = body angle `obs[1]` beyond 2 rad at some step)
+
+| dataset | return | percentiles 5 / 50 / 95 | speed | episodes that flip | return: flipped vs not |
+|---|---|---|---|---|---|
+| `simple-v0` | 6,927 ± 413 | 6,767 / 6,970 / 7,147 | 7.4 m/s | 1.2% | 3,690 vs 6,966 |
+| `medium-v0` | 12,089 ± 3,009 | 4,360 / 13,302 / 13,879 | 13.7 m/s | **20.6%** | 7,140 vs 13,373 |
+
+| rollouts (3 seeds × 10 episodes) | return | flips | return without flip | speed |
+|---|---|---|---|---|
+| simple, λ=8, K=20 | 7,446 (min 7,026) | 0% | 7,446 | 7.9 m/s |
+| medium, λ=4, **K=100** | 10,552 | **30%** | **12,559** | 12.8 m/s |
+| medium, λ=4, K=20 (as trained) | 1,979 | 47% | 2,582 | 2.9 m/s |
+| medium, λ=8, K=20 / K=100 | 1,730 / 1,285 | 30% / 30% | 1,849 / 1,148 | 2.4 m/s |
+
+**Interpretation**
+1. **The λ ranking is a sampler-budget effect, not a property of the learned field.**
+   - The field's slope scales with λ (≈ λ far from the data, ≈ 5λ near it), so the sampler's progress is set by `η·λ·K`.
+   - At `η·λ·K = 0.8` both λ = 2 (K = 40) and λ = 4 (K = 20) give ≈ 3,200–3,400. From ≈ 1.6 upward (λ = 8 with K = 20, λ = 4 with K = 40, λ = 2 with K = 100) every λ reaches ≈ 7,200–7,450 on simple.
+   - With K = 20, λ = 2 and 4 never converge. Training suffers too: V(s) and the TD targets come from those bad samples, so Q overestimates the policy and 17–39% of the weights sit at the cap.
+2. **Collapse, the low-dimensional symptom, is confirmed.** Once converged, each state's samples are ≈ 10× narrower than the dataset's spread, and every noise starting point ends at nearly the same action.
+   - The field is clearly nonzero at dataset actions (‖f‖ ≈ 3–6) and ≈ 0 only at the sampler endpoints. The data are not equilibria; the field has one zero per state, at the mode.
+   - This is the mean-shift picture from the low-dimensional caveat (Statement 1 fails).
+   - Aware therefore acts as a **deterministic, mode-seeking policy** ("denoised BC"), not a sampler. It loses the expressiveness that motivates EqM.
+   - For Phase 2 it means ‖f‖ measures distance from the mode, not from the data support: dataset actions score high, and the actor's own outputs score ≈ 0.
+3. **No harmful drift on these datasets.** The sampler stops: movement → 0 by K ≈ 1000. On simple the return is flat from K = 20 to 1000. Both datasets come from one TQC policy each, so there is a single mode to drift to, and cancellation between modes cannot be tested here.
+4. **Why simple works and medium looks unstable.**
+   - **Simple:** a slow (7.4 m/s), consistent gait with almost no flips. A mode-seeking policy is close to ideal there and robust to small action errors.
+   - **Medium:** a fast gait (13.7 m/s) at the edge of stability. The behavior policy itself flips in 20.6% of episodes, so returns are bimodal.
+   - **Converged medium policy (λ = 4, K = 100):** learns the gait (12,559 without a flip, vs the data's 13,373) but also inherits the flips (30% of episodes). The advantage weighting does not remove them; the critic, trained on the K = 20 policy, overestimates.
+   - **As trained (K = 20):** the unconverged actions cannot sustain the fast gait (2.9 m/s).
+   - **1-episode evals:** each eval shows one mode or the other, so the medium curves jump by thousands; simple's tight returns hide this.
+5. **Medium with λ = 8 is a separate failure.** It isn't under-convergence (‖f‖ ≈ 0.1 by K = 100) or drift (bad at every K, all 3 seeds): the policy only reaches ≈ 2.4 m/s. Its endpoints leave the action box more often (21% of dims vs 8–11%), but the cause is unknown.
+
+**Answers to "Things to verify in Phase 1"** (this data only)
+- **The sampler converges:** not with K = 20 for λ ≤ 4. Use `η·λ·K ≳ 1.6`.
+- **Collapse:** yes.
+- **Drift:** no.
+- **Clip bounds:** 8–21% of action dimensions at convergence.
+
+**Next steps**
+- **Retrain with a converged sampler** (λ = 4 with K = 40–100, or λ = 8 with K = 20), so the critic and the weights see converged actions; then compare λ fairly.
+- **10 eval episodes on medium**: with bimodal returns, 1-episode evals mostly measure flip luck.
+- **Gaussian AWAC on medium**: if it flips ≈ 30% too, the flips come from imitating this dataset, not from the EqM actor.
+- **Mixed simple + medium + expert data**: the only setting here where collapse would cost return, and where EqM should beat a Gaussian.
+- **Log the per-state sample spread and the final ‖f‖ during training**, so collapse and non-convergence show up in W&B.
+
 ## Later phases
-- **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms.
+- **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.
 - **Phase 3 — Offline-to-online:** continue EqM-AWAC online. Consider FINO (wider action support for exploration) and FFM (behavior-tilted fine-tuning).
 - **Alternatives if AWAC becomes the bottleneck:**
   - IQL critic: in-sample, never queries actor actions, so there is no EqM sampling inside critic updates.
