@@ -152,3 +152,4 @@ algorithms/Eagle/checkpoints/
 algorithms/Eagle/checkpoints/
 outputs/
 algorithms/EqM_RL/sweep_runs/
+algorithms/EqM_RL/diagnostics/out/

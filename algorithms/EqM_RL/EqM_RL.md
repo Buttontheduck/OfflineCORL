@@ -299,7 +299,7 @@ Reference: the `simple-v0` dataset averages 6927 ± 413 per episode, and its bes
 - **Tuning:** a lower `T` to make the advantage weighting sharper.
 
 ### Experiment 2: λ sweep on Minari simple-v0 and medium-v0 (3 seeds, 2026-11-03)
-> **Scope.** 3 seeds per setting, 120k steps, RTX 4090 server. The follow-up diagnostics re-evaluate the **final checkpoints** with other sampler settings; nothing was retrained. Those checkpoints' critics and weights were trained with the default sampler (K = 20).
+> **Scope.** 3 seeds per setting, 120k steps, RTX 4090 server. The follow-up diagnostics re-evaluate the **final checkpoints** with other sampler settings; nothing was retrained. Those checkpoints' critics and weights were trained with the default sampler (K = 20). Scripts and the commands that reproduce diagnostics A–C: [`diagnostics/`](diagnostics/README.md).
 
 **Setup** (W&B project `E`, group `scale_minari_simple_medium`; sweep file `sweeps/scale_minari_simple_medium.yaml`)
 
