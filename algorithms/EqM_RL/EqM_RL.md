@@ -395,6 +395,130 @@ At K = 100, the endpoints fall outside the action box for 11% (simple λ = 8), 8
 - **Mixed simple + medium + expert data**: the only setting here where collapse would cost return, and where EqM should beat a Gaussian.
 - **Log the per-state sample spread and the final ‖f‖ during training**, so collapse and non-convergence show up in W&B.
 
+### Experiment 3 (plan, started 2026-11-03)
+> **Rules for this plan**
+> - **Every training run uses `num_train_ops: 151000`** (instead of 120k).
+> - **Step #5 (low-dimensionality fixes) is not run without the project owner's explicit approval**, even if the results of #1–#4 call for it.
+
+| # | Experiment | Question | Runs |
+|---|---|---|---|
+| 0 | Code: evaluate `n_test_episodes` episodes side by side (batched sampler) and use 10; log the final ‖f‖, the per-state sample spread and the clip fraction during training; config flag for BC weights | Readable medium curves; convergence and collapse visible in W&B | – |
+| 1 | BC ablation: advantage weights fixed at 1, λ = 8, K = 20, simple and medium | Does the weighting help? Is medium λ = 8's failure caused by the critic / weighting (≈ 3% effective batch share)? | 6 |
+| 2 | Train with a converged sampler: medium λ = 4 with K = 40, and with η = 0.02 at K = 20; simple λ = 2 with η = 0.04 at K = 20 | Does the `η·λ·K` rule hold in training, and does a converged critic help medium? | 9 |
+| 3 | Gaussian AWAC (`Awac_Minari.py`) on simple and medium, 10 eval episodes | Does a Gaussian policy inherit the medium flips too? | 6 |
+| 4 | D4RL `halfcheetah-medium-expert-v2` and `-medium-replay-v2` (multimodal), Aware vs `algorithms/offline/awac.py`, `hawk` env | Does EqM's expressiveness matter, and does collapse cost return? | 12 |
+| 5 | **Only with approval:** low-dimensionality fixes (Fourier action lift, Jacobian-gated sampler) | Does removing the collapse improve return on multimodal data? | ≈ 6–9 |
+
+Order: #0, then #1–#3 together, then #4. All with 3 seeds.
+
+**Status (2026-11-03):** #0–#3 done; #4 done for Aware, AWAC re-run pending. Results in the next section.
+
+### Experiment 3: results (3 seeds, 2026-11-03)
+> **Scope.** #1–#3 and the Aware half of #4 are done.
+> - **The AWAC half of #4 (`exp3_d4rl_awac`) crashed at start-up in all 6 runs**, before training.
+>   - Cause: CORL's `algorithms/offline/awac.py` called `wandb.run.save()` with no argument, which wandb 0.26 rejects (`Run.save() missing 1 required positional argument: 'glob_str'`).
+>   - The earlier smoke test missed it because it ran without W&B.
+>   - The line is now removed (the other CORL scripts still have it). The re-run is pending; it takes ≈ 50 min with the 6 runs in parallel on an otherwise idle GPU.
+> - **Exp 2 rows are for reference only.** They used 120k steps and **1** eval episode; Experiment 3 uses 151k steps and 10 eval episodes.
+
+**Setup** (W&B project `E`; groups `exp3_minari`, `exp3_awac_minari`, `exp3_d4rl_aware`; sweep files `sweeps/exp3_*.yaml`)
+
+| | |
+|---|---|
+| Code | #1, #2: `Aware_Minari/`; #3: `Awac_Minari.py` (both `eagle` env); #4: `Aware/` (`hawk` env); all run with `run_sweep.py` |
+| Fixed | 151k steps; eval every 1k steps with **10 episodes**; 3 seeds; everything else at the config defaults, as in Exp 2 |
+| Wall-clock | #1–#3: 21 runs at once; #1/#2 took 98–101 min (K = 40: 136–139 min), #3 took 78–79 min. #4 Aware: 69–72 min |
+
+**Results: Minari HalfCheetah** (eval return: mean of the last 20 evals, 131k–151k, then mean ± std over seeds)
+
+| | Run | `simple-v0` | `medium-v0` |
+|---|---|---|---|
+| Exp 2 | Aware λ = 8, K = 20 | 7,389 ± 21 | 1,280 ± 487 |
+| Exp 2 | Aware λ = 4, K = 20 | 3,269 ± 45 | 1,969 ± 162 |
+| Exp 2 | Aware λ = 2, K = 20 | 296 ± 37 | – |
+| **#1** | **Aware with BC weights (all 1), λ = 8, K = 20** | 7,097 ± 8 | **11,916 ± 248** |
+| #2 | Aware λ = 2, η = 0.04, K = 20 (`η·λ·K` = 1.6) | **7,491 ± 16** | – |
+| #2 | Aware λ = 4, K = 40 (`η·λ·K` = 1.6) | – | 2,742 ± 222 |
+| #2 | Aware λ = 4, η = 0.02, K = 20 (`η·λ·K` = 1.6) | – | 3,149 ± 366 |
+| #3 | Gaussian AWAC (`Awac_Minari.py`) | **7,537 ± 18** | 7,207 ± 235 |
+| | dataset average | 6,927 | 12,089 |
+
+- **At equal steps (100k)**, simple λ = 2 with η = 0.04 and Exp 2's simple λ = 8 both score 7,371. On medium λ = 4, the converged-sampler runs score 1,124 (K = 40) and 1,399 (η = 0.02), vs 1,764 for Exp 2's K = 20.
+- **Still rising at 151k:** medium λ = 4 with a converged sampler (≈ 1,100–1,400 at 100k, ≈ 3,000–3,300 at 150k). Everything else on Minari has plateaued.
+
+**Results: D4RL HalfCheetah, Aware only** (D4RL normalized score; dataset statistics computed from the local hdf5 files; CORL numbers are the README's "Last Scores" after 1M steps)
+
+| dataset | Aware (151k) | raw return | dataset average | best dataset episode | CORL AWAC (1M) | CORL BC (1M) |
+|---|---|---|---|---|---|---|
+| `medium-expert-v2` | 59.5 ± 8.0 | 7,109 ± 998 | 64.4 | 92.9 | 95.0 ± 0.6 | 56.0 ± 7.4 |
+| `medium-replay-v2` | **46.9 ± 0.3** | 5,542 ± 36 | 27.2 | 42.4 | 45.1 ± 0.9 | 35.7 ± 2.3 |
+
+- **The datasets:**
+  - `medium-expert`: 2,000 episodes; returns 7,713 ± 2,970, median 5,246, p95 10,906 (bimodal: medium and expert episodes).
+  - `medium-replay`: 202 episodes; returns 3,093 ± 1,681, best 4,985.
+- **Seeds and episodes:** medium-expert seeds give 5,904 / 7,077 / 8,347, and within one eval the 10 episodes spread widely (std 2,342, min 2,765). medium-replay is tight (episode std 121).
+- **Learning curves:** medium-expert is still rising (5,820 at 100k → 7,480 at 150k); medium-replay has plateaued since ≈ 50k.
+
+**Critic and weights** (late training: mean over seeds of the last-20-eval means. The "effective batch share" of the weights is `mean² / (mean² + var)`; BC = 100%. BC runs still log the AWAC weights, but the loss doesn't use them.)
+
+| run | return | Q at dataset actions | Q implied by the eval return | Q / implied | weights median | effective batch share |
+|---|---|---|---|---|---|---|
+| simple, λ = 2, η = 0.04 | 7,491 | 749 | 749 | 1.0 | 0.72 | 21% |
+| simple, BC weights | 7,097 | 705 | 710 | 1.0 | – | 100% |
+| simple, Gaussian AWAC | 7,537 | 663 | 754 | 0.9 | 1.00 | 10% |
+| medium, BC weights | 11,916 | 1,250 | 1,192 | 1.05 | – | 100% |
+| medium, λ = 4, K = 40 | 2,742 | 1,442 | 274 | **5.3** | 0.27 | **2.9%** |
+| medium, λ = 4, η = 0.02 | 3,149 | 1,438 | 315 | **4.6** | 0.26 | **2.9%** |
+| medium, λ = 4, K = 20 (Exp 2) | 1,969 | 695 | 197 | 3.5 | 18.0 | 49% (39% at the cap) |
+| medium, λ = 8, K = 20 (Exp 2) | 1,280 | 1,435 | 128 | **14** | 0.32 | **2.9%** |
+| medium, Gaussian AWAC | 7,207 | 1,216 | 721 | 1.7 | 0.61 | 16% |
+| D4RL medium-expert | 7,109 | 1,163 | 711 | 1.7 | 0.14 | **3.6%** |
+| D4RL medium-replay | 5,542 | 427 | 554 | 0.8 | 0.58 | 4.3% |
+
+- **Per-state sample spread** (new log from #0): 0.07–0.14 in every Aware run, vs the datasets' ≈ 0.25–0.29 (Exp 2, diagnostic B). The collapse persists, and it is narrowest on D4RL medium-expert (0.068).
+
+**Interpretation**
+1. **Medium's failure comes from the weighting, not the EqM actor (#1).**
+   - With BC weights, Aware reaches 11,916, about the dataset average (12,089); each seed's best eval is ≈ 14,500. The EqM actor can learn the fast gait.
+   - With advantage weights, every failing medium run has the same signature: the critic overestimates the policy's value 3.5–14×, and the weights use only ≈ 3% of each batch (or 39% sit at the cap at K = 20).
+   - The BC run's critic is calibrated (Q / implied ≈ 1.05), because its policy ≈ the behavior policy.
+   - Its 10-episode evals still spread widely (std 3,222, min 4,883), so it probably inherits the dataset's flips; this is not measured.
+2. **On simple, the weighting helps a little.** BC weights give 7,097 (+2.5% over the data); the weighted runs give 7,389–7,491 (+7–8%). The critic is calibrated there.
+3. **The `η·λ·K` rule holds in training (#2).**
+   - λ = 2 with η = 0.04 jumps from 296 (Exp 2) to 7,491. It matches λ = 8 at equal steps, with a calibrated critic and mild weights.
+   - So λ only matters through `η·λ·K`.
+   - On medium, K = 40 and η = 0.02 give the same result (2,742 vs 3,149), so K and η are interchangeable too.
+4. **A converged sampler does not fix medium (#2).**
+   - At equal steps it is no better than K = 20.
+   - In Exp 2 (diagnostic A), the K = 20-trained λ = 4 checkpoints reached 9,671–10,160 when *evaluated* with K = 40–100. *Training* with converged samples gives only ≈ 3,000.
+   - The converged samples feed V(s) and the TD targets. The critic then overestimates more (≈ 5× vs 3.5×), the advantage of dataset actions turns negative (mean ≈ −2.6), and the weights collapse onto ≈ 3% of the batch.
+5. **Gaussian AWAC (#3):**
+   - **simple:** it ties Aware (7,537 vs 7,491).
+   - **medium:** it reaches only 7,207 (60% of the data). Its critic overestimates too (1.7×), but its weights keep a larger effective batch (16%).
+   - Its evals swing widely: std over the last 20 evals is 1,797, and each seed's best eval is 9,805–11,814.
+   - So the weighting problem on medium is not specific to EqM. The EqM actor is hit much harder by it, yet the EqM actor with BC weights beats Gaussian AWAC by ≈ 4,700.
+6. **D4RL (#4, Aware half):**
+   - **medium-replay is a success.** 46.9 is above the best dataset episode (42.4), and at 15% of the steps it matches CORL AWAC's 1M-step score (45.1).
+   - **medium-expert is weak.** 59.5 is below the dataset average (64.4), at the level of CORL's BC (56.0), and far below CORL AWAC (95.0).
+   - medium-expert shows medium-v0's signature: 1.7× overestimation, ≈ 3.6% effective batch, the sharpest weights of all runs (median 0.14), and large seed and episode variance.
+   - It is still improving at 151k.
+   - Whether expressiveness or collapse costs return can't be judged until the AWAC runs finish (same data and steps).
+
+**Answers to the Experiment 3 questions**
+- **#1, does the weighting help?** A little on simple (+300–400). On medium it is what breaks Aware: BC 11,916 vs weighted λ = 8 1,280.
+- **#2, does the `η·λ·K` rule hold in training?** Yes.
+- **#2, does a converged critic help medium?** No.
+- **#3, does a Gaussian policy inherit the flips?** Still open. `Awac_Minari.py` logs only the mean of the 10 episodes, so the checkpoints in `/workspace/Trained_Models/checkpoints/AWAC_env_namemedium-v0_*` need a re-evaluation with the diagnostic C rollout code.
+- **#4:** waiting for the AWAC re-run.
+
+**Next steps**
+- **Re-run `exp3_d4rl_awac`** with the fixed `awac.py`. First delete the 6 crashed runs from W&B group `exp3_d4rl_awac`.
+- **Count flips** for Gaussian AWAC and for Aware with BC weights on medium (diagnostic C).
+- **Fix the weighting on medium.** BC works, and the weighting is what fails. Candidates:
+  - softer weights (higher T);
+  - normalizing the advantage per batch;
+  - an in-sample V(s) (IQL expectile) instead of V from EqM samples, which is the IQL-critic alternative listed under *Later phases*.
+
 ## Later phases
 - **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.
 - **Phase 3 — Offline-to-online:** continue EqM-AWAC online. Consider FINO (wider action support for exploration) and FFM (behavior-tilted fine-tuning).
