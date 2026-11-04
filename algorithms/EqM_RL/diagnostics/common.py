@@ -130,6 +130,12 @@ class Policy:
         return x, out
 
     @torch.no_grad()
+    def act(self, s: torch.Tensor) -> torch.Tensor:
+        """The policy as trained and evaluated: one sample at the run's own K, eta and momentum,
+        clipped to the action box (Actor.sample)."""
+        return self.sample(s, self.cfg["actor"]["num_step"])[0].clamp(self.low, self.high)
+
+    @torch.no_grad()
     def sample_rows(self, s: torch.Tensor, K: torch.Tensor, eta: torch.Tensor, mu: torch.Tensor):
         """Like sample, but every row has its own K, eta and mu (tensors of shape (N,)), so many
         sampler settings run as one batch. Returns each row's action after its own K steps
@@ -145,3 +151,75 @@ class Policy:
             if hit.any():
                 out[hit] = x[hit]
         return out
+
+
+class AwacPolicy:
+    """A Gaussian policy on the same D4RL dataset as `pol`, evaluated with its mean as awac.py does:
+    either a CORL AWAC run (algorithms/offline/awac.py: its 3-hidden-layer actor and both critics)
+    or a Gaussian fit of Aware/fit_actor.py (config.yaml has actor.kind = gaussian: the saved depth
+    and width, no critics). Both normalize states with the same formula on the same dataset, so
+    pol.states() applies. `kind` is 'corl_awac' or 'fit_gaussian'."""
+
+    def __init__(self, run_dir: Path, pol: Policy, checkpoint: str = None):
+        self.run_dir, self.pol = Path(run_dir), pol
+        self.cfg = yaml.safe_load(open(self.run_dir / "config.yaml"))
+        assert self.cfg["env_name"] == pol.cfg["env_name"], "the Gaussian run is on another dataset"
+        self.checkpoint = self.run_dir / checkpoint if checkpoint else latest_checkpoint(self.run_dir)
+        sd = torch.load(self.checkpoint, map_location=pol.device)
+        actor_cfg = self.cfg.get("actor")
+        if isinstance(actor_cfg, dict) and actor_cfg.get("kind") == "gaussian":
+            sys.path.insert(0, str(EQM_RL / "Aware"))
+            from gaussian_actor import GaussianActor
+
+            self.kind = "fit_gaussian"
+            self.actor = GaussianActor(pol.state_dim, pol.action_dim, self.cfg["hidden_dim"],
+                                       self.cfg["num_hidden_layers"], self.cfg.get("min_log_std", -20.0),
+                                       self.cfg.get("max_log_std", 2.0))
+        else:
+            sys.path.insert(0, str(EQM_RL.parent / "offline"))
+            import awac as corl_awac  # CORL's algorithms/offline/awac.py
+
+            self.kind = "corl_awac"
+            self.actor = corl_awac.Actor(pol.state_dim, pol.action_dim, self.cfg["hidden_dim"])
+        self.actor.load_state_dict(sd["actor"])
+        self.actor.to(pol.device).eval()
+        self.critics = []
+        if "critic_1" in sd and "critic_2" in sd:
+            sys.path.insert(0, str(EQM_RL.parent / "offline"))
+            import awac as corl_awac
+
+            for key in ("critic_1", "critic_2"):
+                c = corl_awac.Critic(pol.state_dim, pol.action_dim, self.cfg["hidden_dim"]).to(pol.device).eval()
+                c.load_state_dict(sd[key])
+                self.critics.append(c)
+
+    @torch.no_grad()
+    def mean(self, s: torch.Tensor) -> torch.Tensor:
+        """The Gaussian mean, unclipped."""
+        return self.actor._mlp(s)
+
+    @torch.no_grad()
+    def act(self, s: torch.Tensor) -> torch.Tensor:
+        """The policy as awac.py evaluates it: the mean, clipped to the action box."""
+        return self.mean(s).clamp(self.pol.low, self.pol.high)
+
+    @torch.no_grad()
+    def q(self, s: torch.Tensor, a: torch.Tensor) -> torch.Tensor:
+        if not self.critics:
+            raise RuntimeError(f"{self.run_dir.name} has no critics (a fit_actor.py Gaussian fit)")
+        return torch.min(self.critics[0](s, a), self.critics[1](s, a)).squeeze(-1)
+
+
+# ---------------------------------------------------------------------- MuJoCo state (D4RL envs)
+def get_sim_state(env) -> tuple:
+    """Full MuJoCo state of a D4RL (mujoco-py) env: (qpos, qvel). HalfCheetah has no actuator
+    activations and no randomness in its dynamics, so this is everything that sets the future."""
+    data = env.unwrapped.sim.data
+    return data.qpos.copy(), data.qvel.copy()
+
+
+def set_sim_state(env, state: tuple) -> np.ndarray:
+    """Put a state from get_sim_state into an env that has just been reset (so its time limit
+    counts from 0) and return the observation there."""
+    env.unwrapped.set_state(*state)
+    return env.unwrapped._get_obs()
