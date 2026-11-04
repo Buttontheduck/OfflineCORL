@@ -6,9 +6,9 @@ Usage (from algorithms/EqM_RL/):
     python run_sweep.py sweeps/temperature_minari.yaml --parallel 8
 
 Any Python with PyYAML can start this file (the hawk, eagle or base env). Each training
-run is started with the Python of the conda env its target needs: `aware` (D4RL) runs
-in hawk, `aware_minari` and `awac_minari` run in eagle. The sweep file format is
-described in sweeps/README.md.
+run is started with the Python of the conda env its target needs: `aware`, `awac_d4rl`,
+`iql_d4rl` and `fit_actor` (D4RL) run in hawk, `aware_minari` and `awac_minari` run in
+eagle. The sweep file format is described in sweeps/README.md.
 
 Output: sweep_runs/<sweep name>_<date-time>/ with a copy of the sweep file, plan.txt
 (every command), runs.csv (status of every run) and one folder per run with its log.
@@ -46,6 +46,12 @@ TARGETS = {
     # CORL's Gaussian AWAC on D4RL (algorithms/offline/awac.py, pyrallis command line)
     "awac_d4rl": dict(script=HERE.parent / "offline" / "awac.py", conda_env="hawk",
                       style="pyrallis", data="d4rl", name_prefix="AWAC"),
+    # CORL's IQL on D4RL (algorithms/offline/iql.py, pyrallis; its dataset key is `env`)
+    "iql_d4rl": dict(script=HERE.parent / "offline" / "iql.py", conda_env="hawk",
+                     style="pyrallis", data="d4rl", name_prefix="IQL", env_key="env"),
+    # Actor-only fits on frozen weights, Gaussian or EqM (Aware/fit_actor.py, pyrallis)
+    "fit_actor": dict(script=HERE / "Aware" / "fit_actor.py", conda_env="hawk",
+                      style="pyrallis", data="d4rl", name_prefix="Fit"),
 }
 SWEEP_KEYS = {"target", "parallel", "stagger", "conda_env", "fixed", "grid"}
 MUJOCO_BIN = Path.home() / ".mujoco" / "mujoco210" / "bin"
@@ -177,7 +183,8 @@ def default_env_name(target: dict) -> str:
     if target["style"] == "hydra":
         with open(target["script"].parent / "config.yaml") as f:
             return yaml.safe_load(f)["env_name"]
-    m = re.search(r'env_name:\s*str\s*=\s*"([^"]+)"', target["script"].read_text())
+    key = target.get("env_key", "env_name")
+    m = re.search(rf'\b{key}:\s*str\s*=\s*"([^"]+)"', target["script"].read_text())
     if not m:
         sys.exit(f"Cannot find the default env_name in {target['script']}")
     return m.group(1)
@@ -258,7 +265,8 @@ def main() -> int:
         print("WARNING: CUDA MPS is not running, so parallel runs take turns on the GPU "
               "(about 5x one run in total instead of 16x). Start it with: nvidia-cuda-mps-control -d")
 
-    env_names = sorted({str(r["overrides"].get("env_name", default_env_name(target))) for r in runs})
+    env_key = target.get("env_key", "env_name")
+    env_names = sorted({str(r["overrides"].get(env_key, default_env_name(target))) for r in runs})
     prefetch_datasets(python, target, env, env_names)
 
     sweep_dir.mkdir(parents=True)

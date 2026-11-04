@@ -1,0 +1,17 @@
+# Optional (EqM_RL.md, "Planned next experiments", section 2, "Limits of the Aware-weights arm"):
+# the matched-concentration refit. Aware's weights recomputed with the temperature that gives the
+# IQL weights' effective batch share (make_weights.py --match_share), from
+# /workspace/Trained_Models/weights/aware_matched_seed<seed>.npz. 3 seeds. 6 runs, hawk env.
+#   python run_sweep.py sweeps/exp4_fit_aware_matched.yaml
+target: fit_actor
+parallel: 6
+
+fixed:
+  name: Fit_aware_matched
+  env_name: halfcheetah-medium-expert-v2
+  num_train_ops: 310001
+  weights: aware_matched
+
+grid:
+  actor: [gaussian, eqm]
+  seed: [1, 2, 3]

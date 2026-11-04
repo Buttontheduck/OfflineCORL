@@ -149,7 +149,7 @@ class Otter(nn.Module):
 
 
     
-    def _actor_loss(self, states, actions):
+    def _actor_loss(self, states, actions, weights=None):
         
         """
         B: Batch  Dimensions
@@ -182,9 +182,12 @@ class Otter(nn.Module):
             
         pred_grad = self._model(noisy_action,states)
         
-        weights = self._offline_weights(states=states, actions= actions, num_actions=self.num_actions)
-        if self.weighting == "bc":
-            weights = torch.ones_like(weights)
+        if weights is None:
+            weights = self._offline_weights(states=states, actions= actions, num_actions=self.num_actions)
+            if self.weighting == "bc":
+                weights = torch.ones_like(weights)
+        # else: fixed weights (B, 1) given by the caller, e.g. Aware/fit_actor.py with frozen weights;
+        # no critic is queried then.
 
         loss_per_sample_and_dim = F.mse_loss(pred_grad, scaled_target_grad, reduction='none') # Returns (B,A), loss for each sample and each action dimension 
         loss_per_sample = loss_per_sample_and_dim.sum(dim=-1, keepdim=True) # Returns (B,1), loss for each gradient prediction

@@ -1,0 +1,18 @@
+# EqM_RL.md, "Planned next experiments", section 2, step 1: one IQL critic (Q and V) per seed on
+# D4RL halfcheetah-medium-expert-v2, CORL's algorithms/offline/iql.py with its MuJoCo defaults
+# (expectile 0.7; beta 3 for its own Gaussian policy, a free IQL reference score). 310k steps,
+# as decided for Experiment 4. The final checkpoint feeds Aware/make_weights.py --source iql.
+# 3 runs, hawk env.
+#   python run_sweep.py sweeps/exp4_iql.yaml
+target: iql_d4rl
+parallel: 3
+
+fixed:
+  project: E
+  env: halfcheetah-medium-expert-v2
+  max_timesteps: 310000
+  checkpoints_path: /workspace/Trained_Models/checkpoints/
+  n_episodes: 10
+
+grid:
+  seed: [1, 2, 3]

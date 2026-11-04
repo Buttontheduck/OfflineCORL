@@ -1,0 +1,17 @@
+# EqM_RL.md, "Planned next experiments", section 2: expert-only BC control. Gaussian and EqM
+# actors (Aware/fit_actor.py) on the same expert-half trajectories of medium-expert, all weights 1,
+# no critic. 310k steps, 3 seeds. Needs no weight files, so it can start at once. 6 runs, hawk env.
+#   python run_sweep.py sweeps/exp4_fit_bc.yaml
+target: fit_actor
+parallel: 6
+
+fixed:
+  name: Fit_bc
+  env_name: halfcheetah-medium-expert-v2
+  num_train_ops: 310001
+  weights: ones
+  data_filter: expert_half
+
+grid:
+  actor: [gaussian, eqm]
+  seed: [1, 2, 3]

@@ -1,0 +1,16 @@
+# EqM_RL.md, "Planned next experiments", section 2: Gaussian and EqM actors on the same frozen IQL
+# weights (T = 1), from /workspace/Trained_Models/weights/iql_seed<seed>.npz (make_weights.py on the
+# exp4_iql.yaml runs). 310k steps, 3 seeds. 6 runs, hawk env.
+#   python run_sweep.py sweeps/exp4_fit_iql.yaml
+target: fit_actor
+parallel: 6
+
+fixed:
+  name: Fit_iql
+  env_name: halfcheetah-medium-expert-v2
+  num_train_ops: 310001
+  weights: iql
+
+grid:
+  actor: [gaussian, eqm]
+  seed: [1, 2, 3]

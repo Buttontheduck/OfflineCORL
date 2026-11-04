@@ -1,0 +1,19 @@
+# EqM_RL.md, "Planned next experiments", section 5c. Aware on D4RL halfcheetah-medium-expert-v2
+# trained for 1M steps instead of 151k: does more training close the gap to Gaussian AWAC?
+# Fresh runs: the existing checkpoints hold no optimizer state and no target critics, so they
+# can't be resumed exactly. Otherwise as exp3_d4rl_aware.yaml (T 1, lambda 8, K 20, eta 0.01),
+# 3 seeds, 10 eval episodes. A checkpoint is saved at every eval (every 1k steps, ~2.4 GB per
+# run); checkpoint_310000.pt is the Aware weight source for the 2x2 frozen-weights study.
+# 3 runs, hawk env, ~8-10 h.
+#   python run_sweep.py sweeps/exp4_aware_1m.yaml
+target: aware
+parallel: 3
+
+fixed:
+  name: Aware_1M
+  env_name: halfcheetah-medium-expert-v2
+  num_train_ops: 1000001   # the extra 1 makes the last eval (and checkpoint) happen at step 1,000,000
+  n_test_episodes: 10
+
+grid:
+  seed: [1, 2, 3]
