@@ -37,6 +37,9 @@ grid:                    # every combination is one run: 3 x 2 x 3 = 18 runs
 | `aware` | `Aware/main.py` (Hydra config `Aware/config.yaml`) | D4RL | `hawk` |
 | `aware_minari` | `Aware_Minari/main.py` (Hydra config `Aware_Minari/config.yaml`) | Minari | `eagle` |
 | `awac_minari` | `Awac_Minari.py` (Gaussian AWAC baseline, pyrallis `TrainConfig`) | Minari | `eagle` |
+| `awac_d4rl` | CORL's `algorithms/offline/awac.py` (Gaussian AWAC, pyrallis) | D4RL | `hawk` |
+| `iql_d4rl` | CORL's `algorithms/offline/iql.py` (IQL, pyrallis; its dataset key is `env`, not `env_name`) | D4RL | `hawk` |
+| `fit_actor` | `Aware/fit_actor.py` (Gaussian or EqM actor alone, on fixed weights, pyrallis) | D4RL | `hawk` |
 
 - **Keys** are the names in the target's config. A key that doesn't exist is an error,
   which catches typos (for Hydra targets, write `+key: value` to add a new key).
@@ -98,3 +101,56 @@ off.
 | 32, MPS | out of GPU memory (about 0.9 GB per run) | |
 
 So 16 at once is the sweet spot on this GPU.
+
+## Experiment 4: priority 2 and the 1M-step run (310k steps)
+
+`EqM_RL.md`, "Planned next experiments", section 2 and 5c. Every training run uses 310k steps,
+except the 1M-step Aware run. Weight files go to `/workspace/Trained_Models/weights/` (not in
+git), one per source and seed: `<source>_seed<seed>.npz`, the names `fit_actor.py` looks for.
+
+**Unattended:** `run_exp4.sh` (in `algorithms/EqM_RL/`) runs priority 1 and every step of this
+table in order, waits for its inputs and for free GPU memory, and ends by writing
+`sweep_runs/exp4_<date-time>/summary.md` (`diagnostics/summarize_exp4.py`). Start it detached:
+`setsid nohup bash run_exp4.sh > /dev/null 2>&1 < /dev/null &`. Don't edit the script while it
+runs: bash reads it as it goes.
+
+| Order | Command | Runs | Needs |
+|---|---|---|---|
+| any time | `python run_sweep.py sweeps/exp4_aware_1m.yaml` | 3 | nothing (started 2026-11-04) |
+| any time | `python run_sweep.py sweeps/exp4_fit_bc.yaml` | 6 | nothing |
+| any time | `python run_sweep.py sweeps/exp4_iql.yaml` | 3 | nothing |
+| after `exp4_iql` | `make_weights.py --source iql` (below) | – | the IQL checkpoints |
+| then | `python run_sweep.py sweeps/exp4_fit_iql.yaml` | 6 | `iql_seed*.npz` |
+| after the 1M runs pass 310k | `make_weights.py --source aware` (below) | – | `checkpoint_310000.pt` |
+| then | `python run_sweep.py sweeps/exp4_fit_aware.yaml` | 6 | `aware_seed*.npz` |
+| optional | `python run_sweep.py sweeps/exp4_fit_aware_matched.yaml` | 6 | `aware_matched_seed*.npz` |
+
+```bash
+cd algorithms/EqM_RL/Aware      # hawk env, with the D4RL exports of diagnostics/README.md
+C=/workspace/Trained_Models/checkpoints; W=/workspace/Trained_Models/weights
+for s in 1 2 3; do
+  python make_weights.py --source iql --run_dir $(ls -d $C/IQL_seed$s-*) --out $W/iql_seed$s.npz
+  python make_weights.py --source aware --run_dir $(ls -d $C/Aware_1M_seed$s-*) \
+      --checkpoint checkpoint_310000.pt --out $W/aware_seed$s.npz
+  python make_weights.py --source aware --run_dir $(ls -d $C/Aware_1M_seed$s-*) \
+      --checkpoint checkpoint_310000.pt --match_share $W/iql_seed$s.npz --out $W/aware_matched_seed$s.npz
+done
+```
+
+- **Same targets for both actors:** `make_weights.py` computes the weights once per seed; the
+  Gaussian and the EqM fit of that seed read the same file. For the Aware source, V(s) averages
+  32 EqM samples per state with a fixed seed (training used 1). About 1 min per file.
+- **Matched concentration:** with the weight cap, the effective batch share is not monotone in
+  T, so `--match_share` scans T on a log grid, refines every crossing, takes the one closest to
+  T = 1, lists all crossings in the file's `meta`, and saves nothing if the match misses by more
+  than 0.005 (`--match_tol`).
+- **Both sources at 310k:** the IQL critics train 310k steps, and the Aware weights come from
+  the 1M-step runs' `checkpoint_310000.pt`, so both weight sources had the same training length.
+- **The fits:** `fit_actor.py` trains only the actor (no critic), evaluates 10 episodes every
+  1k steps (score, normalized score, flip rate), and keeps a checkpoint every 10k steps. Both
+  kinds of fit load with `diagnostics/common.py` (EqM with `Policy`, Gaussian with `AwacPolicy`),
+  so the priority-1 scripts work on them too.
+- **Expert half:** `data_filter: expert_half` keeps the second 1,000 of the 2,000 episodes
+  (999,000 transitions). Their returns: mean 10,645, minimum 2,046 (a few of the expert's own
+  episodes go wrong); the dropped medium half's maximum is 5,304.
+

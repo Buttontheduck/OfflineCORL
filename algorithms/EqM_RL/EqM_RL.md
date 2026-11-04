@@ -704,6 +704,11 @@ T = 1/3 behaves like T = 1: 17.2% outside the box at convergence, nn ratio 0.95,
 > **Status: planned, not run.** The priority is a shared IQL-critic experiment and targeted sampler interventions on D4RL `halfcheetah-medium-expert-v2`. These experiments treat the preceding explanations involving critic ranking, saturation, and low-dimensional mode seeking as hypotheses to test, rather than established causes. Existing diagnostics argue against substantial continuing drift after convergence on the tested dataset states; they do not rule out harmful movement during convergence or effects of the sampler during training.
 >
 > **Edited later on 2026-11-04:** the order changed, experiments were added, and those changes were then revised after two reviews. Each change is explained in a **Notes** box under the part it changed, and the new experiments are in section 5.
+>
+> **Run settings and code (2026-11-04):**
+> - **310k steps:** the project owner set every training run of this plan to 310k steps instead of Experiment 3's 151k, except the 1M-step Aware run (5c). That run started on 2026-11-04 (`sweeps/exp4_aware_1m.yaml`), and its `checkpoint_310000.pt` is the Aware weight source in section 2, so both weight sources train 310k steps.
+> - **Priority 1 (evaluation only):** `diagnostics/interventions.py` (clipping and averaging), `diagnostics/handoff.py` (5a), `diagnostics/rollout.py --awac` (5b). Commands: [`diagnostics/README.md`](diagnostics/README.md).
+> - **Priority 2:** `Aware/make_weights.py` (frozen weights from an IQL or Aware checkpoint), `Aware/fit_actor.py` (Gaussian or EqM actor alone on those weights, or BC on the expert half), CORL's `iql.py`, and the sweeps `exp4_iql`, `exp4_fit_bc`, `exp4_fit_iql`, `exp4_fit_aware` and `exp4_fit_aware_matched`. Order and commands: [`sweeps/README.md`](sweeps/README.md).
 
 #### 1. Recommended experiment order and evaluation protocol
 
