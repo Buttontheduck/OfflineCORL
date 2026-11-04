@@ -701,7 +701,7 @@ T = 1/3 behaves like T = 1: 17.2% outside the box at convergence, nn ratio 0.95,
 
 ### Planned next experiments: critic feedback, tangential drift, and action dimension (2026-11-04)
 
-> **Status: planned, not run.** The priority is a shared IQL-critic experiment and targeted sampler interventions on D4RL `halfcheetah-medium-expert-v2`. These experiments treat the preceding explanations involving critic ranking, saturation, and low-dimensional mode seeking as hypotheses to test, rather than established causes. Existing diagnostics argue against substantial continuing drift after convergence on the tested dataset states; they do not rule out harmful movement during convergence or effects of the sampler during training.
+> **Status (2026-11-04): priority 1 done** (results in the next section, "Experiment 4, priority 1"); priority 2 and the 1M-step Aware run are running. *Originally:* planned, not run. The priority is a shared IQL-critic experiment and targeted sampler interventions on D4RL `halfcheetah-medium-expert-v2`. These experiments treat the preceding explanations involving critic ranking, saturation, and low-dimensional mode seeking as hypotheses to test, rather than established causes. Existing diagnostics argue against substantial continuing drift after convergence on the tested dataset states; they do not rule out harmful movement during convergence or effects of the sampler during training.
 >
 > **Edited later on 2026-11-04:** the order changed, experiments were added, and those changes were then revised after two reviews. Each change is explained in a **Notes** box under the part it changed, and the new experiments are in section 5.
 >
@@ -954,6 +954,79 @@ The most informative first **training** comparison is Gaussian versus EqM under 
 **e) Hopper and Walker2d medium-expert** (later, only after a fix works on HalfCheetah)
 - **What:** the best Aware variant and Gaussian AWAC on `hopper-medium-expert-v2` and `walker2d-medium-expert-v2`, 3 seeds each.
 - **Why:** checks whether the results hold beyond HalfCheetah. In these environments falling ends the episode, so falls show up directly in the score. Hopper has 3-D actions and Walker2d 6-D, which adds another data point on action dimension (a weak one, because the tasks differ).
+
+### Experiment 4, priority 1: action interventions, handoff, Minari flips (3 seeds, 2026-11-04)
+> **Scope.** Evaluation only: the final checkpoints of Experiment 3 (151k steps) were re-run, nothing was retrained. The plan is in "Planned next experiments" (section 1, and 5a/5b).
+> - **Runs:** on D4RL `halfcheetah-medium-expert-v2`, Aware with T = 1 (#4), T = 1/3 and BC weights (the controls), each with the CORL Gaussian AWAC run of the same seed. On Minari `medium-v0`, Gaussian AWAC (`Awac_Minari.py`, Exp 3 #3) and Aware with BC weights (Exp 3 #1).
+> - **Code:** `diagnostics/interventions.py`, `diagnostics/handoff.py`, `diagnostics/rollout.py --awac`, all started by `run_exp4.sh`; tables by `diagnostics/summarize_exp4.py`. Commands: [`diagnostics/README.md`](diagnostics/README.md).
+
+**Setup**
+
+| | |
+|---|---|
+| Sampler | The trained setting of each run (η = 0.01, K = 20, momentum 0.3). |
+| Interventions | Aware: executed actions clipped to ±1 (as trained), ±0.95 or ±0.9; or the average of 4 or 16 independent samples, each clipped to ±1 first. AWAC: its mean clipped to ±1, ±0.95, ±0.9. All treatments of a run share the env seeds, and Aware's treatments share the sampler noise. |
+| Episodes | Screening: 20 per seed (env seeds 69+, as the training evals). Confirmation: 100 **new** episodes per seed (seeds 1000+) for **every** treatment, so no treatment was selected by hand. Uncertainty: std over the 3 training seeds. |
+| Measured | Return, flip (body angle `obs[1]` beyond 2 rad), speed `obs[8]`, raw sampler dims outside ±1, executed dims at the bound (\|a\| ≥ 0.99 b); and the same over the 50 steps before each flip vs the same steps of episodes without a flip. |
+| Handoff | The full MuJoCo state (qpos, qvel) of 20 AWAC and 20 Aware episodes per seed, saved after 100, 300 and 500 steps, then continued for 200 steps by AWAC (once: deterministic) and by Aware (4 times: sampler noise). States that had already flipped are kept apart. Restore check: restoring each saved state and replaying the source's recorded actions for 20 steps matched within 1.5 × 10⁻⁹ (T = 1) and 6.6 × 10⁻⁹ (T = 1/3); the limit is 10⁻⁶. |
+| Minari | 20 episodes per seed (env seeds 1000+), flips counted as above. |
+| Wall-clock | ≈ 10 min for the 24 D4RL jobs, 6 at a time, next to the priority-2 training runs; a few minutes for Minari. |
+
+**Results: interventions** (confirmation episodes; return and flips: mean ± std over seeds, flips per seed in brackets)
+
+| executed action | T = 1: return | T = 1: flips | T = 1/3: return | T = 1/3: flips | BC weights: return | BC: flips |
+|---|---|---|---|---|---|---|
+| ±1, one sample (as trained) | 7,159 ± 1,487 | **51%** (81 / 43 / 28) | 6,113 ± 1,486 | **57%** (21 / 63 / 86) | 5,784 ± 342 | 2% |
+| ±0.95 | 7,637 ± 659 | 39% (53 / 32 / 31) | 6,253 ± 1,140 | 55% (24 / 62 / 80) | 5,889 ± 494 | 0% |
+| ±0.9 | 7,419 ± 741 | 38% (55 / 31 / 28) | 6,596 ± 568 | 48% (28 / 50 / 65) | 5,713 ± 639 | 0% |
+| average of 4 samples | 7,983 ± 1,189 | 43% (64 / 41 / 25) | 6,586 ± 1,308 | 52% (21 / 52 / 83) | 6,200 ± 595 | 1% |
+| average of 16 samples | 8,039 ± 1,301 | 37% (58 / 34 / 18) | 6,719 ± 1,033 | 51% (23 / 55 / 74) | 6,242 ± 687 | 0% |
+
+- **Gaussian AWAC:** 11,261 ± 68 with 3% flips (4 / 0 / 4) at ±1; 11,098 and 4% at ±0.95; 10,678 and 5% at ±0.9. Limiting its actions only slows it a little.
+- **Speed and saturation, T = 1:** speed 7.5 m/s as trained, 7.8–8.4 m/s with the interventions. The sampler's raw endpoints stay outside ±1 in ≈ 16% of dims in every treatment. Executed dims at the bound: 17.7% as trained, 11–12.5% when averaging.
+- **Screening agrees:** T = 1 went from 52% flips (7,455) to 28–48% (7,496–7,918); T = 1/3 stayed at 43–60%; BC stayed at 0–3%.
+- **Before flips** (executed dims at the bound, 50 steps before a flip vs the same steps without a flip): T = 1 25.2% vs 21.4%; T = 1/3 23.2% vs 20.6%; Gaussian AWAC, before its rare flips, 9.2% vs 2.3%.
+
+**Results: handoff** (flips within the 200 steps after the switch, upright states only; mean over seeds)
+
+| state made by → continued by | T = 1: t = 100 / 300 / 500 | T = 1/3: t = 100 / 300 / 500 |
+|---|---|---|
+| AWAC → AWAC (control) | 0 / 0 / 0% | 0 / 0 / 0% |
+| AWAC → **Aware** (handoff) | **17 / 18 / 24%** | **21 / 33 / 29%** |
+| Aware → **AWAC** (handoff) | **2 / 0 / 0%** | **3 / 2 / 5%** |
+| Aware → Aware (control) | 15 / 17 / 9% | 16 / 16 / 11% |
+
+- **Return over the 200 steps, T = 1:** AWAC → AWAC 2,308–2,413; Aware → AWAC 2,244–2,301; AWAC → Aware 1,808–1,921; Aware → Aware 1,862–1,923.
+- **Upright states:** all 60 per cell at t = 100; of the Aware-made states, 51 and 45 (T = 1), 47 and 38 (T = 1/3) at t = 300 and 500. The rest had already flipped.
+
+**Results: Minari `medium-v0`**
+
+| policy | return | flips (per seed) |
+|---|---|---|
+| Gaussian AWAC | 6,374 ± 1,786 | **83%** (75 / 80 / 95) |
+| Aware, BC weights | 12,524 ± 34 | 25% (30 / 20 / 25) |
+| the data itself | 12,089 | 20.6% |
+
+**Interpretation**
+1. **Saturated or noisy executed actions are at most a small part of the flips.**
+   - Clipping to ±0.9 or ±0.95, or averaging 16 samples, lowers the flips of T = 1 from 51% to 37–39% at the same speed, in 2 of 3 seeds (seed 1: 81% → 53–58%; seed 3 stays at 18–31%). For T = 1/3 the change is within noise (57% → 48–55%).
+   - Averaging removes the differences between samples and clipping removes the extreme values; both help about equally and little. More than a third of the T = 1 episodes still flip, against 3% for AWAC.
+   - With 3 seeds whose flip rates spread from 28% to 81%, a 12-point drop is suggestive, not established.
+2. **The pre-flip saturation does not show that saturation causes flips.** Aware's actions are slightly more often at the bound before a flip (25% vs 21%), but AWAC shows a larger contrast before its rare flips (9% vs 2%). That fits a policy reacting with extreme actions once the body tips, so it cannot separate cause from reaction.
+3. **The flips come from Aware's actions, not from the states it reaches.**
+   - From AWAC's own stable states, Aware flips in 17–24% (T = 1) and 21–33% (T = 1/3) of 200-step continuations; AWAC itself never does.
+   - From Aware's upright states, AWAC flips in 0–5% and runs almost at its own speed (return 2,244–2,301 vs 2,308–2,413).
+   - So Aware does not leave the robot in states that a good policy can't run on; at ordinary states, it chooses actions that tip the robot.
+   - Aware flips slightly *more* after taking over from AWAC than from its own states. AWAC's states are at a faster gait (≈ 11.5 m/s), which is closer to unstable.
+   - Caveat: by t = 300–500 the upright Aware states are the survivors of their episodes, which may be the easier ones.
+4. **On Minari `medium-v0`, flips are not specific to EqM.** Gaussian AWAC flips in 83% of its episodes, four times the data's rate, and reaches only half its return. Aware with BC weights flips about as often as the data (25% vs 20.6%) and matches its return. This answers Experiment 3 #3: the Gaussian does not just inherit the data's flips, the weighting makes it flip far more. On D4RL medium-expert, by contrast, the Gaussian AWAC is the stable one.
+
+**Answers**
+- **Can a small change to the executed actions reduce instability?** A little for T = 1 (51% → 37–39% flips), not for T = 1/3. It does not recover the expert gait.
+- **Do flips depend on who generated the state or on who acts after it?** On who acts after it: Aware's actions flip the robot even from AWAC's states, and AWAC recovers from Aware's states.
+- **Does a Gaussian policy flip on Minari medium?** Yes, much more than the data (83%).
+
+**What this means for priority 2.** The problem is *which* actions Aware picks at ordinary states, not their magnitude, the sampler noise, or the states it visits. That leaves the learned target (the peak of the weighted action distribution) and the weights themselves. Priority 2 tests exactly these: expert-only BC (can EqM hold the fast gait without a critic?) and the 2 × 2 frozen-weights study (does EqM pick bad actions even with IQL's weights; does a Gaussian with Aware's weights?).
 
 ## Later phases
 - **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.
