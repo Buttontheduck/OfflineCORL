@@ -701,7 +701,7 @@ T = 1/3 behaves like T = 1: 17.2% outside the box at convergence, nn ratio 0.95,
 
 ### Planned next experiments: critic feedback, tangential drift, and action dimension (2026-11-04)
 
-> **Status (2026-11-04): priority 1 done** (results in the next section, "Experiment 4, priority 1"); priority 2 and the 1M-step Aware run are running. *Originally:* planned, not run. The priority is a shared IQL-critic experiment and targeted sampler interventions on D4RL `halfcheetah-medium-expert-v2`. These experiments treat the preceding explanations involving critic ranking, saturation, and low-dimensional mode seeking as hypotheses to test, rather than established causes. Existing diagnostics argue against substantial continuing drift after convergence on the tested dataset states; they do not rule out harmful movement during convergence or effects of the sampler during training.
+> **Status (2026-11-04): priorities 1, 2 and 3 done.** Results are in the next two sections, "Experiment 4, priority 1" and "Experiment 4, priorities 2 and 3". *Originally:* planned, not run. The priority is a shared IQL-critic experiment and targeted sampler interventions on D4RL `halfcheetah-medium-expert-v2`. These experiments treat the preceding explanations involving critic ranking, saturation, and low-dimensional mode seeking as hypotheses to test, rather than established causes. Existing diagnostics argue against substantial continuing drift after convergence on the tested dataset states; they do not rule out harmful movement during convergence or effects of the sampler during training.
 >
 > **Edited later on 2026-11-04:** the order changed, experiments were added, and those changes were then revised after two reviews. Each change is explained in a **Notes** box under the part it changed, and the new experiments are in section 5.
 >
@@ -1027,6 +1027,154 @@ The most informative first **training** comparison is Gaussian versus EqM under 
 - **Does a Gaussian policy flip on Minari medium?** Yes, much more than the data (83%).
 
 **What this means for priority 2.** The problem is *which* actions Aware picks at ordinary states, not their magnitude, the sampler noise, or the states it visits. That leaves the learned target (the peak of the weighted action distribution) and the weights themselves. Priority 2 tests exactly these: expert-only BC (can EqM hold the fast gait without a critic?) and the 2 × 2 frozen-weights study (does EqM pick bad actions even with IQL's weights; does a Gaussian with Aware's weights?).
+
+> **Note (added after priority 3):** the 1M-step run below shows that these 151k checkpoints were undertrained. The same configuration flips in 8% of episodes at 310k and 1% at 1M. The conclusions above describe Aware at 151k.
+
+### Experiment 4, priorities 2 and 3: frozen weights, expert-only BC, Aware for 1M steps (3 seeds, 2026-11-04)
+> **Scope.** All runs on D4RL `halfcheetah-medium-expert-v2`, seeds 1–3.
+> - **Priority 2:** actor-only runs, 310k steps each. A Gaussian actor and an EqM actor were trained on the same frozen weights (plan section 2), and on expert-only data with equal weights (expert-only BC).
+> - **Priority 3:** a fresh Aware run for 1M steps (plan section 5c), trained normally, with the critic learning alongside the actor.
+> - **Code:** `Aware/make_weights.py`, `Aware/fit_actor.py`, CORL's `iql.py`; sweeps `exp4_iql`, `exp4_fit_bc`, `exp4_fit_iql`, `exp4_fit_aware`, `exp4_fit_aware_matched` and `exp4_aware_1m`. `run_exp4.sh` started all priority-2 steps, and `diagnostics/summarize_exp4.py` made the tables. Flip counts of the 1M runs came from `diagnostics/interventions.py --only aware_b1_n1`.
+
+**What the weight variants mean**
+
+- **Weights in general.**
+  - The actor learns by copying dataset actions. Each row (state, action) gets a weight `w = min(exp(A / T), 100)`.
+  - `A = min(Q1, Q2)(s, a) − V(s)` is a critic's verdict on how much better this action is than a "normal" action at this state. `T` sets how strongly differences in A become differences in weight.
+  - **Effective batch share:** mean² / (mean² + var) of the weights within a batch of 256. Multiplied by 256, it gives how many rows of the batch effectively count. A share of 1 means equal weights (BC).
+- **Live (normal Aware).** The critic trains alongside the actor, so the weights change at every step. V(s) uses the actor's own sampled action, so the actor partly sets its own weights (the feedback loop).
+- **Frozen.**
+  - A finished critic computes the weight of every one of the 1,998,000 rows once, and the weights are saved to a file.
+  - A new actor trains from scratch on that file. Nothing in the file changes during training, and the actor has no influence on it.
+  - The Gaussian and the EqM actor of a seed read the same file, so any difference between them comes from the actor type alone.
+- **Frozen IQL critic.**
+  - The critic comes from CORL's `iql.py`, trained 310k steps on the same data.
+  - Its V(s) is learned from dataset actions only: an upper expectile (0.7) of Q over the actions in the data. It never looks at an actor.
+  - A > 0 means "better than a typical good dataset action at this state".
+  - T = 1. The online TwinQ is used, because `iql.py` saves no target Q.
+- **Frozen Aware critic.**
+  - Both critics and the EqM actor are taken from `checkpoint_310000.pt` of the 1M-step runs below, so both weight sources trained for 310k steps.
+  - V(s) = min Q at the actor's own clipped samples, as in training, but averaged over 32 samples per state (training uses 1), with a fixed seed.
+  - A > 0 means "better than what Aware's own actor would do at this state". T = 1.
+- **Flatter ("matched") Aware weights.**
+  - These use the same frozen Aware critic and the same A for every row, so the ranking of actions is unchanged. Only T is larger: 3.71, 2.33 and 3.94 for seeds 1–3.
+  - Each T was chosen so that the weights' effective batch share equals that of the IQL weights of the same seed. The matched rows therefore differ from the IQL rows only in which critic ranks the actions, not in how concentrated the weights are.
+  - Example: actions with A = +4 and A = −4 get weights 54.6 and 0.018 at T = 1 (a ratio of about 3,000), but 2.9 and 0.34 at T = 3.7 (a ratio of about 9).
+- **Expert-only BC.** All weights are 1 on the expert half of the data (episodes 1,000–1,999), and the medium half is dropped. No critic is involved.
+
+**Setup**
+
+| | |
+|---|---|
+| Actors | EqM as in Aware: 4 × 256 MLP, λ = 8, a₀ = 0.8, η = 0.01, K = 20, momentum 0.3, one sample per evaluation step. Gaussian: CORL `awac.py`'s actor (mean MLP, state-independent log-std in [−20, 2], evaluated with its mean), made 4 × 256 to match the EqM network. |
+| Fits | 310k updates, batch 256, Adam 3 × 10⁻⁴. Evaluated every 1k steps with 10 episodes (env seeds 69+, as in training). Score: mean of the last 20 evals (291k–310k), then mean ± std over seeds. Flips: share of the episodes in those 20 evals. |
+| 1M-step Aware | A fresh run as #4 (T = 1, λ = 8, K = 20), 1M steps, a checkpoint every 1k steps. Score at a step: mean of the evals in the 20k steps up to it. Flips: 100 new episodes per seed (env seeds 1000+) at 151k, 310k, 500k and 1M, with the trained sampler. These are the same episodes as priority 1's confirmation runs. |
+| Wall-clock | Priority 2: 2.5 h (IQL 55 min, then the fits), alongside the 1M runs. The 1M runs: about 8.3 h each, 3 in parallel. |
+
+**Results: the weights** (per seed: 1 / 2 / 3)
+
+| weights | T | effective batch share (rows of 256) | at the cap | below 0.01 | median | A > 0 |
+|---|---|---|---|---|---|---|
+| IQL | 1 | 0.465 / 0.149 / 0.343 (119 / 38 / 88) | 36 / 9 / 24% | 19 / 37 / 18% | 13.4 / 0.07 / 2.1 | 65 / 31 / 56% |
+| Aware | 1 | 0.043 / 0.043 / 0.046 (11 / 11 / 12) | 0.7 / 1.1 / 1.2% | 22 / 22 / 20% | 0.28 / 0.26 / 0.32 | 21 / 21 / 23% |
+| Aware, matched | 3.71 / 2.33 / 3.94 | 0.465 / 0.149 / 0.343 (119 / 38 / 88) | 0 / 0.2 / 0.1% | 4 / 9 / 3% | 0.71 / 0.57 / 0.75 | 21 / 21 / 23% |
+
+- **Advantages:** IQL's A averages +1.2 / −3.1 / +0.3 (std 8.4–9.2); Aware's −3.3 / −3.3 / −3.0 (std 6.6–7.3).
+- **Why Aware's A is mostly negative:** by 310k its actor is already better than most dataset actions, especially the medium half.
+- **IQL seed 2's critic is the odd one:** only 31% of rows get A > 0, and the median weight is 0.07.
+
+**Results: actors on frozen weights** (310k steps; normalized score, per seed in brackets)
+
+| weights | EqM | Gaussian | flips: EqM | flips: Gaussian |
+|---|---|---|---|---|
+| expert-only BC | 92.6 ± 0.1 | 92.5 ± 0.1 | 0% | 0% |
+| IQL, T = 1 | 78.4 ± 13.9 (91.6 / 59.2 / 84.2) | 86.6 ± 9.3 (93.6 / 73.4 / 92.7) | 25% (4 / 54 / 17) | 11% (0 / 31 / 3) |
+| Aware, T = 1 | 86.2 ± 1.1 (87.7 / 85.5 / 85.4) | 92.1 ± 0.8 (93.1 / 91.4 / 91.8) | 11% (10 / 8 / 16) | 2% (0 / 2 / 4) |
+| Aware, matched T | **92.2 ± 0.2** (92.2 / 92.0 / 92.4) | **93.2 ± 0.4** (93.2 / 92.7 / 93.6) | 2% (3 / 2 / 2) | 1% (0 / 2 / 0) |
+| *IQL's own Gaussian policy (β = 3), reference* | – | 86.2 ± 2.2 (85.0 / 89.2 / 84.3) | – | – |
+
+**Learning curves** (mean over seeds of the evals in the 10k steps up to each point)
+
+| weights | actor | 50k | 100k | 151k | 200k | 250k | 310k |
+|---|---|---|---|---|---|---|---|
+| expert-only BC | EqM | 92.2 | 92.9 | 93.2 | 93.0 | 92.6 | 92.5 |
+| | Gaussian | 92.4 | 92.7 | 92.7 | 92.6 | 92.4 | 92.6 |
+| IQL, T = 1 | EqM | 61.3 | 70.4 | 74.6 | 76.8 | 79.2 | 78.4 |
+| | Gaussian | 78.8 | 83.7 | 81.8 | 81.0 | 84.8 | 87.0 |
+| Aware, T = 1 | EqM | 57.4 | 71.0 | 81.3 | 82.9 | 85.5 | 86.1 |
+| | Gaussian | 82.5 | 85.6 | 88.0 | 91.5 | 91.8 | 92.1 |
+| Aware, matched T | EqM | 70.4 | 82.8 | 89.3 | 91.5 | 91.7 | 92.4 |
+| | Gaussian | 90.0 | 91.6 | 92.8 | 93.3 | 93.7 | 93.1 |
+
+**Results: Aware for 1M steps** (live training, T = 1)
+
+| | 151k | 310k | 500k | 700k | 1M |
+|---|---|---|---|---|---|
+| score | 59.7 ± 8.0 (50.2 / 59.3 / 69.7) | 87.4 ± 1.7 (85.2 / 87.8 / 89.2) | 91.9 ± 1.4 (92.2 / 90.1 / 93.4) | 94.1 ± 1.1 (93.1 / 93.6 / 95.7) | **95.5 ± 0.5** (96.1 / 95.5 / 94.9) |
+| return, 100 new episodes per seed | 8,233 ± 970 | 10,536 ± 381 | 11,057 ± 229 | – | **11,593 ± 133** |
+| flips | 31% (53 / 15 / 24) | 8% (3 / 18 / 3) | 9% (14 / 12 / 0) | – | **1%** (0 / 1 / 1) |
+| speed (m/s) | 8.6 | 11.0 | 11.5 | – | 12.0 |
+| executed dims at the bound | 15.8% | 11.5% | 10.9% | – | 11.5% |
+
+- **The fresh run reproduces Experiment 3 at 151k:** 59.7 here vs 59.5. Experiment 3's run flipped more on the same episodes (51%: 81 / 43 / 28).
+- **Best single eval:** 98.5 / 98.3 / 98.7.
+- **References:**
+  - Gaussian AWAC at 151k (Experiment 3): 93.4 ± 0.2. On the same 100 episodes it returns 11,261 ± 68 with 3% flips.
+  - CORL's README, after 1M steps: AWAC 95.0 ± 0.6 and BC 56.0 ± 7.4.
+  - The expert half of the data averages 88.1.
+
+**Interpretation**
+1. **EqM can imitate the expert gait.**
+   - With expert-only BC, EqM scores 92.6 and the Gaussian 92.5. Both reach this level by 50k steps, with no flips.
+   - So EqM's network and sampler can hold the fast gait. The failure seen at 151k needs the advantage weighting, or the slow learning that comes with it.
+2. **With identical weights, EqM trails the Gaussian, and the gap follows how concentrated the weights are.**
+   - The gap at 310k is 8.2 points on IQL's weights, 5.9 on Aware's at T = 1, and 1.0 on Aware's flatter weights. The flips follow the same order.
+   - The gap is mostly speed. On Aware's weights at T = 1, EqM is 25 points behind at 50k and 6 behind at 310k. At T = 1, only about 11 rows of each batch of 256 carry the weight, and EqM learns more slowly from such a target than a Gaussian.
+   - In the plan's outcome table, this is "EqM improves but still trails Gaussian" together with "Gaussian works with Aware's weights".
+3. **Aware's weights are usable, and its critic ranks actions at least as well as IQL's.**
+   - At T = 1, both actors score higher on Aware's weights than on IQL's: EqM 86.2 vs 78.4, Gaussian 92.1 vs 86.6.
+   - At the same concentration (matched), EqM scores 92.2 on Aware's ranking against 78.4 on IQL's.
+   - IQL's average is pulled down by seed 2, whose critic gave few rows a positive advantage. Both actors did worst on it (59 and 73), with the most flips (54% and 31%).
+4. **The feedback loop shows no cost by 310k.**
+   - Live Aware at 310k (87.4) scores the same as EqM trained on frozen Aware weights from that same checkpoint (86.2).
+   - The frozen fit is ahead earlier (81 vs 60 at 151k). But it had a finished 310k critic from its first step, while the live run's critic was still learning, so this does not isolate the feedback loop.
+   - The frozen V(s) also averages 32 samples instead of 1.
+5. **More training closes the gap.**
+   - The score climbs from 59.7 at 151k to 87.4 at 310k and 95.5 at 1M. Flips drop from 31% to 8–9% at 310k–500k and to 1% at 1M. Speed rises from 8.6 to 12.0 m/s.
+   - Experiment 3's gap was mostly slow learning, which is the plan's first reading in 5c.
+   - At 1M, Aware matches CORL's published AWAC at 1M (95.0 ± 0.6). It also returns more than our 151k Gaussian AWAC on the same 100 episodes (11,593 vs 11,261).
+   - Caveat: we have not run AWAC for 1M steps ourselves, so a same-machine, same-budget comparison is still missing.
+
+**Answers to the plan's questions**
+- **Does EqM fail even when action preferences are identical?** No, but it learns more slowly and flips more than the Gaussian, the more so the more concentrated the weights. At 310k it trails by 8, 6 and 1 points.
+- **Are Aware's own weights usable?** Yes. A Gaussian reaches 92.1 on them, and EqM 86.2, or 92.2 with flatter weights.
+- **Can EqM reproduce the fast gait without critic weighting?** Yes: 92.6 with expert-only BC, with no flips.
+- **Does more training close the gap?** Yes, for this configuration: 95.5 at 1M with 1% flips.
+
+**What these results say about the temperature T for EqM**
+
+| setting | T | effective batch share | EqM |
+|---|---|---|---|
+| live, BC weights (Exp 3) | ∞ | 1.0 | 50.1 at 151k (copies the medium half too) |
+| live, T = 1/3 (Exp 3) | 1/3 | 0.066 (4.3% at the cap) | 53.4 at 151k; 57% flips (priority 1) |
+| live, T = 1 | 1 | ≈ 0.036 | 59.7 at 151k, 87.4 at 310k, 95.5 at 1M |
+| frozen Aware critic, T = 1 | 1 | 0.043–0.046 | 86.2 at 310k, 11% flips |
+| frozen Aware critic, matched | 2.3–3.9 | 0.15–0.47 | 92.2 at 310k (92.0 at T = 2.33, 92.4 at T = 3.94), 2% flips |
+| expert-only BC | – | 1.0 on the expert half | 92.6 at 310k |
+
+- **What we know:**
+  - With frozen weights, T ≈ 2.3–3.9 is better for EqM than T = 1: 92.2 vs 86.2 at 310k, with 2% vs 11% flips. It also learns faster: 70 vs 57 at 50k, and 89 vs 81 at 151k.
+  - Within 2.3–3.9 the score barely changed. Sharper weights (T = 1/3) were not better, and no weighting at all (BC on all data) was much worse.
+  - So moderately flat weights suit EqM better than Aware's T = 1, at least for learning speed.
+- **What we don't know:**
+  1. **Whether this holds in live training.** T was changed only on frozen weights. In live training, A changes scale as the critic and actor learn, so one T gives different concentrations at different times.
+  2. **Whether flatter weights also give the best final score.**
+     - Live T = 1 reached 95.5 at 1M, above every 310k fit, including expert-only BC (92.6).
+     - The matched EqM fit had already levelled off near the expert-BC level (91.5 at 200k, 92.4 at 310k).
+     - Flatter weights may learn faster and then stop near that level. Sharper ones may be slower but go higher. The matched fits ran only 310k steps, so this is open.
+  3. **This was not a T sweep.** It was one T per seed, chosen to match IQL's concentration.
+  4. **A good T depends on the critic.** It depends on the scale of A (std ≈ 7 for Aware, 8.4–9.2 for IQL). The effective batch share is the more portable setting: 0.15–0.47 worked, and 0.04 was slow.
+- **The test that would settle it:** live Aware at T = 2 and T = 4, or with T adjusted every batch to keep a target share (e.g. 0.3). 3 seeds, compared with T = 1's curve: 59.7, 87.4 and 95.5 at 151k, 310k and 1M. About 2.5 h at 310k steps, or 8 h at 1M.
 
 ## Later phases
 - **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.
