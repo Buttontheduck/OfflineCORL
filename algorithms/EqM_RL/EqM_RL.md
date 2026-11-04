@@ -699,6 +699,257 @@ T = 1/3 behaves like T = 1: 17.2% outside the box at convergence, nn ratio 0.95,
   - a bounded action parameterization (e.g. tanh-squashed), so fixed points cannot leave the box. That one is a low-dimensionality-style change, so it needs the owner's approval.
 - **Count flips on Minari medium-v0** for Gaussian AWAC and Aware with BC weights (Experiment 3 #3, still open). `drift.py` and `common.py` support Minari runs, but `drift.py` has only been run on D4RL so far.
 
+### Planned next experiments: critic feedback, tangential drift, and action dimension (2026-11-04)
+
+> **Status: planned, not run.** The priority is a shared IQL-critic experiment and targeted sampler interventions on D4RL `halfcheetah-medium-expert-v2`. These experiments treat the preceding explanations involving critic ranking, saturation, and low-dimensional mode seeking as hypotheses to test, rather than established causes. Existing diagnostics argue against substantial continuing drift after convergence on the tested dataset states; they do not rule out harmful movement during convergence or effects of the sampler during training.
+>
+> **Edited later on 2026-11-04:** the order changed, experiments were added, and those changes were then revised after two reviews. Each change is explained in a **Notes** box under the part it changed, and the new experiments are in section 5.
+
+#### 1. Recommended experiment order and evaluation protocol
+
+| Priority | Experiment | Main question |
+|---|---|---|
+| 1 | Reevaluate existing checkpoints with inward action clipping and action averaging. Also the handoff test and the Minari flip counts (section 5a, 5b) | Can a small change to executed actions reduce instability? Do flips depend on who generated the state or on who acts after it? |
+| 2 | Run together: (a) Gaussian and EqM actors on the **same frozen weights**, from an IQL critic and from Aware's own critic; (b) Gaussian BC and EqM BC on the same expert-only trajectories | Does EqM fail even when action preferences are identical? Are Aware's own weights usable? Can EqM reproduce the fast gait without critic weighting? |
+| 3 | Aware for 1M steps, as a fresh run (section 5c) | Does more training close the gap? |
+| 4 | Targeted drift and representation experiments (section 3, and section 4 step 2), shaped by the results of priorities 1–3 | Does tangential movement contribute to the failures? Does changing the action representation address them? |
+| alongside | Controlled synthetic dimension study (section 4 step 1), running from the start | Under which separations, anisotropies, and imbalances do the low-dimensional symptoms appear, and how do they change with d? |
+| low | Gaussian AWAC temperature and weight-concentration sensitivity (section 5d) | How do return, flips, and saturation change as the weights sharpen? |
+
+> **Notes (edited 2026-11-04):**
+> - **Changed: expert-only BC moved from priority 3 to priority 2,** so it runs at the same time as the IQL test. It is cheap, needs no new critic code (only a filter that keeps the expert half of the data), and it is the simplest test of whether the EqM actor can run the fast gait at all. If EqM falls over even here, the critic is not the main problem, and the IQL result has to be read differently.
+> - **Changed: the IQL test gets a second set of weights,** from Aware's own critic. See the notes in section 2.
+> - **Added: a controlled conditional-mixture dataset to the drift test,** as a mechanism test next to `medium-expert`, which stays the main dataset. See the notes in section 3.
+> - **Changed: the synthetic dimension study now comes before the Fourier experiment.** See the notes in section 4.
+> - **Added:** the handoff test and the Minari flip counts (priority 1), the 1M-step Aware run (priority 3), and the Gaussian AWAC temperature test (low priority). They are described in section 5.
+> - **Revised after second review: the order.** The 1M-step run now has priority 3 on its own, ahead of the AWAC temperature test, which became a low-priority sensitivity test (see 5d). Drift and representation experiments share priority 4 and are shaped by the results of priorities 1–3. The synthetic study runs alongside everything from the start, because it is cheap and doesn't depend on the other results.
+> - **Not changed:** the evaluation-only interventions below and the common evaluation protocol.
+
+**First, evaluation-only interventions on existing checkpoints:**
+- Test executed action bounds of ±1.0, ±0.95, and ±0.9.
+- Average 1, 4, or 16 independently sampled, clipped actions. Initially test this separately from inward clipping, so their effects can be distinguished.
+- Apply the clipping treatments to Gaussian AWAC too.
+- Measure return, flip rate, forward speed, and action changes **before** flips. Record raw endpoints and executed actions separately: both the critic and the environment receive clipped actions in the current implementation.
+- Fewer flips accompanied by much slower running would establish a stability–speed tradeoff, rather than recovery of expert behavior. Averaging may do little if EqM samples already converge to nearly identical actions; that is informative too.
+
+**Common evaluation protocol:** use the existing three training seeds for screening. Use about 20 episodes per seed to select promising settings, then around 100 **new** evaluation episodes per seed for confirmation. Use common environment seeds across treatments and common sampler noise where applicable. Select settings on the screening episodes only. Treat training seeds as independent units when reporting uncertainty; repeated episodes or evaluation checkpoints are not additional training seeds. Report each seed's return and flip rate, along with speed and saturation. Confirm promising training changes with additional training seeds when feasible.
+
+#### 2. Shared IQL critic: test value learning separately from actor extraction
+
+**Expectation:** an IQL-like critic could help substantially, but it is not guaranteed to close the gap. It removes one plausible failure mechanism: policy-generated actions entering value-learning targets. It does not guarantee that the extracted EqM policy will be stable during rollouts.
+
+The proposed replacement is an expectile value fit and a value-based TD target:
+
+$$
+V(s) \leftarrow \operatorname{expectile}_{\tau_{\mathrm{exp}}}\!\left[Q(s,a),\ a\sim D(\cdot\mid s)\right],
+\qquad y = r + \gamma(1-d)V(s').
+$$
+
+Extract the actor with fixed dataset weights:
+
+$$
+w(s,a) = \min\!\left\{\exp\!\left[\frac{Q(s,a)-V(s)}{T}\right],\ 100\right\}.
+$$
+
+This follows IQL's separation of value learning from policy extraction; see the [IQL paper](https://arxiv.org/abs/2110.06169).
+
+**Controlled design:**
+1. Train one IQL Q/V pair per seed on the same dataset and preprocessing as the comparison methods.
+2. Freeze Q/V and compute fixed weights for dataset transitions.
+3. Train a Gaussian actor and an EqM actor using those **identical weights**.
+4. Match data, preprocessing, actor training budgets, and approximately network capacity. Report critic-pretraining and actor-training budgets separately. Check learning curves before interpreting a failure as structural rather than undertraining.
+5. Start with expectile `τ_exp = 0.7`, as in the [authors' MuJoCo configuration](https://github.com/ikostrikov/implicit_q_learning/blob/master/configs/mujoco_config.py). Keep `T = 1` for the first comparison with current Aware; test `T = 1/3` separately so temperature is not silently changed alongside the critic. Here `T` divides the advantage, whereas the official configuration's `temperature = 3` is an inverse-temperature multiplier.
+6. Log weight distributions, clipping fractions, and effective batch share. These help distinguish changes in action preferences from changes in weight sharpness.
+7. **Second set of weights, from Aware's own critic.** For each seed, take the trained Aware medium-expert checkpoint (T = 1, #4) and freeze both its critics **and its EqM actor**. Compute the weights once with the training formula: V(s) from that actor's EqM sampler (η = 0.01, K = 20, momentum 0.3), averaged over many samples per state (e.g. 32; training used 1) with a fixed random seed, so V(s) is not noisy. Save them as **one cached weight array per seed**, and train both actors on that same array. Otherwise the random samples in V(s) would give the two actors slightly different targets.
+
+| Frozen weights from | Gaussian actor | EqM actor |
+|---|---|---|
+| IQL critic | planned | planned |
+| Aware's critic | added | added |
+
+**Limits of the Aware-weights arm:**
+- It tests the **final** weights only. During training the weights changed together with the critic and the actor; a refit on frozen final weights can't reproduce that feedback loop.
+- Aware's weights are very concentrated (≈ 3.6% effective batch share). A failure on them can come from that concentration, from optimization, or from too little training, not only from a wrong ranking of actions.
+- **Optional, matched concentration:** also refit on Aware's weights recomputed with a temperature chosen so that their effective batch share matches the IQL weights'. This separates *which* actions get weight from *how concentrated* the weight is.
+
+| Outcome | Interpretation |
+|---|---|
+| Both actors work well | The original critic–policy coupling or resulting weights likely contributed; this alone does not isolate which component. |
+| Gaussian works; EqM fails | EqM fitting/sampling remains a problem under a shared target. |
+| Both fail | Investigate the common target, training budget, and implementation before attributing failure to EqM. |
+| EqM improves but still trails Gaussian | Both value learning and actor extraction may contribute. |
+| Gaussian works with Aware's weights | Those weights support a successful Gaussian policy. This strengthens an actor-fitting/sampling explanation for EqM's failure. |
+| Gaussian fails with Aware's weights but works with IQL's | The weight source matters. |
+| Gaussian fails with Aware's weights | Does not alone show that Aware's critic ranks actions wrongly: weight concentration, optimization, and too little training can also cause it. |
+
+**Complementary control: expert-only BC.** Train Gaussian BC and EqM BC on exactly the same expert-only trajectories, with all weights equal to one and no critic-dependent actor update. If Gaussian BC runs the expert gait reliably while EqM BC flips, the failure can occur without advantage weighting. This is a matched control; comparing EqM BC at 151k updates against published Gaussian BC at 1M updates cannot isolate imitation quality.
+
+> **Notes (edited 2026-11-04):**
+> - **Added: step 7, the 2 × 2 table, the "Limits of the Aware-weights arm" list, and the last three outcome rows.** The original design trains both actors on IQL's weights only. That shows whether EqM can use good weights, but not whether Aware's own weights are usable. Training a Gaussian actor on Aware's weights adds that comparison. The trained Aware checkpoints already exist, so this adds two actor-only runs per seed (four with the optional matched-concentration refit) and no critic training.
+> - **Revised after review:** the first version of the outcome rows read a Gaussian failure on Aware's weights as proof that Aware's critic ranks actions wrongly; the rows are now softer, and a row for "fails with Aware's weights, works with IQL's" is added. Step 7 now also freezes the Aware actor and uses one cached weight array for both actors, and the limits list says that this tests only the final weights.
+> - **Changed: expert-only BC (the paragraph above) now runs at the same time as this experiment** (priority 2 in section 1), not after it.
+
+#### 3. Tangential drift: measure the movement and intervene on it
+
+**Hypothesis:** after approaching the conditional action distribution, refinement moves actions along it in a way that worsens the resulting policy. A return-versus-K curve alone cannot establish this mechanism.
+
+**Datasets.** Run the measurements and interventions below on:
+- **`medium-expert` first: the main dataset,** because that is where the unexplained failure occurs.
+  - Tangential drift does not need two separate behaviors. Within one behavior, samples can slide along a spread-out, anisotropic action distribution toward its peak.
+  - That 99% of an expert state's 32 nearest neighbours are expert states shows that medium and expert states are well separated. It does not show that each state has a single action or no tangent directions.
+  - Aware's per-state samples on medium-expert are the narrowest of all runs (spread ≈ 0.068), which is consistent with samples sliding toward the peak. Sliding toward the peak of the weighted distribution during the 20 sampler steps could also be what produces the saturated actions.
+- **A controlled conditional-mixture dataset as a mechanism test** (new; needs a small script). It targets the case with two behaviors at the same state, where the sampler can pick one behavior and cancellation between them can create false stopping points (caveat points 3 and 4).
+  - **Build it without switching policies:** collect a fixed bank of states from rollouts of two policies we already have, the medium-expert Gaussian AWAC (fast gait) and Aware with BC weights (medium gait). Then query both policies many times at every banked state and keep the (state, action) pairs. The conditional target is the mixture $p(a\mid s) = \tfrac12\,\pi_{\mathrm{AWAC}}(a\mid s) + \tfrac12\,\pi_{\mathrm{BC}}(a\mid s)$. The queried actions are never executed, so switching between gaits can't destabilize anything; this isolates distribution fitting.
+  - **Fit it with BC:** train the EqM actor with all weights equal to one, using the actor-only trainer from the 2 × 2 study in section 2. No rewards or next states are needed.
+  - **Measure against the actual mixture:** compare EqM's samples at each state with fresh samples from the mixture itself (a distribution distance, plus the share of samples near each component). Don't assume two separated groups or a 50/50 geometric split: the two components can overlap and form a single mode. Report how far apart the two policies' actions are at each state, and analyse well-separated states separately.
+  - **Optional, controlled separation:** Aware-BC gives nearly identical actions at a state (spread ≈ 0.06), so the components can also be placed by hand, e.g. Gaussians around each policy's action with a chosen spread and distance.
+  - **"Good actions" needs separate evidence:** two policies that work on their own trajectories need not both be safe at the same state. Before calling both components good actions, branch the simulator from identical states with each policy's action and compare the outcomes.
+- **`halfcheetah-medium-replay-v2`** as a natural example of the two-behavior case, where policies from different stages of training visit similar states. Check its per-state multimodality with the same nearest-neighbour test first.
+
+**Measurement at fixed states:**
+- Include held-out dataset states, normally visited states, and states shortly before flips.
+- For each fixed state, hold initial noise constant across sampler treatments and record the entire action-refinement trajectory. This separates movement during sampling from changes caused by the environment evolving.
+- Estimate local action directions from an **independent data-based reference**, accounting for variation in nearby states. Do not use the EqM Jacobian alone to define the tangent: the field being investigated should not define its own reference.
+- Validate the estimated directions across neighbourhood sizes and held-out data. If the conditional distribution has no reliable thin structure or clear covariance eigengap, a tangent/normal decomposition may not be identifiable. In that case, report movement along high- and low-variance directions without claiming they define a true manifold.
+- Measure cumulative movement in the estimated tangent and normal directions, field residual, sample spread, proximity to the conditional reference, and saturation. Use the advantage-weighted conditional target as well as the unweighted behavior reference when interpreting changes in distribution fit.
+
+Where the decomposition is reliable, modify the sampler update near the estimated conditional data region:
+
+$$
+\Delta a_{\alpha} = P_N\Delta a + \alpha P_T\Delta a,
+\qquad \alpha\in\{1,\ 0.5,\ 0\}.
+$$
+
+Here $P_T$ selects estimated tangent directions and $P_N$ the remaining directions. Keep the field fixed. Use the same initial noise, clipping, and sampler implementation across treatments; document how a modified direction enters the Nesterov look-ahead.
+
+| Intervention | Purpose |
+|---|---|
+| Suppress tangential movement | Test the proposed mechanism |
+| Uniformly reduce update size | Check whether simply moving less explains the benefit |
+| Suppress a random subspace of equal dimension | Check whether the estimated tangent directions matter specifically |
+
+Match the control interventions' update magnitudes as closely as practical. Compare full rollouts using separate screening and confirmation episodes.
+
+**Evidence supporting harmful tangential drift would combine:**
+1. Tangential movement occurs during the refinement interval associated with deterioration.
+2. Suppressing it reduces flips and improves return beyond the matched controls.
+3. The improvement retains a comparable running speed.
+
+**Stronger simulator check:** restore the same **full simulator state**, including relevant time/RNG state, and compare earlier versus later refinement actions, followed by a common continuation policy. This measures consequences without relying on a learned critic's judgment. Use this alongside sustained-intervention rollouts, since a one-action comparison does not capture every effect of repeatedly following a policy.
+
+Focus on movement **before convergence**. Current measurements make substantial ongoing movement after convergence unlikely on the tested dataset states. Evaluation-only interventions still cannot rule out the training sampler having already shaped the critic, weights, and field adversely.
+
+> **Notes (edited 2026-11-04):**
+> - **Added: the "Datasets" paragraph.** `medium-expert` stays the main dataset, as in the original plan. Added next to it: a controlled conditional-mixture dataset as a mechanism test, and `medium-replay` as a natural example of the two-behavior case. They test the two-behavior side of the caveat (picking one behavior, cancellation), which `medium-expert` can't show clearly because its medium and expert states don't overlap.
+> - **Revised after review:** the first version of this paragraph called `medium-expert` a control where harmful drift could not happen. That mixed up tangential drift, which can happen within one behavior, with cancellation between two behaviors, and it read the 99% neighbour result as "one action per state". Both claims are removed.
+> - **Revised after second review: the mixture dataset.** The first version switched between the two policies at random at every step and expected half of the samples near each policy's action. But switching gaits every step can itself destabilize control, two components need not form two separate modes, and two policies need not both be safe at the same state. The dataset is now built from a fixed state bank with repeated queries of both policies (no switching), EqM is compared with samples from the actual mixture, and calling both components "good" needs simulator branches.
+> - **Not changed:** the measurements, the interventions and their controls, the evidence criteria, and the simulator check.
+
+#### 4. Low dimension: separate representation improvements from a dimensional cause
+
+Distinguish two claims:
+- A different action representation improves EqM.
+- Low action dimension causes the failure.
+
+The first is easier to establish. **Fourier lifting succeeding alone would not prove the second.** A deterministic lift increases ambient dimension while leaving the intrinsic degrees of freedom unchanged; it also changes geometry and the information available after corruption.
+
+**What current results already suggest.** Collapse is just as strong in runs that work (BC weights, medium-replay), and Gaussian AWAC also executes one deterministic action per state, yet scores 93.4. Also, an EqM actor that sampled the advantage-weighted distribution perfectly would give random draws from it, not its average, which is what AWAC executes. So low dimension may be real and still not be the cause of this failure, and a better representation may improve sample quality without closing the gap.
+
+**Step 1: synthetic test (runs alongside the other experiments from the start; a few hours, no RL training).** Use a known conditional action distribution and compute or approximate the optimal EqM regression field, then compare it with the trained network. This distinguishes failure inherent to the objective/sampling dynamics from fitting error. For the cancellation hypothesis, locate low-density stationary points, perturb them to test attraction or escape, and check whether lifting removes the problematic behavior. A small field norm at a midpoint alone does not establish an attracting false equilibrium. Controlled dimension sweeps should specify intrinsic dimension, ambient dimension, and signal-to-noise/separation changes separately. A concrete sweep:
+- two-mode mixtures in which mode separation, covariance anisotropy, and mixture imbalance are varied, not one fixed mixture;
+- two sweeps: intrinsic = ambient = d for d ∈ {2, 6, 12, 24, 48}; and intrinsic dimension fixed at 6 with a distance-preserving linear embedding into ambient d ∈ {6, 12, 24, 48} (6 dimensions can't be embedded into 2 while keeping distances);
+- state whether the noise level is fixed in total or per coordinate, and normalize norm-based metrics across d (e.g. ‖f‖ / √d), so that differences don't come from the coordinate count alone;
+- measure ‖f‖ at the data, the sample spread against the true spread, the share of samples on each mode, and stationary points between the modes.
+
+The EqM paper's high-dimensional arguments give no practical cutoff dimension. So a good result at d = 6 on these mixtures would weaken the dimension explanation, but it would not show that HalfCheetah's 6-D actions are high-dimensional enough. Step 2 remains the direct test.
+
+**Step 2: RL comparison** (a low-dimensionality fix, so it needs the project owner's approval, like Experiment 3's #5). Use the same frozen dataset weights from the IQL experiment, and compare:
+
+| Actor representation | Purpose |
+|---|---|
+| Original 6-D actions | Baseline |
+| Larger 6-D network | Control for model capacity |
+| Actions plus zero coordinates | Control for extra coordinates |
+| Distance-preserving linear embedding | Increase ambient dimension without stretching signal distances |
+| Rescaled 6-D actions, decoded before execution | Control for signal-to-noise and scale changes |
+| Actions plus Fourier features | Test informative nonlinear lifting |
+
+**Protocol:**
+- Start with one added dimension count, such as 24. If the effect is clear, test a smaller and larger count.
+- Keep loss scaling explicit and monitor original-action and auxiliary-coordinate errors separately. Match model capacity where practical and report compute.
+- Compare both equal sampling compute and adequately converged sampling. A fixed K can unfairly penalize a representation that converges more slowly.
+- Measure decoded action quality, distribution coverage, refinement movement, return, and flips. Keep the critic fixed initially so representation changes cannot alter the weights.
+- Treat zero padding as an imperfect control: its noisy coordinates can reveal information about the corruption level.
+- Improvement specific to Fourier lifting would support an informative-representation effect. Improvement from scaling or extra capacity too would weaken an explanation based specifically on dimension. A successful fixed-weight comparison should be followed by end-to-end training to test whether the benefit survives critic–actor feedback.
+
+**Defer action chunking.** It changes temporal information and the control problem as well as dimension, so success would be harder to interpret as evidence for a dimensional cause.
+
+> **Notes (edited 2026-11-04):**
+> - **Changed: the synthetic test moved from the end of this section to step 1,** and now has a concrete dimension sweep. It needs no RL training and shows under which conditions the low-dimensional symptoms appear. The original paragraph's text is kept unchanged inside step 1.
+> - **Revised after second review: the sweep.** The embedded arm now starts at d = 6, since 6 dimensions can't be embedded into 2 while keeping distances. The sweep now varies separation, anisotropy, and imbalance, states how noise scales, and normalizes metrics across d. The first version's line "if the symptoms are small at d = 6, step 2 can wait" is removed: a result on synthetic mixtures can't show that HalfCheetah's actions are high-dimensional enough. The study now runs alongside the other experiments instead of gating step 2.
+> - **Added: "What current results already suggest".** It explains why low dimension may not be the main cause here, so a step 2 that changes little would not be surprising.
+> - **Added: the approval reminder in step 2.** Step 2 is a low-dimensionality fix, so under Experiment 3's rules it needs the project owner's approval. The synthetic test in step 1 does not.
+
+The most informative first **training** comparison is Gaussian versus EqM under identical frozen IQL weights. It gives the subsequent drift and lifting experiments a cleaner foundation.
+
+#### 5. Additional experiments
+
+> **Notes (added 2026-11-04):**
+> - This whole section is new; none of these experiments were in the original plan. Their place in the order is in the table in section 1.
+> - **Revised after second review:** 5a now uses a 2 × 2 design with matched controls, a fixed horizon after the switch, and narrower readings. 5c is a fresh run (the existing checkpoints can't be resumed exactly), counts flips at the trained sampler setting only, and draws a softer conclusion. 5d is relabelled as a temperature and weight-concentration sensitivity test with low priority: because of the weight cap, sharper weights don't move the Gaussian toward the peak, so it can't separate "average vs peak".
+
+**a) Handoff test** (evaluation only, priority 1)
+- **What:** save full simulator states from rollouts of Gaussian AWAC and of Aware (existing medium-expert checkpoints of the same seed; Aware with T = 1 and T = 1/3) at several points in the episode, e.g. steps 100, 300 and 500. From each saved state, continue for the **same fixed horizon** (e.g. 200 steps) with each policy:
+
+| State generated by | Continue with AWAC | Continue with Aware |
+|---|---|---|
+| AWAC | control | handoff |
+| Aware | handoff | control |
+
+- **Design details:**
+  - The equal horizon matters: otherwise a switch at step 500 has less time to fail than a switch at step 100.
+  - Keep states where a flip has already happened separate from upright states.
+  - HalfCheetah's physics are deterministic and AWAC acts with its mean action, so an AWAC continuation from a saved state has a single outcome. Repeat Aware's continuations with several noise seeds per state.
+- **Question:** does the flip rate depend more on who generated the state or on who acts after it?
+- **Reading (kept narrow):**
+  - Aware flips more than AWAC from the same AWAC-generated states: Aware's actions are riskier at those states.
+  - AWAC fails after taking over from Aware: this AWAC policy did not recover from those states. It does not show that they can't be recovered from.
+  - Aware does better after taking over from AWAC than when in control from the start: this could come from easier states, from skipping the start-up phase, or from the shorter exposure, not necessarily from errors that build up over time.
+- **Cost:** about an hour, no training. `drift.py` already loads both policies (`--awac`); it needs options to save and restore simulator states.
+
+**b) Count flips on Minari `medium-v0`** (evaluation only, priority 1; left over from Experiment 3 #3)
+- **What:** roll out the saved Gaussian AWAC checkpoints (`/workspace/Trained_Models/checkpoints/AWAC_env_namemedium-v0_*`) and Aware with BC weights (`Aware_env_namemedium-v0_scale_gradient8.0_weightingbc_*`), 3 seeds × 20 episodes, and count flips.
+- **Question:** does a normal Gaussian actor also fall over on this dataset, whose behavior policy itself flips in 20.6% of episodes?
+- **Cost:** under an hour. `rollout.py` handles the Aware runs; the `Awac_Minari.py` checkpoints need a small loader.
+
+**c) Train Aware for 1M steps on medium-expert** (training, priority 3)
+- **What:** a **fresh** run of Aware as in #4 (T = 1, λ = 8, K = 20), 3 seeds, 1M steps (CORL's standard budget) instead of 151k. Keep checkpoints at 151k, 300k, 500k and 1M, and count flips at each with the normal sampler setting only (η = 0.01, K = 20, momentum 0.3). The 198-setting drift grid is not needed.
+- **Why a fresh run:** the existing checkpoints hold only the actor and the two online critics (`model`, `critic_1`, `critic_2`), with no optimizer state and no target critics. Continuing from them would restart Adam and reset the target critics, which is not the same as uninterrupted training. The alternative is to implement a complete training-state resume first.
+- **Why:** Aware was still improving when it stopped (5,820 at 100k → 7,480 at 150k), while AWAC was within ≈ 3% of its final score by 100k. Part of the gap may be slow learning.
+- **Reading:** if Aware gets close to AWAC (≈ 93) and the flips drop, the gap was mostly slow learning. If it levels off well below, the conclusion is only that more training with this configuration did not close the gap. Optimization and hyperparameters remain possible causes, next to a structural limit.
+- **Cost:** about 8 hours per run (151k took 69–75 min with 6 runs in parallel). **Needs the project owner's OK:** Experiment 3's rules fix every training run at 151k steps.
+
+**d) Gaussian AWAC: temperature and weight-concentration sensitivity** (training, low priority)
+- **What:** CORL's `awac.py` on medium-expert with `awac_lambda` = 1/10 and 1/30 (the tuned value is 1/3; smaller means sharper weights), 3 seeds each, 151k steps. Count flips and saturation at the end. Log the effective batch share, the share of weights at the cap, and the share of near-zero weights (`awac.py` logs no weight statistics yet).
+- **What it is not: a clean "average vs peak" test.** The weights are capped, `w = min(exp(A/T), 100)`, so an action reaches the cap whenever A > T·ln 100:
+
+| T (`awac_lambda`) | Advantage that reaches the cap |
+|---|---|
+| 1/3 | 1.54 |
+| 1/10 | 0.46 |
+| 1/30 | 0.15 |
+
+- **Why that matters:**
+  - As T shrinks, many positive-advantage actions get the same maximum weight. The fit then approaches the average of the positive-advantage actions, not the single best-rated action.
+  - Even without the cap, sharper weights change the target distribution itself; they don't just change how the original target's average is extracted.
+  - The clean average-vs-peak comparison is the 2 × 2 frozen-weights study in section 2: identical weights, with the Gaussian fitting their average and EqM going to their peak.
+- **Reading:** how return, flips, and saturation change as the weights sharpen and concentrate. Compare the effective batch share with Aware's (≈ 3.6%).
+- **Cost:** about 45 minutes per run, 6 runs.
+
+**e) Hopper and Walker2d medium-expert** (later, only after a fix works on HalfCheetah)
+- **What:** the best Aware variant and Gaussian AWAC on `hopper-medium-expert-v2` and `walker2d-medium-expert-v2`, 3 seeds each.
+- **Why:** checks whether the results hold beyond HalfCheetah. In these environments falling ends the episode, so falls show up directly in the score. Hopper has 3-D actions and Walker2d 6-D, which adds another data point on action dimension (a weak one, because the tasks differ).
+
 ## Later phases
 - **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.
 - **Phase 3 — Offline-to-online:** continue EqM-AWAC online. Consider FINO (wider action support for exploration) and FFM (behavior-tilted fine-tuning).
