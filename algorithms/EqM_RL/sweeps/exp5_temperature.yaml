@@ -1,0 +1,20 @@
+# Experiment 5 (EqM_RL.md, "Experiment 4, priorities 2 and 3", "What these results say about the
+# temperature T"): live Aware on D4RL halfcheetah-medium-expert-v2 at T = 1, 2, 3, 4. With frozen
+# Aware weights, T = 2.3-3.9 made EqM learn faster than T = 1 (92.2 vs 86.2 at 310k); does that
+# hold when the critic trains alongside the actor? T = 1 is rerun as the control in the same batch.
+# Otherwise as exp4_aware_1m.yaml (lambda 8, K 20, eta 0.01), 3 seeds, 10 eval episodes, 310k steps.
+# A checkpoint is saved at every eval (every 1k steps, ~0.75 GB per run).
+# 12 runs, hawk env. Started by run_exp5.sh, which also counts flips and writes the summary.
+#   python run_sweep.py sweeps/exp5_temperature.yaml
+target: aware
+parallel: 12
+
+fixed:
+  name: Exp5_T
+  env_name: halfcheetah-medium-expert-v2
+  num_train_ops: 310001   # the extra 1 makes the last eval (and checkpoint) happen at step 310,000
+  n_test_episodes: 10
+
+grid:
+  temperature: [1.0, 2.0, 3.0, 4.0]
+  seed: [1, 2, 3]

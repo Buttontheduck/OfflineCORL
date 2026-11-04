@@ -154,3 +154,18 @@ done
   (999,000 transitions). Their returns: mean 10,645, minimum 2,046 (a few of the expert's own
   episodes go wrong); the dropped medium half's maximum is 5,304.
 
+
+## Experiment 5: live Aware at T = 1, 2, 3, 4 (310k steps)
+
+`EqM_RL.md`, "Experiment 4, priorities 2 and 3", "What these results say about the temperature
+T": with frozen Aware weights, T = 2.3–3.9 made EqM learn faster than T = 1. This checks whether
+that holds when the critic trains alongside the actor. 4 temperatures × 3 seeds = 12 runs at once,
+T = 1 rerun as the control in the same batch.
+
+**Unattended:** `run_exp5.sh` runs `sweeps/exp5_temperature.yaml`, then counts flips at
+`checkpoint_310000.pt` (100 new episodes per seed, env seeds 1000+, as in Experiment 4) and writes
+`sweep_runs/exp5_<date-time>/summary.md` (`diagnostics/summarize_exp5.py`): score at 310k,
+learning curves, flips, and the live weights' effective batch share over training (from the
+per-step `weighting/*` logs). Start it detached:
+`setsid nohup bash run_exp5.sh > /dev/null 2>&1 < /dev/null &`. 12 runs at once: about 40
+steps/s each, ≈ 2.5 h, plus ≈ 20 min of flip counts.
