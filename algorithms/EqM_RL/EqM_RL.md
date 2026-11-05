@@ -1175,6 +1175,142 @@ The most informative first **training** comparison is Gaussian versus EqM under 
   3. **This was not a T sweep.** It was one T per seed, chosen to match IQL's concentration.
   4. **A good T depends on the critic.** It depends on the scale of A (std ≈ 7 for Aware, 8.4–9.2 for IQL). The effective batch share is the more portable setting: 0.15–0.47 worked, and 0.04 was slow.
 - **The test that would settle it:** live Aware at T = 2 and T = 4, or with T adjusted every batch to keep a target share (e.g. 0.3). 3 seeds, compared with T = 1's curve: 59.7, 87.4 and 95.5 at 151k, 310k and 1M. About 2.5 h at 310k steps, or 8 h at 1M.
+- **Done:** run as Experiment 5 (next section). In short, flatter weights learn much faster in live training too, but T = 4 levels off near 94 while T = 1 goes on to 95.5 at 1M.
+
+### Experiment 5: live Aware at T = 1, 2, 3, 4, and T = 4 for 1M steps (3 seeds, 2026-11-04/05)
+> **Scope.** Live Aware (critic and actor training together) on D4RL `halfcheetah-medium-expert-v2`, seeds 1–3. This is the test proposed at the end of the previous section: does a flatter T also help when the critic trains alongside the actor, and does it give the best final score?
+> - **Part 1:** T = 1, 2, 3 and 4 for 310k steps, 12 runs at once. T = 1 is the control.
+> - **Part 2:** T = 4 for 1M steps, compared with Experiment 4's 1M-step run at T = 1.
+> - **Code:** sweeps `exp5_temperature` and `exp5_aware_1m_T4`, run unattended by `run_exp5.sh` and `run_exp5_1m.sh`. Tables by `diagnostics/summarize_exp5.py` and `diagnostics/summarize_exp5_1m.py`, which read the local wandb files through `diagnostics/wandb_history.py`. Summaries: `sweep_runs/exp5_20261104-162815/summary.md` and `sweep_runs/exp5_1m_20261104-233507/summary.md`.
+
+**Setup**
+
+| | |
+|---|---|
+| Training | As Experiment 4's 1M-step Aware run (EqM 4 × 256, λ = 8, K = 20, η = 0.01); only T changes. 10 evaluation episodes every 1k steps, a checkpoint at each. |
+| Score | Part 1: mean of the last 20 evals (291k–310k). Part 2: mean of the evals in the 20k steps up to each step. Then mean ± std over seeds. |
+| Flips | 100 new episodes per seed (env seeds 1000+) with the trained sampler, at 310k (part 1) and at 151k, 310k, 500k and 1M (part 2). The same episodes as in Experiment 4. |
+| Determinism | Training is deterministic per seed. The T = 1 control's checkpoints at 310k are bit-for-bit identical to Experiment 4's 1M run at 310k, and part 2 repeats part 1's T = 4 runs up to 310k (same scores and flips per seed). |
+| Wall-clock | Part 1: 166–170 min per run, 12 at once; with flip counts 17:28–20:21 German time on 2026-11-04. Part 2: 483–489 min per run, 3 at once, sharing the GPU with Experiment 6 from 02:24; 00:35–08:47 on 2026-11-05. |
+
+**Results, part 1: T = 1–4 at 310k** (normalized score; per seed: 1 / 2 / 3)
+
+| T | score | per seed | return, 100 new episodes per seed | flips | flips per seed | speed (m/s) | executed dims at the bound |
+|---|---|---|---|---|---|---|---|
+| 1 | 87.4 ± 1.7 | 85.2 / 87.8 / 89.2 | 10,536 ± 381 | 8% | 3 / 18 / 3% | 11.0 | 11.5% |
+| 2 | 89.8 ± 1.6 | 89.8 / 87.8 / 91.8 | 10,740 ± 719 | 6% | 1 / 15 / 3% | 11.2 | 10.6% |
+| 3 | 90.9 ± 1.0 | 91.1 / 92.1 / 89.7 | 11,079 ± 163 | 5% | 3 / 3 / 10% | 11.5 | 6.0% |
+| 4 | **91.8 ± 0.6** | 92.1 / 92.3 / 91.0 | 10,971 ± 197 | **2%** | 1 / 5 / 0% | 11.4 | 6.6% |
+
+Learning curves (mean over seeds of the evals in the 10k steps up to each point):
+
+| T | 50k | 100k | 151k | 200k | 250k | 310k |
+|---|---|---|---|---|---|---|
+| 1 | 36.8 | 51.4 | 60.3 | 75.4 | 82.8 | 88.4 |
+| 2 | 41.1 | 62.2 | 75.1 | 80.8 | 88.4 | 90.3 |
+| 3 | 51.2 | 77.0 | 81.8 | 87.1 | 88.7 | 91.2 |
+| 4 | 62.5 | 82.2 | 87.3 | 90.5 | 90.0 | 91.9 |
+
+Live weights (effective batch share; × 256 = rows of the batch that effectively count):
+
+| T | 1k–50k | 50k–151k | 151k–310k | at the cap, 151k–310k | A std, 151k–310k |
+|---|---|---|---|---|---|
+| 1 | 0.078 | 0.038 | 0.044 (11 rows) | 1.3% | 7.1 |
+| 2 | 0.275 | 0.123 | 0.077 (20 rows) | 0.4% | 7.1 |
+| 3 | 0.431 | 0.222 | 0.124 (32 rows) | 0.3% | 7.8 |
+| 4 | 0.523 | 0.273 | 0.140 (36 rows) | 0.2% | 8.7 |
+
+**Results, part 2: T = 4 vs T = 1 for 1M steps**
+
+| T | 151k | 310k | 500k | 700k | 1M | best single eval |
+|---|---|---|---|---|---|---|
+| 1 | 59.8 ± 8.1 | 87.4 ± 1.7 | 91.9 ± 1.4 | 94.1 ± 1.1 | **95.5 ± 0.5** (96.1 / 95.5 / 94.9) | 98.5 / 98.3 / 98.7 |
+| 4 | **87.1 ± 0.8** | **91.8 ± 0.6** | **93.6 ± 0.3** | 94.0 ± 0.2 | 93.7 ± 0.1 (93.8 / 93.8 / 93.5) | 96.2 / 96.0 / 96.2 |
+
+The T = 1 row is Experiment 4's run, read with the same windows as T = 4 (59.8 at 151k here vs 59.7 in Experiment 4's table).
+
+On 100 new episodes per seed:
+
+| T | step | return | flips (per seed) | speed (m/s) | executed dims at the bound |
+|---|---|---|---|---|---|
+| 1 | 151k | 8,233 ± 970 | 31% (53 / 15 / 24) | 8.6 | 15.8% |
+| 4 | 151k | 10,904 ± 142 | 4% (5 / 6 / 1) | 11.3 | 7.0% |
+| 1 | 500k | 11,057 ± 229 | 9% (14 / 12 / 0) | 11.5 | 10.9% |
+| 4 | 500k | 11,297 ± 84 | 1% (0 / 0 / 2) | 11.7 | 5.5% |
+| 1 | 1M | **11,593 ± 133** | 1% (0 / 1 / 1) | **12.0** | 11.5% |
+| 4 | 1M | 11,318 ± 164 | 0% (0 / 0 / 0) | 11.7 | 4.5% |
+
+Live weights over the 1M steps (effective batch share):
+
+| T | 1k–50k | 50k–151k | 151k–310k | 310k–500k | 500k–1M | A std, 500k–1M |
+|---|---|---|---|---|---|---|
+| 1 | 0.078 | 0.038 | 0.044 | 0.051 | 0.065 (17 rows) | 8.2 |
+| 4 | 0.523 | 0.273 | 0.140 | 0.113 | 0.104 (27 rows) | 9.2 |
+
+References: CORL's AWAC after 1M steps 95.0 ± 0.6; our Gaussian AWAC at 151k 93.4 ± 0.2 (11,261 return, 3% flips on the same 100 episodes); EqM expert-only BC 92.6.
+
+**Interpretation**
+1. **Flatter weights help live training too, mainly in speed.**
+   - At 151k the score rises steadily with T: 60, 75, 82 and 87 for T = 1–4. At 310k: 87.4, 89.8, 90.9 and 91.8, and flips fall from 8% to 2%.
+   - This confirms in live training what the frozen-weight fits showed (T = 2.3–3.9: 92.2 at 310k, against 86.2 at T = 1).
+   - T = 4 at 151k (87.1, 4% flips) is already about where T = 1 is at 310k (87.4, 8% flips).
+2. **But T = 4 ends lower.**
+   - T = 4 levels off around 94 by 700k and ends at 93.7 ± 0.1. T = 1 keeps climbing to 95.5 ± 0.5.
+   - The gap is small but consistent: all three T = 1 seeds end above all three T = 4 seeds (94.9–96.1 vs 93.5–93.8), and T = 1's best single evals are about 2 points higher (98.3–98.7 vs 96.0–96.2).
+   - On the 100 new episodes at 1M, T = 1 returns more (11,593 vs 11,318) and runs faster (12.0 vs 11.7 m/s). Both have almost no flips left.
+   - This answers open question 2 of the previous section: flatter weights learn faster and then stop near the expert-BC level (92.6) and our Gaussian AWAC at 151k (93.4); sharper weights are slower but go higher.
+3. **A fixed T does not hold a fixed concentration.**
+   - As the advantages spread out during training (A std 9.2 at the end), T = 4's share falls from 0.52 to 0.10 (about 134 → 27 rows of 256). T = 1 stays at 0.04–0.08 (10–20 rows).
+   - So T = 4 also sharpens over time, but at 1M it is still about 1.6× flatter than T = 1.
+4. **Saturation no longer tracks the score late in training.** At 1M, T = 1 drives 11.5% of executed action dimensions to the bound, against 4.5% at T = 4, and still runs faster with 1% flips.
+
+**Answers**
+- **Does a flatter T help in live training?** Yes, for learning speed and stability: T = 4 is 27 points ahead at 151k, and its flips average at most 4% from 151k on (T = 1: 31% at 151k).
+- **Does it give the best final score?** No: at 1M, T = 1 is 1.8 points higher, consistently across seeds.
+- **Practical choice:** T ≈ 3–4 for budgets around 150k–300k steps, T = 1 for 1M steps. Untested options that might get both: T lowered from 4 to 1 during training, or T set every batch to hold a target effective batch share.
+
+### Experiment 6: Aware on AntMaze large-diverse, T = 1/3, 1, 4 (3 seeds, 2026-11-05)
+> **Scope.** The first environment other than HalfCheetah: D4RL `antmaze-large-diverse-v2` (999,000 transitions; reward 1 only at the goal, in 0.6% of rows; 29-D observations, 8-D actions). Live Aware for 1M steps at T = 1/3, 1 and 4, seeds 1–3.
+> - **Code:** sweep `exp6_antmaze_ld`, run unattended by `run_exp6.sh`; runs were started one at a time by `gpu_gate` in `run_sweep.py`. Summary by `diagnostics/summarize_exp5_1m.py` with its AntMaze options: `sweep_runs/exp6_20261105-012352/summary.md`. The critic table below was read from the runs' local wandb files (`weighting/q_mean`, `weighting/adv_std`).
+
+**Setup**
+
+| | |
+|---|---|
+| Training | Aware as on HalfCheetah (EqM 4 × 256, λ = 8, K = 20, η = 0.01, γ = 0.99); only T changes. Rewards shifted by −1 (`normalize_reward: true`, as CORL's AWAC and IQL on AntMaze): −1 per step, 0 at the goal. |
+| Evaluation | 100 episodes every 20k steps (50 evals per run). An episode ends at the goal, so the score is the success rate in %. |
+| Wall-clock | 447–464 min per run. Started 5 min apart from 02:24 to 03:04 German time, then all 9 at once, partly alongside Experiment 5's 1M-step runs. Finished 09:55–10:41. All 9 exited normally. |
+
+**Results** (success rate in %)
+
+| T | score at 100k, 250k, 500k, 750k, 1M (evals in the 100k steps up to each) | best single eval (per seed) | effective batch share, 500k–1M | A std, 500k–1M |
+|---|---|---|---|---|
+| 1/3 | 0.0 at each | 0 / 0 / 0 | 0.055 (14 rows) | 1.4 |
+| 1 | 0.0 at each, except 0.1 at 500k | 1 / 0 / 0 | 0.116 (30 rows) | 1.5 |
+| 4 | 0.0 at each | 0 / 1 / 0 | 0.496 (127 rows) | 2.0 |
+
+No run ever had more than 1 success in 100 episodes. CORL after 1M steps: BC 0.0 ± 0.0, Gaussian AWAC 0.0 ± 0.0, CQL 20.5 ± 13.2, IQL 30.3 ± 3.6, ReBRAC 64.0 ± 5.4.
+
+**The critic:** mean of min(Q1, Q2) at the batch's dataset actions, averaged over 3 seeds (seed std ≤ 1.2 in every cell)
+
+| T | 0–20k | 20k–100k | 100k–300k | 300k–600k | 600k–1M |
+|---|---|---|---|---|---|
+| 1/3 | −35.8 | −88.5 | −101.3 | −105.9 | −105.9 |
+| 1 | −36.1 | −91.2 | −104.6 | −108.5 | −107.6 |
+| 4 | −36.4 | −92.7 | −108.4 | −113.1 | −113.8 |
+
+With −1 per step and γ = 0.99, a state from which the goal is never reached is worth −100, and one that reaches it in k steps −100 · (1 − 0.99^k). No state is truly worth less than −100.
+
+**Interpretation**
+1. **Aware fails on AntMaze large-diverse at every T,** as CORL's BC and Gaussian AWAC do.
+2. **The critic never learns that the goal can be reached.**
+   - By 100k–300k steps, the mean Q at dataset actions is at or below −100 in every run, and it ends at −106 to −114. That is below the lowest value any state can truly have, so the critic underestimates, and on average it rates dataset actions as no better than never reaching the goal.
+   - The spread of A is 1.4–2.0, against 7–9 on HalfCheetah, so the weights have almost nothing to rank.
+3. **T has nothing to work with.** T changes how concentrated the weights are (shares 0.06, 0.12 and 0.50), not what they point at. Higher T also ends with lower Q (−106 → −114); this was not examined further.
+4. **Likely reason: the AWAC-type critic.** Like AWAC's, Aware's critic bootstraps from the actor's own sampled next action. On AntMaze large, reaching the goal needs stitching parts of different dataset trajectories together, which the methods that score here get from their critic or regularisation (IQL's expectile value, CQL's conservatism, ReBRAC's BC-regularised actor-critic). CORL's Gaussian AWAC, with the same kind of critic, also scores 0. So this looks like a limit of the AWAC family on AntMaze, not something specific to the EqM actor.
+5. **Not checked:** the trained policies were not rolled out to see where the ant goes, and Q near the goal was not looked at separately. The logs record only success.
+
+**Next step (not prepared):** Aware with an IQL critic on AntMaze. This is the shared-IQL-critic idea of the plan's section 2 and the "IQL critic" alternative under Later phases; CORL's IQL reaches 30.3 here.
 
 ## Later phases
 - **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.
