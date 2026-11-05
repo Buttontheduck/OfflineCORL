@@ -50,6 +50,8 @@ agent:
   num_actions: 1
   fino_knob: 0.1
   weighting: 'awac'   # 'awac' = exp(A/T) weights; 'bc' = all weights 1 (behavior cloning ablation)
+  critic: 'awac'      # 'awac' = Q on the actor's next action, V(s) from the actor's sample (Aware); 'iql' = IQL's in-sample critic (V by expectile regression, Q target r + gamma V(s'))
+  iql_tau: 0.7        # IQL expectile for V(s); only used with critic: 'iql' (CORL: 0.7 locomotion, 0.9 AntMaze)
 
 
 actor: 

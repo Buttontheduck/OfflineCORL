@@ -1312,6 +1312,27 @@ With −1 per step and γ = 0.99, a state from which the goal is never reached i
 
 **Next step (not prepared):** Aware with an IQL critic on AntMaze. This is the shared-IQL-critic idea of the plan's section 2 and the "IQL critic" alternative under Later phases; CORL's IQL reaches 30.3 here.
 
+### Experiment 7 (plan, started 2026-11-05): Aware on AntMaze umaze and medium, and Aware with an IQL critic
+> **Status:** running. All runs 1M steps, seeds 1–3, D4RL v2 datasets, rewards shifted by −1, success rate over 100 episodes every 20k steps (as Experiment 6).
+
+**Goal:** test whether Aware handles multimodal data (several actions per state) better, and whether an in-sample critic fixes the AntMaze failure of Experiment 6.
+
+| Group | Runs | Datasets | Critic | T |
+|---|---|---|---|---|
+| A | 12 | `antmaze-umaze-v2`, `-umaze-diverse-v2`, `-medium-play-v2`, `-medium-diverse-v2` | Aware's own (AWAC-type) | 4 |
+| IQL | 3 | `antmaze-medium-diverse-v2` | IQL, in-sample (new `agent.critic: iql`) | 0.1 |
+
+- **A, the multimodality comparison:** each pair shares a maze. The "play"/plain data drives the ant to one or a few goals; the "diverse" data drives it to random goals from random starts, so a state sees more different actions. If the EqM actor handles multimodality, its result should hold up better on the diverse data than CORL's Gaussian methods do (CORL, BC / AWAC: umaze 55.3 / 56.8, umaze-diverse 47.3 / 54.8; medium-play and medium-diverse 0–0.8). On the medium mazes, Aware's AWAC-type critic will most likely fail as in Experiment 6.
+- **IQL, the critic test:** the EqM actor is unchanged; only the critic changes. Settings are IQL's recommended AntMaze values from CORL (`configs/offline/iql/antmaze/medium_diverse_v2.yaml`): T = 0.1 (β = 10), expectile 0.9, γ = 0.99, weight cap 100. CORL's IQL with a Gaussian actor scores 73.8 here.
+- **The IQL critic (`Aware/agents.py`, `agent.critic: iql`):**
+  - A V(s) network learns an upper expectile (0.9) of min target Q(s, a) over dataset actions.
+  - Q's target is r + γ·V(s′), not Q at the actor's sampled next action.
+  - The weights are w = min(exp((min target Q(s, a) − V(s)) / T), 100).
+  - The critic never sees an EqM action, so the actor→critic feedback of Experiments 3–6 is gone. Update order as CORL's `iql.py`: V, then Q, then the actor.
+  - Networks keep Aware's 4 × 256 size (CORL's IQL uses 2 × 256). `agent.critic: awac` (the default) is the original Aware, unchanged.
+- **Code:** `sweeps/exp7_antmaze.yaml`, run unattended by `run_exp7.sh`; summary by `diagnostics/summarize_exp5_1m.py` into `sweep_runs/exp7_<date-time>/summary.md`.
+- **Not in this experiment:** our own Gaussian AWAC runs and frozen-weight fits; CORL's published numbers are the references.
+
 ## Later phases
 - **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.
 - **Phase 3 — Offline-to-online:** continue EqM-AWAC online. Consider FINO (wider action support for exploration) and FFM (behavior-tilted fine-tuning).

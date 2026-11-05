@@ -38,6 +38,22 @@ class Critic(nn.Module):
 #################################################################################################
 #################################################################################################
 
+class ValueNetwork(Module):
+    """V(s) for the IQL critic option (agent.critic: iql): same MLP as DeterministicCritic,
+    state only."""
+    def __init__(self, state_dim, hidden_dim, num_hidden_layers):
+        super().__init__()
+        self.model = MLP(
+            input_dim         = state_dim,
+            output_dim        = 1,
+            hidden_dim        = hidden_dim,
+            num_hidden_layers = num_hidden_layers
+            )
+
+    def forward(self, state: torch.Tensor) -> torch.Tensor:
+        return self.model(state)
+
+
 class DeterministicCritic(Module):
     def __init__(self,state_dim, action_dim, hidden_dim, num_hidden_layers):
         super().__init__()

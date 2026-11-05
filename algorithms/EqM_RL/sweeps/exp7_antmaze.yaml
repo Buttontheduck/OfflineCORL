@@ -1,0 +1,40 @@
+# Experiment 7 (EqM_RL.md, "Experiment 7 (plan)"): Aware on four D4RL AntMaze datasets, 1M steps, 3 seeds.
+#   A: Aware with its own (AWAC-type) critic, T = 4, on antmaze-umaze-v2, -umaze-diverse-v2,
+#      -medium-play-v2 and -medium-diverse-v2 (12 runs). umaze vs umaze-diverse and medium-play vs
+#      medium-diverse: same maze, data with fewer vs more actions per state.
+#   IQL: Aware with IQL's in-sample critic (agent.critic: iql) on antmaze-medium-diverse-v2, with
+#      IQL's recommended AntMaze settings from CORL (configs/offline/iql/antmaze/medium_diverse_v2.yaml):
+#      T = 0.1 (beta = 10), expectile 0.9 (3 runs). The EqM actor is unchanged.
+# Rewards shifted by -1 (normalize_reward: true); lambda 8, K 20, eta 0.01 as before. 100 eval episodes
+# every 20k steps (an episode ends at the goal, so the score is the success rate).
+# Listed seed by seed, IQL first, so the first runs to start cover every group; gpu_gate starts each
+# further run only while the GPU has room.
+# 15 runs, hawk env. Started by run_exp7.sh (the summary follows).
+#   python run_sweep.py sweeps/exp7_antmaze.yaml
+target: aware
+parallel: 15
+gpu_gate: {util_max: 85, min_free_mb: 3000, settle_s: 180, window_s: 60}
+
+fixed:
+  name: Exp7
+  num_train_ops: 1000001   # the extra 1 makes the last eval (and checkpoint) happen at step 1,000,000
+  normalize_reward: true
+  n_test_episodes: 100
+  eval_frequency: 20000
+
+grid:
+  - {env_name: antmaze-medium-diverse-v2, agent.critic: iql, agent.iql_tau: 0.9, temperature: 0.1, seed: 1}
+  - {env_name: antmaze-umaze-v2, temperature: 4.0, seed: 1}
+  - {env_name: antmaze-umaze-diverse-v2, temperature: 4.0, seed: 1}
+  - {env_name: antmaze-medium-play-v2, temperature: 4.0, seed: 1}
+  - {env_name: antmaze-medium-diverse-v2, temperature: 4.0, seed: 1}
+  - {env_name: antmaze-medium-diverse-v2, agent.critic: iql, agent.iql_tau: 0.9, temperature: 0.1, seed: 2}
+  - {env_name: antmaze-umaze-v2, temperature: 4.0, seed: 2}
+  - {env_name: antmaze-umaze-diverse-v2, temperature: 4.0, seed: 2}
+  - {env_name: antmaze-medium-play-v2, temperature: 4.0, seed: 2}
+  - {env_name: antmaze-medium-diverse-v2, temperature: 4.0, seed: 2}
+  - {env_name: antmaze-medium-diverse-v2, agent.critic: iql, agent.iql_tau: 0.9, temperature: 0.1, seed: 3}
+  - {env_name: antmaze-umaze-v2, temperature: 4.0, seed: 3}
+  - {env_name: antmaze-umaze-diverse-v2, temperature: 4.0, seed: 3}
+  - {env_name: antmaze-medium-play-v2, temperature: 4.0, seed: 3}
+  - {env_name: antmaze-medium-diverse-v2, temperature: 4.0, seed: 3}

@@ -47,6 +47,10 @@ class Otter(nn.Module):
         num_actions: int = 10,
         fino_knob: float = 0.1,
         weighting: str = "awac",
+        critic: str = "awac",
+        iql_tau: float = 0.7,
+        value: nn.Module = None,
+        value_optimizer: torch.optim.Optimizer = None,
         **kwargs
 
     ):
@@ -83,7 +87,21 @@ class Otter(nn.Module):
             raise ValueError(f"weighting must be 'awac' or 'bc', got {weighting!r}")
         self.weighting = weighting
 
-        
+        # 'awac': Q is trained on the actor's sampled next action, and V(s) = min Q at the
+        # actor's own sample (the original Aware). 'iql': IQL's in-sample critic (Kostrikov et
+        # al. 2021, as CORL's iql.py): V(s) is an upper expectile (iql_tau) of min target Q over
+        # dataset actions, Q's target is r + gamma * V(s'), and A = min target Q(s, a) - V(s).
+        # The critic then never sees an EqM sample.
+        if critic not in ("awac", "iql"):
+            raise ValueError(f"critic must be 'awac' or 'iql', got {critic!r}")
+        if critic == "iql" and (value is None or value_optimizer is None):
+            raise ValueError("critic 'iql' needs a value network and its optimizer")
+        self.critic = critic
+        self._iql_tau = iql_tau
+        self._value = value
+        self._value_optimizer = value_optimizer
+
+
         
 
     def _expand_dims(self,low_dim_vector,reference):
@@ -200,28 +218,33 @@ class Otter(nn.Module):
     
     def _offline_weights(self, states, actions, num_actions):
             with torch.no_grad():
-                # pi_actions shape: [num_actions, batch_size, action_dim]
-                pi_actions = self._actor(states, num_actions=num_actions)
-                N, B, A = pi_actions.shape
+                if self.critic == "iql":
+                  # IQL: A = min target Q(s, a) - V(s), all at dataset actions (CORL iql.py)
+                  q = torch.min(self._target_critic_1(states, actions), self._target_critic_2(states, actions))
+                  v = self._value(states)
+                else:
+                  # pi_actions shape: [num_actions, batch_size, action_dim]
+                  pi_actions = self._actor(states, num_actions=num_actions)
+                  N, B, A = pi_actions.shape
     
-                # Repeat states and flatten both to [N * B, dim] for the critic
-                repeated_states = states.unsqueeze(0).repeat(N, 1, 1)
-                flat_states = repeated_states.reshape(N * B, -1)
-                flat_pi_actions = pi_actions.reshape(N * B, A)
+                  # Repeat states and flatten both to [N * B, dim] for the critic
+                  repeated_states = states.unsqueeze(0).repeat(N, 1, 1)
+                  flat_states = repeated_states.reshape(N * B, -1)
+                  flat_pi_actions = pi_actions.reshape(N * B, A)
     
-                # Evaluate Q(s, a_pi) and unflatten back to [N, B, 1]
-                flat_q1 = self._critic_1(flat_states, flat_pi_actions)
-                flat_q2 = self._critic_2(flat_states, flat_pi_actions)
+                  # Evaluate Q(s, a_pi) and unflatten back to [N, B, 1]
+                  flat_q1 = self._critic_1(flat_states, flat_pi_actions)
+                  flat_q2 = self._critic_2(flat_states, flat_pi_actions)
                 
-                q1_pi = flat_q1.reshape(N, B, -1)
-                q2_pi = flat_q2.reshape(N, B, -1)
+                  q1_pi = flat_q1.reshape(N, B, -1)
+                  q2_pi = flat_q2.reshape(N, B, -1)
     
-                # Take min across critics, then average across actions to get V(s)
-                q_pi = torch.min(q1_pi, q2_pi)
-                v = q_pi.mean(dim=0) # shape: [B, 1]
+                  # Take min across critics, then average across actions to get V(s)
+                  q_pi = torch.min(q1_pi, q2_pi)
+                  v = q_pi.mean(dim=0) # shape: [B, 1]
     
-                # Evaluate dataset actions [B, action_dim] with states [B, state_dim]
-                q = torch.min(self._critic_1(states, actions), self._critic_2(states, actions))  
+                  # Evaluate dataset actions [B, action_dim] with states [B, state_dim]
+                  q = torch.min(self._critic_1(states, actions), self._critic_2(states, actions))  
     
                 adv = q - v
                 
@@ -245,12 +268,15 @@ class Otter(nn.Module):
 
     def _critic_loss(self, states, actions, rewards, dones, next_states):
         with torch.no_grad():
-            next_actions = self._actor(next_states).squeeze(0)
+            if self.critic == "iql":
+                q_next = self._value(next_states)   # in-sample: no actor action
+            else:
+                next_actions = self._actor(next_states).squeeze(0)
 
-            q_next = torch.min(
-                self._target_critic_1(next_states, next_actions),
-                self._target_critic_2(next_states, next_actions),
-            )
+                q_next = torch.min(
+                    self._target_critic_1(next_states, next_actions),
+                    self._target_critic_2(next_states, next_actions),
+                )
             q_target = rewards + self._gamma * (1.0 - dones) * q_next
 
         q1 = self._critic_1(states, actions)
@@ -270,6 +296,17 @@ class Otter(nn.Module):
         self._critic_2_optimizer.step()
         return loss.item()
 
+    def _update_value(self, states, actions):
+        """IQL's expectile regression of V(s) towards min target Q(s, a) at dataset actions."""
+        with torch.no_grad():
+            target_q = torch.min(self._target_critic_1(states, actions), self._target_critic_2(states, actions))
+        diff = target_q - self._value(states)
+        loss = (torch.abs(self._iql_tau - (diff < 0).float()) * diff ** 2).mean()
+        self._value_optimizer.zero_grad()
+        loss.backward()
+        self._value_optimizer.step()
+        return loss.item()
+
     def _update_actor(self, states, actions):
         loss = self._actor_loss(states, actions)
         self._model_optimizer.zero_grad()
@@ -280,13 +317,16 @@ class Otter(nn.Module):
     def update(self, batch: TensorBatch) -> Dict[str, float]:
         states, actions, rewards, next_states, truncations, terminals = batch
         dones = terminals
+        result = {}
+        if self.critic == "iql":   # CORL iql.py order: V, then Q, then the actor
+            result["value_loss"] = self._update_value(states, actions)
         critic_loss = self._update_critic(states, actions, rewards, dones, next_states)
         actor_loss  = self._update_actor(states, actions)
 
         soft_update(self._target_critic_1, self._critic_1, self._tau)
         soft_update(self._target_critic_2, self._critic_2, self._tau)
         #result = {"actor_loss": actor_loss}
-        result = {"critic_loss": critic_loss, "actor_loss": actor_loss}
+        result.update(critic_loss=critic_loss, actor_loss=actor_loss)
         return result
 
     def state_dict(self) -> Dict[str, Any]:
@@ -294,12 +334,15 @@ class Otter(nn.Module):
             "model": self._model.state_dict(),
             "critic_1": self._critic_1.state_dict(),
             "critic_2": self._critic_2.state_dict(),
+            **({"value": self._value.state_dict()} if self.critic == "iql" else {}),
         }
 
     def load_state_dict(self, state_dict: Dict[str, Any]):
         self._model.load_state_dict(state_dict["model"])
         self._critic_1.load_state_dict(state_dict["critic_1"])
-        self._critic_2.load_state_dict(state_dict["critic_2"]) 
+        self._critic_2.load_state_dict(state_dict["critic_2"])
+        if self.critic == "iql":
+            self._value.load_state_dict(state_dict["value"])
 
 
 

@@ -199,3 +199,15 @@ AWAC 0.0, CQL 20.5, IQL 30.3, ReBRAC 64.0.
 (`diagnostics/summarize_exp5_1m.py` with AntMaze options: success rate along training, best eval,
 and the live weights' effective batch share). Start it detached:
 `setsid nohup bash run_exp6.sh > /dev/null 2>&1 < /dev/null &`.
+
+## Experiment 7: AntMaze umaze and medium (T = 4), and Aware with an IQL critic (1M steps)
+
+`sweeps/exp7_antmaze.yaml`: 15 Aware runs, 3 seeds each. Aware with its own critic at T = 4 on
+`antmaze-umaze-v2`, `-umaze-diverse-v2`, `-medium-play-v2` and `-medium-diverse-v2`, and Aware with
+the IQL critic (`agent.critic=iql agent.iql_tau=0.9 temperature=0.1`, CORL's IQL AntMaze settings) on
+`antmaze-medium-diverse-v2`. Settings otherwise as Experiment 6. `agent.critic=awac` (the default)
+reproduces the earlier Aware bit for bit (checked over 300 steps against the previous commit).
+
+**Unattended:** `run_exp7.sh` runs the sweep (with `gpu_gate`) and writes
+`sweep_runs/exp7_<date-time>/summary.md`. Start it detached:
+`setsid nohup bash run_exp7.sh > /dev/null 2>&1 < /dev/null &`.

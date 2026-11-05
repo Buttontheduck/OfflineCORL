@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional
 from buffer import ReplayBuffer
 from actor_models import Actor
-from critic_models import DeterministicCritic
+from critic_models import DeterministicCritic, ValueNetwork
 from agents import Otter
 from omegaconf import DictConfig, OmegaConf
 from tqdm import trange
@@ -189,7 +189,15 @@ def train(cfg: DictConfig):
         early_stop    = cfg.actor.early_stop
         )
     
+    # IQL critic option (agent.critic: iql): a V(s) network, same size as the critics
+    value, value_optimizer = None, None
+    if cfg.agent.get("critic", "awac") == "iql":
+        value = ValueNetwork(state_dim, cfg.hidden_dim, cfg.num_hidden_layers).to(cfg.device)
+        value_optimizer = torch.optim.Adam(value.parameters(), lr=cfg.learning_rate)
+
     agent = Otter(
+        value               = value,
+        value_optimizer     = value_optimizer,
         model               = model,
         model_optimizer     = model_optimizer,
         actor               = actor,
