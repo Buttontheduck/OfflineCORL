@@ -9,9 +9,7 @@ seeds (± population std); per-seed values in brackets.
 
 import argparse
 import csv
-import glob
 import json
-import re
 from collections import Counter, defaultdict
 from multiprocessing import Pool
 from pathlib import Path
@@ -26,33 +24,9 @@ ap.add_argument("--wandb", type=Path, default=EQM_RL / "Aware" / "wandb")
 ap.add_argument("--interv", type=Path, default=EQM_RL / "diagnostics" / "out" / "interv")
 args = ap.parse_args()
 
+from wandb_history import read_aware_history as read_wandb, wandb_dir_of  # noqa: E402
+
 CURVE = (50000, 100000, 151000, 200000, 250000, 310000)   # 10k-step windows up to these steps
-WKEYS = ("weighting/weights_mean", "weighting/weights_var", "weighting/weights_clip_frac",
-         "weighting/adv_mean", "weighting/adv_std")
-
-
-def read_wandb(run_dir: str) -> dict:
-    """eval rows (step, normalized score) and per-step weighting rows from a local .wandb file."""
-    from wandb.proto import wandb_internal_pb2 as pb
-    from wandb.sdk.internal import datastore
-
-    ds = datastore.DataStore()
-    ds.open_for_scan(glob.glob(run_dir + "/*.wandb")[0])
-    ev, wt = [], []
-    while (raw := ds.scan_data()) is not None:
-        rec = pb.Record()
-        rec.ParseFromString(raw)
-        if rec.WhichOneof("record_type") != "history":
-            continue
-        h = {it.key or "/".join(it.nested_key): it.value_json for it in rec.history.item}
-        if "_step" not in h:
-            continue
-        step = int(json.loads(h["_step"]))
-        if "eval/normalized_score" in h:
-            ev.append((step, float(json.loads(h["eval/normalized_score"]))))
-        if WKEYS[0] in h:
-            wt.append([step] + [float(json.loads(h[k])) for k in WKEYS])
-    return dict(eval=np.array(ev), weights=np.array(wt))
 
 
 def out(line):
@@ -77,9 +51,8 @@ for row in csv.DictReader(open(sweep / "runs.csv")):
     ov = dict(kv.split("=", 1) for kv in row["overrides"].split())
     ck = sorted(args.checkpoints.glob(f"{ov['name']}-*"), key=lambda p: p.stat().st_mtime)
     ck = ck[-1] if ck else None
-    wb = sorted(glob.glob(str(args.wandb / f"run-*-{ck.name.rsplit('-', 1)[-1]}-*"))) if ck else []
     runs.append(dict(T=float(ov["temperature"]), seed=int(ov["seed"]), status=row["status"], ck=ck,
-                     wandb=wb[-1] if wb else None))
+                     wandb=wandb_dir_of(ck, args.wandb) if ck else None))
 with Pool(min(12, len(runs))) as pool:
     hist = pool.map(read_wandb, [r["wandb"] for r in runs if r["wandb"]])
 for r, h in zip([r for r in runs if r["wandb"]], hist):

@@ -53,7 +53,13 @@ TARGETS = {
     "fit_actor": dict(script=HERE / "Aware" / "fit_actor.py", conda_env="hawk",
                       style="pyrallis", data="d4rl", name_prefix="Fit"),
 }
-SWEEP_KEYS = {"target", "parallel", "stagger", "conda_env", "fixed", "grid"}
+SWEEP_KEYS = {"target", "parallel", "stagger", "conda_env", "fixed", "grid", "gpu_gate"}
+# gpu_gate (optional): start each further run only when the GPU has room, e.g.
+#   gpu_gate: {util_max: 80, min_free_mb: 3000, settle_s: 300, window_s: 60}
+# = mean GPU utilization over the last window_s seconds below util_max %, at least min_free_mb
+# free, and at least settle_s seconds since this sweep's last start (so the window sees the
+# new run at work). The first run starts at once; `parallel` is still the upper limit.
+GPU_GATE_DEFAULTS = {"util_max": 80.0, "min_free_mb": 3000.0, "settle_s": 300.0, "window_s": 60.0}
 MUJOCO_BIN = Path.home() / ".mujoco" / "mujoco210" / "bin"
 
 
@@ -222,6 +228,17 @@ def now() -> str:
     return datetime.datetime.now().strftime("%H:%M:%S")
 
 
+def gpu_sample():
+    """(utilization %, free MB) of GPU 0 from nvidia-smi, or None if it can't be read."""
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=utilization.gpu,memory.free",
+                              "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=10).stdout
+        util, free = out.splitlines()[0].split(",")
+        return float(util), float(free)
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError):
+        return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("sweep", type=Path, help="sweep YAML file")
@@ -289,11 +306,46 @@ def main() -> int:
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, on_sigterm)
 
+    gate = spec.get("gpu_gate")
+    if gate is not None:
+        unknown = set(gate) - set(GPU_GATE_DEFAULTS)
+        if unknown:
+            sys.exit(f"gpu_gate: unknown keys {sorted(unknown)}; allowed: {sorted(GPU_GATE_DEFAULTS)}")
+        gate = {k: float(v) for k, v in {**GPU_GATE_DEFAULTS, **gate}.items()}
+        print(f"GPU gate: a further run starts only when GPU utilization (mean over {gate['window_s']:.0f} s) "
+              f"< {gate['util_max']:.0f}%, free memory >= {gate['min_free_mb']:.0f} MB, and "
+              f">= {gate['settle_s']:.0f} s after the last start\n")
+    util_hist = deque()                         # (time, utilization %) over the last window_s
+    gpu, last_start, last_hold_msg = None, 0.0, 0.0
+
+    def gate_open() -> bool:
+        nonlocal last_hold_msg
+        if gate is None or not running:
+            return True
+        if time.time() - last_start < gate["settle_s"]:
+            return False
+        if gpu is None:                         # nvidia-smi unreadable: don't block
+            return True
+        util = sum(u for _, u in util_hist) / max(len(util_hist), 1)
+        if util < gate["util_max"] and gpu[1] >= gate["min_free_mb"]:
+            return True
+        if time.time() - last_hold_msg > 600:
+            print(f"[{now()}] holding {len(waiting)} runs: GPU utilization {util:.0f}%, "
+                  f"free {gpu[1]:.0f} MB", flush=True)
+            last_hold_msg = time.time()
+        return False
+
     waiting, running = deque(runs), {}
     write_csv()
     try:
         while waiting or running:
             changed = False
+            if gate is not None and waiting:
+                gpu = gpu_sample()
+                if gpu is not None:
+                    util_hist.append((time.time(), gpu[0]))
+                while util_hist and util_hist[0][0] < time.time() - gate["window_s"]:
+                    util_hist.popleft()
             for proc, r in list(running.items()):
                 rc = proc.poll()
                 if rc is None:
@@ -309,8 +361,9 @@ def main() -> int:
                 else:
                     print(f"[{now()}] FAILED {r['idx']:03d} {r['tag']} (exit {rc}), "
                           f"see {r['run_dir'] / 'stdout.log'}")
-            while waiting and len(running) < parallel:
+            while waiting and len(running) < parallel and gate_open():
                 r = waiting.popleft()
+                last_start = time.time()
                 r["run_dir"].mkdir(parents=True, exist_ok=True)
                 r["log_file"] = open(r["run_dir"] / "stdout.log", "w")
                 # own session: Ctrl-C in the terminal reaches only this runner, which then

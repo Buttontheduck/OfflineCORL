@@ -1,0 +1,20 @@
+# Experiment 5, follow-up: live Aware at T = 4 for 1M steps. At 310k, T = 4 learned much faster
+# than T = 1 (91.8 vs 87.4) but was levelling off near the expert-only BC level (92.6), while
+# T = 1 went on to 95.5 at 1M (exp4_aware_1m.yaml). Does T = 4 also end higher, or only faster?
+# Otherwise as exp4_aware_1m.yaml (lambda 8, K 20, eta 0.01), 3 seeds, 10 eval episodes.
+# Training is deterministic per seed, so the first 310k steps repeat exp5_temperature's T = 4 runs.
+# A checkpoint is saved at every eval (every 1k steps, ~2.4 GB per run).
+# 3 runs, hawk env. Started by run_exp5_1m.sh (flip counts and the summary follow).
+#   python run_sweep.py sweeps/exp5_aware_1m_T4.yaml
+target: aware
+parallel: 3
+
+fixed:
+  name: Aware_1M_T4
+  env_name: halfcheetah-medium-expert-v2
+  temperature: 4.0
+  num_train_ops: 1000001   # the extra 1 makes the last eval (and checkpoint) happen at step 1,000,000
+  n_test_episodes: 10
+
+grid:
+  seed: [1, 2, 3]

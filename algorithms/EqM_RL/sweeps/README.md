@@ -54,7 +54,15 @@ grid:                    # every combination is one run: 3 x 2 x 3 = 18 runs
 - **A list as one value:** wrap it in another list, e.g. `some_key: [[1, 2], [3, 4]]` is
   two runs.
 - **Optional keys:** `conda_env` (use another env than the default), `stagger` (seconds
-  between starts, default 2).
+  between starts, default 2), and `gpu_gate`, which starts each further run only while the GPU
+  has room:
+  ```yaml
+  gpu_gate: {util_max: 80, min_free_mb: 3000, settle_s: 300, window_s: 60}
+  ```
+  A further run starts only if the GPU's mean utilization over the last `window_s` seconds is
+  below `util_max` %, at least `min_free_mb` MB are free, and at least `settle_s` seconds have
+  passed since the sweep's last start (so the window sees the new run at work). The first run
+  starts at once, and `parallel` is still the upper limit. The runs start in file order.
 
 ## What the runner sets for you
 
@@ -169,3 +177,25 @@ learning curves, flips, and the live weights' effective batch share over trainin
 per-step `weighting/*` logs). Start it detached:
 `setsid nohup bash run_exp5.sh > /dev/null 2>&1 < /dev/null &`. 12 runs at once: about 40
 steps/s each, ≈ 2.5 h, plus ≈ 20 min of flip counts.
+
+**Follow-up, T = 4 for 1M steps:** `run_exp5_1m.sh` runs `sweeps/exp5_aware_1m_T4.yaml` (3 seeds),
+counts flips at 151k, 310k, 500k and 1M, and writes `sweep_runs/exp5_1m_<date-time>/summary.md`
+(`diagnostics/summarize_exp5_1m.py`: T = 1 vs T = 4 along training, including the T = 1 run of
+`exp4_aware_1m`). Training is deterministic per seed, so its first 310k steps repeat the T = 4
+runs of `exp5_temperature` exactly. 3 runs alone on the GPU: about 44 steps/s each, ≈ 6.5 h.
+Both summary scripts read the local wandb files through `diagnostics/wandb_history.py`.
+
+## Experiment 6: AntMaze large-diverse, T = 1/3, 1, 4 (1M steps)
+
+`sweeps/exp6_antmaze_ld.yaml`: Aware on D4RL `antmaze-large-diverse-v2` (downloaded to
+`~/.d4rl/datasets`, 231 MB), 3 seeds per T, 1M steps. Rewards shifted by −1
+(`normalize_reward: true`, as CORL's AWAC and IQL on AntMaze); λ 8, K 20, η 0.01 as on
+HalfCheetah. Score = success rate over 100 episodes (an episode ends at the goal), evaluated every
+20k steps: one eval of 100 failed episodes takes about 95 s. The runs are listed seed by seed and
+started by `gpu_gate`, so they don't all start together. CORL after 1M steps: BC 0.0, Gaussian
+AWAC 0.0, CQL 20.5, IQL 30.3, ReBRAC 64.0.
+
+**Unattended:** `run_exp6.sh` runs the sweep and writes `sweep_runs/exp6_<date-time>/summary.md`
+(`diagnostics/summarize_exp5_1m.py` with AntMaze options: success rate along training, best eval,
+and the live weights' effective batch share). Start it detached:
+`setsid nohup bash run_exp6.sh > /dev/null 2>&1 < /dev/null &`.

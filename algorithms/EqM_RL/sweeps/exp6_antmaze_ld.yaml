@@ -1,0 +1,33 @@
+# Experiment 6: Aware on D4RL antmaze-large-diverse-v2, 1M steps, T = 1/3, 1, 4, 3 seeds (9 runs).
+# A second environment after HalfCheetah: sparse goal reward (1 at the goal, 0.6% of rows), 8-D
+# actions, many different routes in the data. Score = success rate over 100 episodes (an episode
+# ends at the goal). CORL after 1M steps: BC 0.0, Gaussian AWAC 0.0, CQL 20.5, IQL 30.3, ReBRAC 64.0.
+# Rewards shifted by -1 (normalize_reward: true, as CORL's AWAC and IQL on AntMaze); lambda 8,
+# K 20, eta 0.01 as on HalfCheetah. 100 eval episodes every 20k steps (50 evals, a checkpoint at each;
+# one eval of 100 failed episodes takes ~95 s).
+# The runs are listed seed by seed, so the first ones to start cover all three T. gpu_gate starts each
+# further run only while the GPU has room (see run_sweep.py), so they don't all start together.
+# 9 runs, hawk env. Started by run_exp6.sh (the summary follows).
+#   python run_sweep.py sweeps/exp6_antmaze_ld.yaml
+target: aware
+parallel: 9
+gpu_gate: {util_max: 80, min_free_mb: 3000, settle_s: 300, window_s: 60}
+
+fixed:
+  name: AntMaze_LD
+  env_name: antmaze-large-diverse-v2
+  num_train_ops: 1000001   # the extra 1 makes the last eval (and checkpoint) happen at step 1,000,000
+  normalize_reward: true
+  n_test_episodes: 100
+  eval_frequency: 20000
+
+grid:
+  - {temperature: 0.3333, seed: 1}
+  - {temperature: 1.0, seed: 1}
+  - {temperature: 4.0, seed: 1}
+  - {temperature: 0.3333, seed: 2}
+  - {temperature: 1.0, seed: 2}
+  - {temperature: 4.0, seed: 2}
+  - {temperature: 0.3333, seed: 3}
+  - {temperature: 1.0, seed: 3}
+  - {temperature: 4.0, seed: 3}
