@@ -20,8 +20,8 @@ import numpy as np
 EQM_RL = Path(__file__).resolve().parents[1]
 ALGOS = {   # label: (group prefix, wandb root, eval key, offset added to the logged step)
     "Aware, T = 4": ("Exp8_Aware-T4_", EQM_RL / "Aware" / "wandb", "eval/normalized_score", 0),
-    # awac.py evaluates after update t and logs it at step t, so its evals sit at 19,999, 39,999, ...
-    "Gaussian AWAC": ("Exp8_AWAC_", EQM_RL.parent / "offline" / "wandb", "d4rl_normalized_score", 1),
+    # awac.py logs with Aware's keys, its evals at 20,000, 40,000, ... (updates done)
+    "Gaussian AWAC": ("Exp8_AWAC_", EQM_RL.parent / "offline" / "wandb", "eval/normalized_score", 0),
 }
 DATASETS = ["maze2d-umaze-v1", "maze2d-medium-v1", "maze2d-large-v1"]
 CORL = {"maze2d-umaze-v1": "0.4 / 65.7", "maze2d-medium-v1": "0.8 / 84.6", "maze2d-large-v1": "2.3 / 215.5"}

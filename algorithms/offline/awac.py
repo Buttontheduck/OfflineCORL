@@ -478,23 +478,27 @@ def train(config: TrainConfig):
         batch = replay_buffer.sample(config.batch_size)
         batch = [b.to(config.device) for b in batch]
         update_result = awac.update(batch)
-        wandb.log(update_result, step=t)
+        # Same keys as EqM_RL/Aware (train/*, eval/*), so both share wandb panels
+        wandb.log({f"train/{k}": v for k, v in update_result.items()}, step=t)
         if (t + 1) % config.eval_frequency == 0:
             eval_scores = eval_actor(
                 env, actor, config.device, config.n_test_episodes, config.test_seed
             )
-
-            wandb.log({"eval_score": eval_scores.mean()}, step=t)
+            # Logged at step t + 1 = updates done, as Aware logs its evals (20000, 40000, ...)
+            eval_log = {
+                "eval/score": eval_scores.mean(),
+                "eval/score_std": eval_scores.std(),
+                "eval/score_min": eval_scores.min(),
+            }
             if hasattr(env, "get_normalized_score"):
                 normalized_eval_scores = env.get_normalized_score(eval_scores) * 100.0
-                wandb.log(
-                    {"d4rl_normalized_score": normalized_eval_scores.mean()}, step=t
-                )
+                eval_log["eval/normalized_score"] = normalized_eval_scores.mean()
+            wandb.log(eval_log, step=t + 1)
 
             if config.checkpoints_path is not None:
                 torch.save(
                     awac.state_dict(),
-                    os.path.join(config.checkpoints_path, f"checkpoint_{t}.pt"),
+                    os.path.join(config.checkpoints_path, f"checkpoint_{t + 1}.pt"),
                 )
 
     wandb.finish()
