@@ -1313,7 +1313,7 @@ With −1 per step and γ = 0.99, a state from which the goal is never reached i
 **Next step (not prepared):** Aware with an IQL critic on AntMaze. This is the shared-IQL-critic idea of the plan's section 2 and the "IQL critic" alternative under Later phases; CORL's IQL reaches 30.3 here.
 
 ### Experiment 7 (plan, started 2026-11-05): Aware on AntMaze umaze and medium, and Aware with an IQL critic
-> **Status:** running. All runs 1M steps, seeds 1–3, D4RL v2 datasets, rewards shifted by −1, success rate over 100 episodes every 20k steps (as Experiment 6).
+> **Status:** stopped early on 2026-11-05 at 21:14 German time (one run finished 1M steps; the other 14 ended at 620k–980k); results in the next section. All runs were planned for 1M steps, seeds 1–3, D4RL v2 datasets, rewards shifted by −1, success rate over 100 episodes every 20k steps (as Experiment 6).
 
 **Goal:** test whether Aware handles multimodal data (several actions per state) better, and whether an in-sample critic fixes the AntMaze failure of Experiment 6.
 
@@ -1333,11 +1333,61 @@ With −1 per step and γ = 0.99, a state from which the goal is never reached i
 - **Code:** `sweeps/exp7_antmaze.yaml`, run unattended by `run_exp7.sh`; summary by `diagnostics/summarize_exp5_1m.py` into `sweep_runs/exp7_<date-time>/summary.md`.
 - **Not in this experiment:** our own Gaussian AWAC runs and frozen-weight fits; CORL's published numbers are the references.
 
+### Experiment 7: results, stopped early (3 seeds, 2026-11-05)
+> **Scope.** The 15 runs of the plan above. IQL seed 1 finished 1M steps. The other 14 were stopped by hand at 21:14 German time, between 620k and 980k steps, so every run has its 500k result.
+> - **Code:** sweep `sweep_runs/exp7_antmaze_20261105-143721/`, started by `run_exp7.sh` (`sweep_runs/exp7_20261105-143721/`). The planned summary step never ran, because the runs were stopped first. Scores and critic logs were read from the runs' local wandb files (`eval/normalized_score`, `weighting/*`, `train/*`). A results note is in `sweep_runs/exp7_20261105-143721/summary.md` (local; `sweep_runs/` is not in git).
+
+**Run log**
+
+| | |
+|---|---|
+| Wall-clock | `gpu_gate` started the runs about 3 min apart, from 15:38 to 16:26 German time, all 15 at once. IQL seed 1 finished at 20:54 (317 min). The other 14 were stopped at 21:14 after 289–334 min, at about 45 steps/s. |
+| Stop step | umaze 800k / 760k / 740k; umaze-diverse 800k / 740k / 720k; medium-play 700k / 680k / 640k; medium-diverse 700k / 680k / 620k; IQL 1M / 980k / 920k (seeds 1 / 2 / 3, last eval). |
+
+**Results** (success rate in %). Each score is the mean of the 5 evals in the 100k steps up to that point. With 100 episodes per eval, a single eval scatters by about ±5 points.
+
+| Setting | 400k–500k, per seed | **mean** | last 100k before the stop, per seed | **mean** | best single eval | CORL BC / AWAC / IQL |
+|---|---|---|---|---|---|---|
+| umaze, T = 4 | 64.8 / 65.0 / 69.6 | **66.5** | 68.2 / 58.4 / 68.8 | **65.1** | 82 / 80 / 80 | 55.3 / 56.8 / 77.0 |
+| umaze-diverse, T = 4 | 52.2 / 50.6 / 48.2 | **50.3** | 53.2 / 52.6 / 54.4 | **53.4** | 66 / 62 / 63 | 47.3 / 54.8 / 54.3 |
+| medium-play, T = 4 | 0.8 / 0.6 / 0.2 | **0.5** | 0.4 / 0.6 / 0.2 | **0.4** | 4 / 3 / 3 | 0.0 / 0.0 / 65.8 |
+| medium-diverse, T = 4 | 0.6 / 0.4 / 0.0 | **0.3** | 0.4 / 0.2 / 0.4 | **0.3** | 2 / 3 / 2 | 0.8 / 0.0 / 73.8 |
+| medium-diverse, IQL critic, T = 0.1 | 43.8 / 42.2 / 21.2 | **35.7** | 38.0 / 0.0 / 23.0 | **20.3** | 66 / 65 / 59 | – / – / 73.8 |
+
+**The IQL critic, per seed:** mean of min target Q(s, a) at dataset actions, and the score along training. The critic values are means over the logged training steps in each bin (every 200th record).
+
+| Seed | | 0–100k | 100k–300k | 300k–500k | 500k–600k | 600k–650k | 650k–700k | 700k–end |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Q mean | −64 | −77 | −79 | −80 | −80 | −80 | −80 |
+| | critic loss | 1.8 | 1.8 | 1.3 | 1.3 | 1.2 | 1.2 | 1.2 |
+| 2 | Q mean | −63 | −78 | −79 | −79 | −67 | −20 | **+747** |
+| | critic loss | 1.9 | 1.7 | 1.5 | 1.6 | 9.7 | 76 | 3,460 |
+| 3 | Q mean | −63 | **+174** | +7,980 | +33,700 | +51,300 | +58,000 | **+84,800** |
+| | critic loss | 1.8 | 1,840 | 8.3·10⁵ | 6.3·10⁶ | 1.1·10⁷ | 1.3·10⁷ | 3.2·10⁷ |
+
+With −1 per step and γ = 0.99, every true value lies between −100 and 0, so any positive Q means the critic has diverged.
+- **Seed 1:** the critic stays stable at about −80 throughout.
+- **Seed 2:** the critic diverges at about 600k. The score falls from 42 (600k) to 25 (620k), 7 (640k), 3 (660k), then 0 at every eval from 680k on.
+- **Seed 3:** the critic diverges at 100k–200k. The score falls from 59 (120k) to 14 (200k), then stays at 8–31 for the rest of the run.
+- **Weights in the diverged runs:** A's spread grows from 0.75 to 39 (seed 2) and 3,800 (seed 3). The median weight drops to about 0, and 17–19% of each batch sits at the cap of 100, so the actor fits a small subset of the batch that the broken advantages pick out.
+
+**Interpretation**
+1. **With its own critic, Aware behaves like behaviour cloning on AntMaze.** On umaze and umaze-diverse it reaches its level at the very first eval (20k steps: umaze 64 / 55 / 70, umaze-diverse 54 / 55 / 56) and stays flat to the end. The critic adds no improvement after that.
+2. **umaze: about 66 %,** roughly 10 points above CORL's BC (55.3) and Gaussian AWAC (56.8), and below IQL (77.0).
+3. **umaze-diverse: about 50–53 %,** level with CORL's AWAC (54.8) and IQL (54.3), slightly above BC (47.3). Going from umaze to umaze-diverse, Aware loses 12–16 points (end and 500k); CORL's Gaussian AWAC loses about 2 and BC about 8. So on these pairs there is no sign that the EqM actor handles the more multimodal data better.
+4. **medium-play and medium-diverse: about 0 %,** as CORL's BC and AWAC, and as Experiment 6 on large-diverse. The AWAC-type critic does not stitch, and nothing changed with longer training (no run ever passed 4 successes in 100 episodes). Running to 1M would not have changed this.
+5. **The IQL critic shows the critic is the bottleneck.**
+   - With it, medium-diverse goes from 0 to about 45–60 % within 100k–300k steps (single evals up to 66 / 65 / 59). So the EqM actor can use a good advantage signal.
+   - That is still below CORL's IQL (73.8), and it does not last. Seed 1, whose critic stayed stable, drifts from about 50 (200k–300k) to 38 at 1M. Seeds 2 and 3 collapse when their critics diverge.
+6. **The divergence is in the critic, not caused by the actor.** With `agent.critic: iql`, the V and Q updates in `Aware/agents.py` use only dataset actions and never call the EqM actor. Learning rates, τ, γ, expectile, reward shift and batch size match CORL's `configs/offline/iql/antmaze/medium_diverse_v2.yaml`. The one known difference is depth: Aware's Q and V networks have 4 hidden layers of 256 (`num_hidden_layers: 4`), CORL's `TwinQ`/`ValueFunction` have 2. This is the main suspect. Not tested.
+
+**Next step (not prepared):** rerun the IQL group with 2-layer Q and V networks (the actor unchanged). If it is stable for 1M steps, compare its score with CORL's IQL 73.8 on medium-diverse and run it on medium-play and large-diverse.
+
 ## Later phases
 - **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.
 - **Phase 3 — Offline-to-online:** continue EqM-AWAC online. Consider FINO (wider action support for exploration) and FFM (behavior-tilted fine-tuning).
 - **Alternatives if AWAC becomes the bottleneck:**
-  - IQL critic: in-sample, never queries actor actions, so there is no EqM sampling inside critic updates.
+  - IQL critic: in-sample, never queries actor actions, so there is no EqM sampling inside critic updates. Tried in Experiment 7: medium-diverse rises from 0 to about 50 %, but the 4-layer critic diverged in 2 of 3 seeds.
   - QIPO: iterative support-set weighting.
   - DFQL: Q-gradient injection into the field.
 - **Low-dimensional fixes, if drift or cancellation show up:** Fourier lift of the action, Jacobian-gated samplers, or action chunking.
