@@ -1,0 +1,32 @@
+# Experiment 8 (EqM_RL.md, "Experiment 8 (plan)"): Aware vs Gaussian AWAC on D4RL Maze2D, the
+# low-dimensional-action test (2-D actions, against 6-D HalfCheetah and 8-D AntMaze).
+# This file: Aware, own (AWAC-type) critic, T = 4, as in Experiments 5-7 (lambda 8, K 20, eta 0.01).
+# The AWAC half is sweeps/exp8_maze2d_awac.yaml; run_exp8.sh starts both at once.
+# maze2d-umaze/-medium/-large-v1 (sparse), 3 seeds, 1M steps, 100 eval episodes every 20k steps.
+# Rewards unshifted (as CORL on Maze2D). Buffer 5M: maze2d-large has about 4M transitions.
+# wandb: one group per algorithm and dataset (Exp8_Aware-T4_<dataset>), seeds inside the group.
+# Listed seed by seed so the first runs to start cover every dataset. 9 runs, hawk env.
+#   python run_sweep.py sweeps/exp8_maze2d_aware.yaml
+target: aware
+parallel: 9
+gpu_gate: {util_max: 85, min_free_mb: 3000, settle_s: 180, window_s: 60}
+
+fixed:
+  name: Exp8_Aware-T4
+  num_train_ops: 1000001   # the extra 1 makes the last eval (and checkpoint) happen at step 1,000,000
+  temperature: 4.0
+  normalize_reward: false
+  buffer_size: 5000000
+  n_test_episodes: 100
+  eval_frequency: 20000
+
+grid:
+  - {group: Exp8_Aware-T4_maze2d-umaze-v1,  env_name: maze2d-umaze-v1,  seed: 1}
+  - {group: Exp8_Aware-T4_maze2d-medium-v1, env_name: maze2d-medium-v1, seed: 1}
+  - {group: Exp8_Aware-T4_maze2d-large-v1,  env_name: maze2d-large-v1,  seed: 1}
+  - {group: Exp8_Aware-T4_maze2d-umaze-v1,  env_name: maze2d-umaze-v1,  seed: 2}
+  - {group: Exp8_Aware-T4_maze2d-medium-v1, env_name: maze2d-medium-v1, seed: 2}
+  - {group: Exp8_Aware-T4_maze2d-large-v1,  env_name: maze2d-large-v1,  seed: 2}
+  - {group: Exp8_Aware-T4_maze2d-umaze-v1,  env_name: maze2d-umaze-v1,  seed: 3}
+  - {group: Exp8_Aware-T4_maze2d-medium-v1, env_name: maze2d-medium-v1, seed: 3}
+  - {group: Exp8_Aware-T4_maze2d-large-v1,  env_name: maze2d-large-v1,  seed: 3}

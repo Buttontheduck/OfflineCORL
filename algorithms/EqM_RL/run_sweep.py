@@ -103,9 +103,12 @@ def expand_grid(grid) -> list:
 
 def tag_of(combo: dict) -> str:
     """Short readable id of one grid point, e.g. temperature0.3_num_step10_seed1.
-    Values with '/' (dataset ids) keep only their last part: simple-v0."""
+    Values with '/' (dataset ids) keep only their last part: simple-v0. A per-grid wandb
+    `group` is left out (it only names the wandb group, not the run)."""
     parts = []
     for k, v in combo.items():
+        if k == "group":
+            continue
         val = re.sub(r"[^\w.\-]+", "", str(v).rsplit("/", 1)[-1])
         parts.append(f"{k.split('.')[-1]}{val}")
     return "_".join(parts) or "base"

@@ -1,0 +1,34 @@
+# Experiment 8 (EqM_RL.md, "Experiment 8 (plan)"): Aware vs Gaussian AWAC on D4RL Maze2D.
+# This file: CORL's Gaussian AWAC (algorithms/offline/awac.py) with CORL's Maze2D settings
+# (configs/offline/awac/maze2d/*_v1.yaml: lambda 0.1, lr 3e-4, gamma 0.99, tau 0.005, 1M steps).
+# Evaluated like the Aware half (100 episodes every 20k steps; CORL itself evaluates every 1k).
+# The Aware half is sweeps/exp8_maze2d_aware.yaml; run_exp8.sh starts both at once.
+# wandb: project E, one group per algorithm and dataset (Exp8_AWAC_<dataset>), seeds inside the group.
+# 9 runs, hawk env.
+#   python run_sweep.py sweeps/exp8_maze2d_awac.yaml
+target: awac_d4rl
+parallel: 9
+gpu_gate: {util_max: 85, min_free_mb: 3000, settle_s: 180, window_s: 60}
+
+fixed:
+  project: E                      # awac.py defaults to project CORL
+  name: Exp8_AWAC
+  num_train_ops: 1000000          # awac.py evaluates after step t + 1, so the last eval is at 1M
+  awac_lambda: 0.1                # CORL's Maze2D value
+  normalize_reward: false
+  buffer_size: 5000000            # CORL's config uses 10M; maze2d-large has about 4M transitions
+  n_test_episodes: 100
+  eval_frequency: 20000
+  deterministic_torch: false      # true needs CUBLAS_WORKSPACE_CONFIG on CUDA
+  checkpoints_path: /workspace/Trained_Models/checkpoints/
+
+grid:
+  - {group: Exp8_AWAC_maze2d-umaze-v1,  env_name: maze2d-umaze-v1,  seed: 1}
+  - {group: Exp8_AWAC_maze2d-medium-v1, env_name: maze2d-medium-v1, seed: 1}
+  - {group: Exp8_AWAC_maze2d-large-v1,  env_name: maze2d-large-v1,  seed: 1}
+  - {group: Exp8_AWAC_maze2d-umaze-v1,  env_name: maze2d-umaze-v1,  seed: 2}
+  - {group: Exp8_AWAC_maze2d-medium-v1, env_name: maze2d-medium-v1, seed: 2}
+  - {group: Exp8_AWAC_maze2d-large-v1,  env_name: maze2d-large-v1,  seed: 2}
+  - {group: Exp8_AWAC_maze2d-umaze-v1,  env_name: maze2d-umaze-v1,  seed: 3}
+  - {group: Exp8_AWAC_maze2d-medium-v1, env_name: maze2d-medium-v1, seed: 3}
+  - {group: Exp8_AWAC_maze2d-large-v1,  env_name: maze2d-large-v1,  seed: 3}

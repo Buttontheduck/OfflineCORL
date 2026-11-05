@@ -1383,6 +1383,30 @@ With −1 per step and γ = 0.99, every true value lies between −100 and 0, so
 
 **Next step (not prepared):** rerun the IQL group with 2-layer Q and V networks (the actor unchanged). If it is stable for 1M steps, compare its score with CORL's IQL 73.8 on medium-diverse and run it on medium-play and large-diverse.
 
+### Experiment 8 (plan, started 2026-11-05): Aware vs Gaussian AWAC on Maze2D, the low-dimensional-action test
+> **Status:** running, started 23:54 German time. 18 runs: 2 methods × 3 datasets × seeds 1–3, 1M steps each.
+
+**Goal:** test whether very low action dimension is a practical problem for the EqM actor (see "Caveat: low-dimensional actions"). D4RL Maze2D has **2-D actions** (a force in x and y) and 4-D observations, against 6-D actions on HalfCheetah and 8-D on AntMaze.
+
+| | |
+|---|---|
+| Datasets | `maze2d-umaze-v1`, `-medium-v1`, `-large-v1` (sparse reward): 0.99M / 1.99M / 3.98M transitions, reward 1 in 8.0 / 2.4 / 0.9 % of rows, no terminals. Episodes last 300 / 600 / 800 steps and do not end at the goal, so scores above 100 are possible. 31–33 % of all dataset action coordinates sit exactly at the ±1 bound. |
+| Aware | T = 4, its own (AWAC-type) critic, otherwise as in Experiments 5–7 (EqM 4 × 256, λ = 8, K = 20, η = 0.01, γ = 0.99). |
+| AWAC | CORL's Gaussian AWAC (`algorithms/offline/awac.py`) with CORL's Maze2D settings (`configs/offline/awac/maze2d/*_v1.yaml`): λ = 0.1, lr 3·10⁻⁴, γ = 0.99, τ = 0.005. |
+| Both | 1M steps; rewards unshifted (as CORL on Maze2D); buffer 5M (Aware's default 2M is too small for maze2d-large); 100 eval episodes every 20k steps (CORL evaluates every 1k); checkpoints at every eval. |
+| wandb | Project E, one group per method and dataset with the 3 seeds inside: `Exp8_Aware-T4_<dataset>` and `Exp8_AWAC_<dataset>`. |
+| References | CORL after 1M steps (README, last eval), BC / AWAC: umaze 0.4 / 65.7, medium 0.8 / 84.6, large 2.3 / 215.5. |
+
+**How to read it.** The score comparison alone cannot show that dimension is the cause, since Maze2D differs from HalfCheetah and AntMaze in task, reward and data, not only in action size. Two pieces of evidence:
+1. **Aware's gap to AWAC across action sizes:** 2-D here, against 6-D (Experiment 5, 1M-step HalfCheetah) and 8-D (Experiment 7, AntMaze umaze: Aware about 66 vs CORL's AWAC 56.8). If Aware falls far behind AWAC only at 2-D, that points to dimension. This is suggestive, not proof.
+2. **The actions themselves (after the runs, on the saved checkpoints).** The actions are 2-D, so they can be plotted directly, as in the 2D toy. At 500k and 1M, on a fixed set of dataset states: about 256 EqM samples per state against the dataset actions of nearby states and AWAC's action. Measure sample spread against data spread, the share of samples that land between action modes (cancellation), movement during sampling (tangential drift), and the share at the ±1 bounds. Maze2D's data comes from a controller steering to different goals, so one state often has several valid actions, which is the multimodal case where the toy showed these problems. This needs a new diagnostics script; not written yet.
+
+**Outcomes.** Aware close to AWAC with clean samples means 2-D actions are not a practical problem for this actor. Aware far behind AWAC with collapsed or in-between samples is real evidence for the low-dimension issue.
+
+**Decided with the project owner:** no dense-reward versions. No Aware T = 0.1 arm for now; if Aware fails here, T = 0.1 (AWAC's λ) is the next run, to rule out the temperature as the reason.
+
+- **Code:** `sweeps/exp8_maze2d_aware.yaml` and `sweeps/exp8_maze2d_awac.yaml`, both started at once by `run_exp8.sh`. Summary by `diagnostics/summarize_exp8.py` (finds each run by its wandb group) into `sweep_runs/exp8_<date-time>/summary.md`. `run_sweep.py` now leaves a per-grid `group` out of the run tag.
+
 ## Later phases
 - **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.
 - **Phase 3 — Offline-to-online:** continue EqM-AWAC online. Consider FINO (wider action support for exploration) and FFM (behavior-tilted fine-tuning).
