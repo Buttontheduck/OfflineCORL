@@ -53,7 +53,9 @@ TARGETS = {
     "fit_actor": dict(script=HERE / "Aware" / "fit_actor.py", conda_env="hawk",
                       style="pyrallis", data="d4rl", name_prefix="Fit"),
 }
-SWEEP_KEYS = {"target", "parallel", "stagger", "conda_env", "fixed", "grid", "gpu_gate"}
+SWEEP_KEYS = {"target", "parallel", "stagger", "conda_env", "fixed", "grid", "gpu_gate", "untagged"}
+# untagged (optional): grid keys left out of the run tag and name, e.g. [group, buffer_size]
+# when they only follow from another key. Default: [group].
 # gpu_gate (optional): start each further run only when the GPU has room, e.g.
 #   gpu_gate: {util_max: 80, min_free_mb: 3000, settle_s: 300, window_s: 60}
 # = mean GPU utilization over the last window_s seconds below util_max %, at least min_free_mb
@@ -101,13 +103,13 @@ def expand_grid(grid) -> list:
     return combos
 
 
-def tag_of(combo: dict) -> str:
+def tag_of(combo: dict, untagged=("group",)) -> str:
     """Short readable id of one grid point, e.g. temperature0.3_num_step10_seed1.
-    Values with '/' (dataset ids) keep only their last part: simple-v0. A per-grid wandb
-    `group` is left out (it only names the wandb group, not the run)."""
+    Values with '/' (dataset ids) keep only their last part: simple-v0. Keys in `untagged`
+    are left out, by default a per-grid wandb `group` (it names the group, not the run)."""
     parts = []
     for k, v in combo.items():
-        if k == "group":
+        if k in untagged:
             continue
         val = re.sub(r"[^\w.\-]+", "", str(v).rsplit("/", 1)[-1])
         parts.append(f"{k.split('.')[-1]}{val}")
@@ -171,6 +173,12 @@ def conda_python(env_name: str) -> str:
             return str(c)
     sys.exit(f"Cannot find the Python of conda env '{env_name}'. "
              f"Set 'conda_env:' in the sweep file to an existing env.")
+
+
+def restore_sigint() -> None:
+    """Runs in the child before exec: default SIGINT/SIGQUIT handling (see the Popen call)."""
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    signal.signal(signal.SIGQUIT, signal.SIG_DFL)
 
 
 def child_environment(target: dict) -> dict:
@@ -267,7 +275,7 @@ def main() -> int:
 
     runs = []
     for i, combo in enumerate(expand_grid(spec.get("grid"))):
-        tag = tag_of(combo)
+        tag = tag_of(combo, spec.get("untagged") or ("group",))
         overrides = {**fixed, **combo, "name": f"{name_prefix}_{tag}"}
         run_dir = sweep_dir / f"{i:03d}_{tag}"
         runs.append(dict(idx=i, tag=tag, overrides=overrides, run_dir=run_dir,
@@ -370,9 +378,13 @@ def main() -> int:
                 r["run_dir"].mkdir(parents=True, exist_ok=True)
                 r["log_file"] = open(r["run_dir"] / "stdout.log", "w")
                 # own session: Ctrl-C in the terminal reaches only this runner, which then
-                # stops the runs itself
+                # stops the runs itself. SIGINT is reset to its default in the run: a sweep
+                # started with '&' from a script inherits "ignore SIGINT", and a Python run that
+                # starts with SIGINT ignored never raises KeyboardInterrupt, so it could not close
+                # its W&B run (it stayed 'running' in W&B and was killed after the grace time).
                 proc = subprocess.Popen(r["cmd"], stdout=r["log_file"], stderr=subprocess.STDOUT,
-                                        cwd=target["script"].parent, env=env, start_new_session=True)
+                                        cwd=target["script"].parent, env=env, start_new_session=True,
+                                        preexec_fn=restore_sigint)
                 r["t0"], r["status"] = time.time(), "running"
                 running[proc] = r
                 changed = True
@@ -391,7 +403,7 @@ def main() -> int:
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         for proc in running:
             proc.send_signal(signal.SIGINT)  # lets each run close its W&B run
-        deadline = time.time() + 60
+        deadline = time.time() + 180   # W&B may need a while to upload and close each run
         for proc, r in running.items():
             try:
                 proc.wait(timeout=max(1.0, deadline - time.time()))

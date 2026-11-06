@@ -1,7 +1,8 @@
-"""Summary of Experiment 8 (Aware T = 4 vs CORL's Gaussian AWAC on D4RL Maze2D), as Markdown.
+"""Summary of Experiments 8 and 9 on D4RL Maze2D, as Markdown: Aware at T = 0.1 and 1 (Exp 9) and
+T = 4 (Exp 8) vs CORL's Gaussian AWAC (Exp 8). Arms with no local runs show "–".
 
 Reads the eval scores from the runs' local wandb files, without the network. A run is found by
-its wandb group (Exp8_<algorithm>_<dataset>), read from the command line stored in the run's
+its wandb group (Exp<n>_<algorithm>_<dataset>), read from the command line stored in the run's
 wandb-metadata.json; Aware's runs are in Aware/wandb, AWAC's in algorithms/offline/wandb.
 Scores are D4RL normalized scores; each cell is the mean of the evals in the `--window` steps up
 to that step. Means over seeds (± population std), per seed in brackets.
@@ -19,6 +20,8 @@ import numpy as np
 
 EQM_RL = Path(__file__).resolve().parents[1]
 ALGOS = {   # label: (group prefix, wandb root, eval key, offset added to the logged step)
+    "Aware, T = 0.1": ("Exp9_Aware-T0.1_", EQM_RL / "Aware" / "wandb", "eval/normalized_score", 0),
+    "Aware, T = 1": ("Exp9_Aware-T1_", EQM_RL / "Aware" / "wandb", "eval/normalized_score", 0),
     "Aware, T = 4": ("Exp8_Aware-T4_", EQM_RL / "Aware" / "wandb", "eval/normalized_score", 0),
     # awac.py logs with Aware's keys, its evals at 20,000, 40,000, ... (updates done)
     "Gaussian AWAC": ("Exp8_AWAC_", EQM_RL.parent / "offline" / "wandb", "eval/normalized_score", 0),
@@ -99,7 +102,7 @@ def per_seed(v):
     return " / ".join("–" if x is None else f"{x:.1f}" for x in v)
 
 
-print("# Experiment 8: Aware (T = 4) vs Gaussian AWAC on D4RL Maze2D (2-D actions, 3 seeds)\n")
+print("# Experiments 8 and 9: Aware (T = 0.1, 1, 4) vs Gaussian AWAC on D4RL Maze2D (2-D actions, 3 seeds)\n")
 missing = [f"{a} {d} seed {s}" for a in ALGOS for d in DATASETS for s in seeds if (a, d, s) not in evals]
 if missing:
     print("Not found (no local wandb run): " + ", ".join(missing) + "\n")

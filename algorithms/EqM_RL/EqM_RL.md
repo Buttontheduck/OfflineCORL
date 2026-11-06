@@ -1384,7 +1384,7 @@ With −1 per step and γ = 0.99, every true value lies between −100 and 0, so
 **Next step (not prepared):** rerun the IQL group with 2-layer Q and V networks (the actor unchanged). If it is stable for 1M steps, compare its score with CORL's IQL 73.8 on medium-diverse and run it on medium-play and large-diverse.
 
 ### Experiment 8 (plan, started 2026-11-05): Aware vs Gaussian AWAC on Maze2D, the low-dimensional-action test
-> **Status:** running. 18 runs: 2 methods × 3 datasets × seeds 1–3, 1M steps each. Aware started at 23:54 German time. The AWAC half was restarted at 00:51 (2026-11-06), see "Restart" below.
+> **Status:** stopped by hand on 2026-11-06 at about 04:15 German time, at 440k–540k steps (Aware) and 420k–680k (AWAC); interim results below. 18 runs: 2 methods × 3 datasets × seeds 1–3, planned 1M steps each. Aware started at 23:54 German time (2026-11-05). The AWAC half was restarted at 00:51, see "Restart" below.
 >
 > **Restart of the AWAC half.** CORL's `awac.py` logged its scores under its own wandb keys (`d4rl_normalized_score`, `eval_score`, `actor_loss`) at steps 19,999, 39,999, ..., so in wandb they did not share panels or x-values with Aware's (`eval/normalized_score`, `eval/score`, `train/*` at 20,000, 40,000, ...). `awac.py` now logs Aware's keys, its evals at the update count (t + 1), adds `eval/score_std` and `eval/score_min`, and names checkpoints `checkpoint_<updates>.pt`. The first 9 AWAC runs (about 35 min, 40k–200k steps) were stopped and rerun. Their wandb runs (old keys) are still in the `Exp8_AWAC_*` groups, and their checkpoint folders (`checkpoint_19999.pt`, ...) in `/workspace/Trained_Models/checkpoints/`. The orchestrator is now `sweep_runs/exp8_20261105-225416/resume_awac.sh`.
 >
@@ -1410,6 +1410,62 @@ With −1 per step and γ = 0.99, every true value lies between −100 and 0, so
 **Decided with the project owner:** no dense-reward versions. No Aware T = 0.1 arm for now; if Aware fails here, T = 0.1 (AWAC's λ) is the next run, to rule out the temperature as the reason.
 
 - **Code:** `sweeps/exp8_maze2d_aware.yaml` and `sweeps/exp8_maze2d_awac.yaml`, both started at once by `run_exp8.sh`. Summary by `diagnostics/summarize_exp8.py` (finds each run by its wandb group) into `sweep_runs/exp8_<date-time>/summary.md`. `run_sweep.py` now leaves a per-grid `group` out of the run tag.
+
+### Experiment 8: interim results, stopped early (3 seeds, 2026-11-06)
+> Stopped at 440k–540k steps (Aware) and 420k–680k (AWAC). Full table: `sweep_runs/exp8_20261105-225416/summary.md` (local), by `diagnostics/summarize_exp8.py`.
+
+**Scores** (D4RL normalized; mean of the 5 evals in the 100k steps up to each point, over 3 seeds)
+
+| Dataset | Method | 100k | 250k | 500k | last 100k | CORL BC / AWAC at 1M |
+|---|---|---|---|---|---|---|
+| umaze | Aware, T = 4 | 17.4 | 27.8 | 28.2 | 28.1 ± 1.0 | 0.4 / 65.7 |
+| umaze | Gaussian AWAC | 44.5 | 62.1 | 36.3 | 49.0 ± 11.1 | |
+| medium | Aware, T = 4 | 17.6 | 21.3 | 21.5 | 21.2 ± 0.7 | 0.8 / 84.6 |
+| medium | Gaussian AWAC | 61.0 | 52.1 | 60.1 | 63.2 ± 4.1 | |
+| large | Aware, T = 4 | 18.5 | 27.1 | 24.7 | 25.8 ± 2.8 | 2.3 / 215.5 |
+| large | Gaussian AWAC | 167.2 | 176.3 | 200.0 | 201.1 ± 6.9 | |
+
+**Interpretation**
+1. **At T = 4, Aware is close to behaviour cloning on Maze2D.**
+   - With rewards of at most 1 per step, the advantage spread is only 0.4–0.9 (7–9 on HalfCheetah).
+   - So w = exp(A / 4) is almost uniform: the effective batch share was 0.84–0.98, against 0.50 for T = 4 on AntMaze large-diverse.
+   - Aware's scores are flat, alike across mazes (raw returns 65–90) and alike across seeds.
+   - The gap to AWAC (λ = 0.1) therefore mainly measures the temperature, not the action dimension. This is the confound noted in the plan; Experiment 9 tests it.
+2. **No sign yet of the low-dimensional failure modes.**
+   - The near-BC Aware scores 20–30, while CORL's Gaussian BC scores 0.4–2.3. A likely reason: the data steers to random goals, so a Gaussian mean averages the action modes away, while EqM picks one mode and moves. This is a hint only; it needs an EqM-BC vs Gaussian-BC comparison.
+   - Samples for one state still spread 0.22–0.25 per dimension (no collapse).
+   - Open: only 4–7 % of sampled action coordinates fall outside ±1 before clipping, while 32 % of the dataset's sit exactly at ±1. Check with the action diagnostics.
+3. **Gaussian AWAC is unstable on Maze2D, as on CORL.** Large reaches about 200 (CORL 215.5); medium and umaze are below CORL and swing between evals.
+
+**Stopping and wandb** (fixed for later runs)
+- The Aware sweep had been started with `&` by `run_exp8.sh`. Bash then ignores SIGINT for that job, every run inherited this, and a Python process that starts with SIGINT ignored never raises KeyboardInterrupt. So the sweep's stop signal (SIGINT, then SIGKILL after 60 s) could not let the runs close their W&B runs.
+- Before the fix, stopped runs stayed 'running' in W&B and later became 'crashed' (all 14 stopped Experiment 7 runs).
+- Fixes:
+  - `run_sweep.py` resets SIGINT to default in every run it starts and allows 180 s before killing.
+  - `Aware/main.py` calls `wandb.finish()` only after a complete run. Before, it did so in `finally`, which marked stopped or crashed runs 'finished'. A stopped run is now 'killed', as with CORL's `awac.py`.
+- The 9 Experiment 8 Aware runs were closed afterwards by resuming each W&B run and raising KeyboardInterrupt. All 18 Experiment 8 runs show 'killed', with their data intact.
+
+### Experiment 9 (plan, started 2026-11-06): Aware at T = 0.1 and T = 1 on Maze2D
+> **Status:** running. 18 runs: 2 temperatures × 3 datasets × seeds 1–3, 1M steps each.
+
+**Goal:** remove the temperature confound of Experiment 8, so that Aware vs Gaussian AWAC on Maze2D says something about the 2-D actions. T = 0.1 matches AWAC's λ on this reward scale; T = 1 is in between.
+
+| | |
+|---|---|
+| Datasets | `maze2d-umaze-v1`, `-medium-v1`, `-large-v1` (sparse), as Experiment 8. |
+| Aware | Own (AWAC-type) critic, T = 0.1 or 1, otherwise as Experiment 8 (EqM 4 × 256, λ = 8, K = 20, η = 0.01, γ = 0.99). Rewards unshifted. |
+| Protocol | 1M steps, 100 eval episodes every 20k steps, checkpoints at every eval. |
+| Buffer | Sized to each dataset (1M / 2M / 4M; Experiment 8 used 5M for all) to save GPU memory: measured 570 / 634 / 748 MB per run, so about 12 GB for all 18. |
+| GPU | One sweep, `gpu_gate` (utilization below 90 % over 60 s, at least 3 GB free, 180 s between starts). Runs are listed seed by seed, alternating T, so the first runs to start cover every group. |
+| wandb | Project E, one group per T and dataset with the 3 seeds inside: `Exp9_Aware-T0.1_<dataset>` and `Exp9_Aware-T1_<dataset>`. Same metric keys as Experiment 8's Aware and AWAC, so all share panels. |
+| References | Experiment 8: Aware T = 4 and Gaussian AWAC (stopped at about 500k); CORL's AWAC at 1M. |
+
+**Readout.**
+- If Aware at T = 0.1 comes close to AWAC, the Experiment 8 gap was the temperature, and 2-D actions are not a practical problem for this actor.
+- If it stays far behind, while its weights now carry the critic's signal, low dimension (or the EqM actor more generally) becomes a real suspect. The action diagnostics then decide.
+- Check the effective batch share and A std in the logs, to confirm the weights now concentrate.
+
+- **Code:** `sweeps/exp9_maze2d_aware_T.yaml`, run by `run_exp9.sh` in the foreground. Summary by `diagnostics/summarize_exp8.py`, which now covers Experiments 8 and 9 together. `run_sweep.py` has a new sweep key `untagged` (grid keys left out of run names; default `[group]`).
 
 ## Later phases
 - **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.

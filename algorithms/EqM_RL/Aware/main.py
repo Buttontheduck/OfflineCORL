@@ -269,7 +269,11 @@ def train(cfg: DictConfig):
                         agent.state_dict(),
                         os.path.join(cfg.actual_checkpoints_path, f"checkpoint_{t}.pt"),
                     )
-    finally:
+    except BaseException:
+        # Ctrl-C or an error: leave the W&B run to wandb's exit hook, which marks it 'killed'
+        # (KeyboardInterrupt) or 'failed'; wandb.finish() here would mark it 'finished'.
+        raise
+    else:
         wandb.finish()
 
 

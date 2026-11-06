@@ -1,0 +1,43 @@
+# Experiment 9 (EqM_RL.md, "Experiment 9 (plan)"): Aware at T = 0.1 and T = 1 on the Maze2D datasets of
+# Experiment 8 (maze2d-umaze/-medium/-large-v1, sparse), 3 seeds, 1M steps, 100 eval episodes every
+# 20k steps. Experiment 8 showed that at T = 4 the weights are almost uniform on Maze2D (advantage std
+# 0.4-0.9, effective batch share 0.84-0.98), so Aware was close to BC there; Gaussian AWAC uses 0.1.
+# Own (AWAC-type) critic, otherwise as Experiment 8 (lambda 8, K 20, eta 0.01). Rewards unshifted.
+# Buffer sized to each dataset (0.99M / 1.99M / 3.98M transitions) to keep GPU memory down
+# (measured 570 / 634 / 748 MB per run).
+# wandb: project E, one group per algorithm, T and dataset (Exp9_Aware-T0.1_<dataset>,
+# Exp9_Aware-T1_<dataset>), the 3 seeds inside each group. Same keys as Exp8's Aware and AWAC.
+# Listed seed by seed, alternating T, so the first runs to start cover every group; gpu_gate starts a
+# further run only while the GPU has room. 18 runs, hawk env. Started by run_exp9.sh.
+#   python run_sweep.py sweeps/exp9_maze2d_aware_T.yaml
+target: aware
+parallel: 18
+gpu_gate: {util_max: 90, min_free_mb: 3000, settle_s: 180, window_s: 60}
+untagged: [group, buffer_size]
+
+fixed:
+  name: Exp9_Aware
+  num_train_ops: 1000001   # the extra 1 makes the last eval (and checkpoint) happen at step 1,000,000
+  normalize_reward: false
+  n_test_episodes: 100
+  eval_frequency: 20000
+
+grid:
+  - {group: Exp9_Aware-T0.1_maze2d-umaze-v1, env_name: maze2d-umaze-v1, buffer_size: 1000000, temperature: 0.1, seed: 1}
+  - {group: Exp9_Aware-T0.1_maze2d-medium-v1, env_name: maze2d-medium-v1, buffer_size: 2000000, temperature: 0.1, seed: 1}
+  - {group: Exp9_Aware-T0.1_maze2d-large-v1, env_name: maze2d-large-v1, buffer_size: 4000000, temperature: 0.1, seed: 1}
+  - {group: Exp9_Aware-T1_maze2d-umaze-v1, env_name: maze2d-umaze-v1, buffer_size: 1000000, temperature: 1, seed: 1}
+  - {group: Exp9_Aware-T1_maze2d-medium-v1, env_name: maze2d-medium-v1, buffer_size: 2000000, temperature: 1, seed: 1}
+  - {group: Exp9_Aware-T1_maze2d-large-v1, env_name: maze2d-large-v1, buffer_size: 4000000, temperature: 1, seed: 1}
+  - {group: Exp9_Aware-T0.1_maze2d-umaze-v1, env_name: maze2d-umaze-v1, buffer_size: 1000000, temperature: 0.1, seed: 2}
+  - {group: Exp9_Aware-T0.1_maze2d-medium-v1, env_name: maze2d-medium-v1, buffer_size: 2000000, temperature: 0.1, seed: 2}
+  - {group: Exp9_Aware-T0.1_maze2d-large-v1, env_name: maze2d-large-v1, buffer_size: 4000000, temperature: 0.1, seed: 2}
+  - {group: Exp9_Aware-T1_maze2d-umaze-v1, env_name: maze2d-umaze-v1, buffer_size: 1000000, temperature: 1, seed: 2}
+  - {group: Exp9_Aware-T1_maze2d-medium-v1, env_name: maze2d-medium-v1, buffer_size: 2000000, temperature: 1, seed: 2}
+  - {group: Exp9_Aware-T1_maze2d-large-v1, env_name: maze2d-large-v1, buffer_size: 4000000, temperature: 1, seed: 2}
+  - {group: Exp9_Aware-T0.1_maze2d-umaze-v1, env_name: maze2d-umaze-v1, buffer_size: 1000000, temperature: 0.1, seed: 3}
+  - {group: Exp9_Aware-T0.1_maze2d-medium-v1, env_name: maze2d-medium-v1, buffer_size: 2000000, temperature: 0.1, seed: 3}
+  - {group: Exp9_Aware-T0.1_maze2d-large-v1, env_name: maze2d-large-v1, buffer_size: 4000000, temperature: 0.1, seed: 3}
+  - {group: Exp9_Aware-T1_maze2d-umaze-v1, env_name: maze2d-umaze-v1, buffer_size: 1000000, temperature: 1, seed: 3}
+  - {group: Exp9_Aware-T1_maze2d-medium-v1, env_name: maze2d-medium-v1, buffer_size: 2000000, temperature: 1, seed: 3}
+  - {group: Exp9_Aware-T1_maze2d-large-v1, env_name: maze2d-large-v1, buffer_size: 4000000, temperature: 1, seed: 3}
