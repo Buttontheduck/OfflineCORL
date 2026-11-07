@@ -37,6 +37,8 @@ diag_samples: 8           # samples per state for those logs
 # saving and reproducibility
 checkpoints_path: "/workspace/Trained_Models/checkpoints/"   # null = no checkpoints
 device: cuda # or 'mps' (Mac) / 'cpu'
+compile: false                  # true = torch.compile the EqM sampler's K-step loop (Actor.compile_sampler)
+compile_mode: reduce-overhead   # 'reduce-overhead' = also replay it as one CUDA graph; 'default' = fusion only
 
 # Otter Agent Hyperparameters (Unpacked via **cfg.agent)
 agent:

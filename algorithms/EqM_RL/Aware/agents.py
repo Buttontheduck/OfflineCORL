@@ -249,17 +249,19 @@ class Otter(nn.Module):
                 adv = q - v
                 
 
-                weights = torch.clamp_max(input=torch.exp(adv/self._temperature), max=self._exp_adv_max) 
-                gl.log("weighting/q_mean",            q.mean().item())
-                gl.log("weighting/v_mean",            v.mean().item())
-                gl.log("weighting/adv_mean",          adv.mean().item())
-                gl.log("weighting/adv_std",           adv.std(unbiased=False).item())
-                gl.log("weighting/weights_mean",      weights.mean().item())
-                gl.log("weighting/weights_max",       weights.max().item())
-                gl.log("weighting/weights_min",       weights.min().item())
-                gl.log("weighting/weights_var",       weights.var(unbiased=False).item())
-                gl.log("weighting/weights_median",    weights.median().item())
-                gl.log("weighting/weights_clip_frac", (weights >= self._exp_adv_max).float().mean().item())
+                weights = torch.clamp_max(input=torch.exp(adv/self._temperature), max=self._exp_adv_max)
+                # GPU tensors, no .item(): each .item() makes the CPU wait for the GPU. The logger
+                # turns them into numbers once per log_frequency steps (logger.py, dump).
+                gl.log("weighting/q_mean",            q.mean())
+                gl.log("weighting/v_mean",            v.mean())
+                gl.log("weighting/adv_mean",          adv.mean())
+                gl.log("weighting/adv_std",           adv.std(unbiased=False))
+                gl.log("weighting/weights_mean",      weights.mean())
+                gl.log("weighting/weights_max",       weights.max())
+                gl.log("weighting/weights_min",       weights.min())
+                gl.log("weighting/weights_var",       weights.var(unbiased=False))
+                gl.log("weighting/weights_median",    weights.median())
+                gl.log("weighting/weights_clip_frac", (weights >= self._exp_adv_max).float().mean())
                 
                 
                 
@@ -294,7 +296,7 @@ class Otter(nn.Module):
         loss.backward()
         self._critic_1_optimizer.step()
         self._critic_2_optimizer.step()
-        return loss.item()
+        return loss.detach()   # no .item() sync; logged as a tensor
 
     def _update_value(self, states, actions):
         """IQL's expectile regression of V(s) towards min target Q(s, a) at dataset actions."""
@@ -305,14 +307,14 @@ class Otter(nn.Module):
         self._value_optimizer.zero_grad()
         loss.backward()
         self._value_optimizer.step()
-        return loss.item()
+        return loss.detach()   # no .item() sync; logged as a tensor
 
     def _update_actor(self, states, actions):
         loss = self._actor_loss(states, actions)
         self._model_optimizer.zero_grad()
         loss.backward()
         self._model_optimizer.step()
-        return loss.item()
+        return loss.detach()   # no .item() sync; logged as a tensor
 
     def update(self, batch: TensorBatch) -> Dict[str, float]:
         states, actions, rewards, next_states, truncations, terminals = batch

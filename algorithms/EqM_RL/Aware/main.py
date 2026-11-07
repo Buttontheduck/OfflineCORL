@@ -188,7 +188,9 @@ def train(cfg: DictConfig):
         ood_threshold = cfg.actor.ood_threshold,
         early_stop    = cfg.actor.early_stop
         )
-    
+    if cfg.get("compile", False):
+        actor.compile_sampler(mode=cfg.get("compile_mode", "reduce-overhead"))
+
     # IQL critic option (agent.critic: iql): a V(s) network, same size as the critics
     value, value_optimizer = None, None
     if cfg.agent.get("critic", "awac") == "iql":

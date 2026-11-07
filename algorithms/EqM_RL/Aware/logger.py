@@ -1,6 +1,16 @@
 import wandb
 from collections import defaultdict
 import numpy as np
+import torch
+
+
+def _mean(values) -> float:
+    """Mean of the buffered values of one key: Python/NumPy numbers, or 0-dim GPU tensors (logged
+    without .item() to avoid a GPU sync per value; here they are read back once, in float64 as
+    np.mean would)."""
+    if isinstance(values[0], torch.Tensor):
+        return torch.stack([v.detach() for v in values]).double().mean().item()
+    return float(np.mean(values))
 
 class MetricsLogger:
     _instance = None
@@ -24,7 +34,7 @@ class MetricsLogger:
 
         # Average the values for any metric logged multiple times in one step
         aggregated_metrics = {
-            key: np.mean(values) for key, values in self.buffer.items()
+            key: _mean(values) for key, values in self.buffer.items()
         }
 
         # Single wandb call ensures perfectly synchronized steps

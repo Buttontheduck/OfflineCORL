@@ -29,6 +29,19 @@ class Actor(nn.Module):
         self.ood_threshold = ood_threshold
         self.early_stop = early_stop
 
+        # The K-step descent of _implicit. compile_sampler() swaps in a torch.compile'd version.
+        self._descend_fn = self._descend
+        self._compiled = False
+
+    def compile_sampler(self, mode: str = "reduce-overhead"):
+        """Compile the K-step descent of _implicit with torch.compile, PyTorch's counterpart of
+        jax.jit over a lax.scan loop: the fixed-K loop is unrolled and its ops fused, and mode
+        'reduce-overhead' replays the whole descent as one CUDA graph. Only _implicit uses it (the
+        training actions, the eval sampler and diagnostics()); the other samplers stay eager.
+        The first calls compile (about a minute); each new batch size records one more graph."""
+        self._descend_fn = torch.compile(self._descend, mode=mode)
+        self._compiled = True
+        return self
 
 
     def forward(self, state: torch.Tensor, num_actions: int = 1):
@@ -268,23 +281,31 @@ class Actor(nn.Module):
         self.model.eval()
 
         with torch.no_grad():
-            if self.opt_type == "gd":
-                for _ in range(self.num_step):
-                    grad = self.model(x,state)
-                    x = x - self.step_size * grad
+            x = self._descend_fn(x, state)
+            if self._compiled:
+                x = x.clone()   # a CUDA-graph output is overwritten by the graph's next replay
 
-            elif self.opt_type == "nag":
-                m = torch.zeros_like(x)
-                for _ in range(self.num_step):
-                    x_lookahead = x - self.step_size * m * self.moment
-                    grad = self.model(x_lookahead,state)
-                    m = grad
-                    x = x - self.step_size * m
-            else:
-                raise ValueError(f"\n Action Gradient optimizer must be 'gd' or 'nag', got '{self.opt_type}' \n ")
-        
         if is_training:
             self.model.train()
+        return x
+
+    def _descend(self, x, state):
+        """The K steps of _implicit, without the train/eval switching (so torch.compile sees a
+        pure function). Called under no_grad."""
+        if self.opt_type == "gd":
+            for _ in range(self.num_step):
+                grad = self.model(x,state)
+                x = x - self.step_size * grad
+
+        elif self.opt_type == "nag":
+            m = torch.zeros_like(x)
+            for _ in range(self.num_step):
+                x_lookahead = x - self.step_size * m * self.moment
+                grad = self.model(x_lookahead,state)
+                m = grad
+                x = x - self.step_size * m
+        else:
+            raise ValueError(f"\n Action Gradient optimizer must be 'gd' or 'nag', got '{self.opt_type}' \n ")
         return x
     
 

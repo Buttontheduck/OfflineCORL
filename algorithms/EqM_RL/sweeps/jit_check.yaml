@@ -1,0 +1,17 @@
+# jit check (branch jit): does Aware train the same with the compiled sampler (compile: true) as without?
+# halfcheetah-medium-v2, the config's 120k steps, seeds 1-3, both settings: 6 runs.
+# Readout: eval/normalized_score of compile true vs false, per seed and averaged. They should agree within seed
+# noise. Not step by step: both runs of a seed draw the same random numbers, but rounding differs slightly
+# (check_compile.py: ~1e-7) and training amplifies that over many steps.
+# Speed: compare the runs' minutes in runs.csv (several runs share the GPU, so the gap is smaller than alone).
+#   python run_sweep.py sweeps/jit_check.yaml
+target: aware
+parallel: 6
+
+fixed:
+  name: JIT
+  checkpoints_path: null   # no checkpoints: this only compares scores
+
+grid:
+  compile: [false, true]
+  seed: [1, 2, 3]
