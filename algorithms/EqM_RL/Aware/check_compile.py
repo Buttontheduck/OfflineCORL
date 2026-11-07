@@ -72,7 +72,7 @@ def build(compiled: bool):
     agent = Otter(model=model, model_optimizer=torch.optim.Adam(model.parameters(), lr=3e-4), actor=actor,
                   critic_1=c1, critic_1_optimizer=torch.optim.Adam(c1.parameters(), lr=3e-4),
                   critic_2=c2, critic_2_optimizer=torch.optim.Adam(c2.parameters(), lr=3e-4),
-                  temperature=args.temperature)
+                  temperature=args.temperature, num_actions=1)   # config.yaml's agent.num_actions (Otter's default is 10)
     return agent, actor
 
 
