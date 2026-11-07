@@ -1,0 +1,52 @@
+# Experiment 12 (EqM_RL.md, "Experiment 12"): QIPO phase 3 on EqM. Each Experiment 10 EqM-BC actor
+# (checkpoint_500000.pt) is fine-tuned with the frozen Experiment 11 critic of the same seed
+# (critic_1000000.pt), by Aware/finetune_actor.py: weighted EqM loss over the dataset action and 16 samples of
+# the current actor per state, weights softmax_j(beta * Q), support set renewed every 40k steps (QIPO K_renew
+# = 10 epochs), 400k steps (K3 = 100 epochs), Adam 1e-4, EMA 0.005 (evaluated).
+# Datasets with a usable critic: medium-diverse (stable EqM critics, best-of-16 78.8 %) and umaze (94.6 %).
+# Left out: umaze-diverse (all critics diverged) and large-diverse (the critics learned no goal values).
+# beta: 3 (QIPO), 10 (QIPO's AntMaze ablation), 0 (uniform weights: training on the actor's own samples
+# without Q, the control for the drift seen in the smoke test). Seeds 1-3. 18 runs.
+# Eval every 20k: 100 episodes, one sample per step at K = 10 (main) and K = 20; every 100k also the
+# critic's best of 16. Step 0 is the BC actor.
+# wandb: project E, groups Exp12_FT_<dataset>_beta<beta>. Started by run_exp12.sh (the summary follows).
+#   python run_sweep.py sweeps/exp12_antmaze_finetune.yaml
+target: finetune_actor
+parallel: 18
+gpu_gate: {util_max: 97, min_free_mb: 3000, settle_s: 60, window_s: 30}
+untagged: [group]
+
+fixed:
+  name: Exp12_FT
+  critic_prefix: Exp11_Critic
+  critic_checkpoint: critic_1000000.pt
+  support_num: 16
+  support_K: 10
+  renew_every: 40000
+  num_train_ops: 400001     # the extra 1 makes the last eval (and checkpoint) happen at step 400,000
+  learning_rate: 0.0001
+  eval_frequency: 20000
+  eval_K: "10,20"
+  eval_best_every: 100000
+  n_test_episodes: 100
+  checkpoint_every: 100000
+
+grid:
+  - {group: Exp12_FT_antmaze-medium-diverse-v2_beta3, env_name: antmaze-medium-diverse-v2, beta: 3, seed: 1}
+  - {group: Exp12_FT_antmaze-umaze-v2_beta3, env_name: antmaze-umaze-v2, beta: 3, seed: 1}
+  - {group: Exp12_FT_antmaze-medium-diverse-v2_beta10, env_name: antmaze-medium-diverse-v2, beta: 10, seed: 1}
+  - {group: Exp12_FT_antmaze-umaze-v2_beta10, env_name: antmaze-umaze-v2, beta: 10, seed: 1}
+  - {group: Exp12_FT_antmaze-medium-diverse-v2_beta0, env_name: antmaze-medium-diverse-v2, beta: 0, seed: 1}
+  - {group: Exp12_FT_antmaze-umaze-v2_beta0, env_name: antmaze-umaze-v2, beta: 0, seed: 1}
+  - {group: Exp12_FT_antmaze-medium-diverse-v2_beta3, env_name: antmaze-medium-diverse-v2, beta: 3, seed: 2}
+  - {group: Exp12_FT_antmaze-umaze-v2_beta3, env_name: antmaze-umaze-v2, beta: 3, seed: 2}
+  - {group: Exp12_FT_antmaze-medium-diverse-v2_beta10, env_name: antmaze-medium-diverse-v2, beta: 10, seed: 2}
+  - {group: Exp12_FT_antmaze-umaze-v2_beta10, env_name: antmaze-umaze-v2, beta: 10, seed: 2}
+  - {group: Exp12_FT_antmaze-medium-diverse-v2_beta0, env_name: antmaze-medium-diverse-v2, beta: 0, seed: 2}
+  - {group: Exp12_FT_antmaze-umaze-v2_beta0, env_name: antmaze-umaze-v2, beta: 0, seed: 2}
+  - {group: Exp12_FT_antmaze-medium-diverse-v2_beta3, env_name: antmaze-medium-diverse-v2, beta: 3, seed: 3}
+  - {group: Exp12_FT_antmaze-umaze-v2_beta3, env_name: antmaze-umaze-v2, beta: 3, seed: 3}
+  - {group: Exp12_FT_antmaze-medium-diverse-v2_beta10, env_name: antmaze-medium-diverse-v2, beta: 10, seed: 3}
+  - {group: Exp12_FT_antmaze-umaze-v2_beta10, env_name: antmaze-umaze-v2, beta: 10, seed: 3}
+  - {group: Exp12_FT_antmaze-medium-diverse-v2_beta0, env_name: antmaze-medium-diverse-v2, beta: 0, seed: 3}
+  - {group: Exp12_FT_antmaze-umaze-v2_beta0, env_name: antmaze-umaze-v2, beta: 0, seed: 3}

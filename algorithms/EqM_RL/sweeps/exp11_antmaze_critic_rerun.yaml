@@ -1,0 +1,29 @@
+# Experiment 11, rerun of 4 EqM-BC critics (EqM_RL.md, "Experiment 11"): medium-diverse seed 3 died
+# with CUDA out of memory (its BC run ended just as the sweep started another critic, and both took
+# the freed memory); the three large-diverse critics were stopped while still waiting for their BC
+# checkpoints and restarted here with train_critic.py's GPU lock (critics take turns allocating).
+# Same settings as sweeps/exp11_antmaze_critic.yaml.
+#   python run_sweep.py sweeps/exp11_antmaze_critic_rerun.yaml
+target: train_critic
+parallel: 4
+gpu_gate: {util_max: 99, min_free_mb: 0, settle_s: 30, window_s: 10}
+untagged: [group]
+
+fixed:
+  name: Exp11_Critic
+  bc_prefix: Exp10_BC
+  bc_checkpoint: checkpoint_500000.pt
+  support_num: 16
+  support_K: 10
+  beta: 3.0
+  num_train_ops: 1000001
+  eval_frequency: 100000
+  n_test_episodes: 100
+  eval_candidates: 16
+  checkpoint_every: 100000
+
+grid:
+  - {group: Exp11_Critic_EqMBC_antmaze-medium-diverse-v2, env_name: antmaze-medium-diverse-v2, bc_actor: eqm, seed: 3}
+  - {group: Exp11_Critic_EqMBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, bc_actor: eqm, seed: 1}
+  - {group: Exp11_Critic_EqMBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, bc_actor: eqm, seed: 2}
+  - {group: Exp11_Critic_EqMBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, bc_actor: eqm, seed: 3}

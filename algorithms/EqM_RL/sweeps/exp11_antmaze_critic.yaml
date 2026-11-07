@@ -1,0 +1,56 @@
+# Experiment 11 (EqM_RL.md, "Experiment 11"): QIPO phase 2 on the Experiment 10 BC actors.
+# One critic per BC run (2 actors x 4 AntMaze datasets x seeds 1-3), trained alone with in-support
+# softmax Q-learning (Aware/train_critic.py): target r - 1 + 0.99 * softmax_j(3 Q')-average of Q'(s', a'_j)
+# over the dataset next action and 16 actions sampled once from the frozen BC actor (checkpoint_500000.pt;
+# EqM: K = 10 sampler steps; Gaussian: draws from N(mean, std)). TwinQ 2 x 256 ReLU, 1M steps.
+# Eval every 100k: 100 episodes, at each step the highest-Q of 16 BC candidates (eval/normalized_score),
+# so the score shows what the critic adds to its BC actor without training an actor.
+# The critic of seed s uses BC seed s. A critic whose BC run is still training waits for its checkpoint
+# (and for 2.5 GB free GPU memory) before it touches the GPU, so the whole grid can start at once.
+# EqM first (the main arm), then the Gaussian-BC control.
+# wandb: project E, groups Exp11_Critic_EqMBC_<dataset> / Exp11_Critic_GaussBC_<dataset>.
+# 24 runs, hawk env. Started by run_exp11.sh (the summary follows).
+#   python run_sweep.py sweeps/exp11_antmaze_critic.yaml
+target: train_critic
+parallel: 24
+gpu_gate: {util_max: 97, min_free_mb: 2500, settle_s: 60, window_s: 30}
+untagged: [group]
+
+fixed:
+  name: Exp11_Critic
+  bc_prefix: Exp10_BC
+  bc_checkpoint: checkpoint_500000.pt
+  support_num: 16
+  support_K: 10
+  beta: 3.0
+  num_train_ops: 1000001    # the extra 1 makes the last eval (and checkpoint) happen at step 1,000,000
+  eval_frequency: 100000
+  n_test_episodes: 100
+  eval_candidates: 16
+  checkpoint_every: 100000
+
+grid:
+  - {group: Exp11_Critic_EqMBC_antmaze-umaze-v2, env_name: antmaze-umaze-v2, bc_actor: eqm, seed: 1}
+  - {group: Exp11_Critic_EqMBC_antmaze-umaze-v2, env_name: antmaze-umaze-v2, bc_actor: eqm, seed: 2}
+  - {group: Exp11_Critic_EqMBC_antmaze-umaze-v2, env_name: antmaze-umaze-v2, bc_actor: eqm, seed: 3}
+  - {group: Exp11_Critic_EqMBC_antmaze-umaze-diverse-v2, env_name: antmaze-umaze-diverse-v2, bc_actor: eqm, seed: 1}
+  - {group: Exp11_Critic_EqMBC_antmaze-umaze-diverse-v2, env_name: antmaze-umaze-diverse-v2, bc_actor: eqm, seed: 2}
+  - {group: Exp11_Critic_EqMBC_antmaze-umaze-diverse-v2, env_name: antmaze-umaze-diverse-v2, bc_actor: eqm, seed: 3}
+  - {group: Exp11_Critic_EqMBC_antmaze-medium-diverse-v2, env_name: antmaze-medium-diverse-v2, bc_actor: eqm, seed: 1}
+  - {group: Exp11_Critic_EqMBC_antmaze-medium-diverse-v2, env_name: antmaze-medium-diverse-v2, bc_actor: eqm, seed: 2}
+  - {group: Exp11_Critic_EqMBC_antmaze-medium-diverse-v2, env_name: antmaze-medium-diverse-v2, bc_actor: eqm, seed: 3}
+  - {group: Exp11_Critic_EqMBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, bc_actor: eqm, seed: 1}
+  - {group: Exp11_Critic_EqMBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, bc_actor: eqm, seed: 2}
+  - {group: Exp11_Critic_EqMBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, bc_actor: eqm, seed: 3}
+  - {group: Exp11_Critic_GaussBC_antmaze-umaze-v2, env_name: antmaze-umaze-v2, bc_actor: gaussian, seed: 1}
+  - {group: Exp11_Critic_GaussBC_antmaze-umaze-v2, env_name: antmaze-umaze-v2, bc_actor: gaussian, seed: 2}
+  - {group: Exp11_Critic_GaussBC_antmaze-umaze-v2, env_name: antmaze-umaze-v2, bc_actor: gaussian, seed: 3}
+  - {group: Exp11_Critic_GaussBC_antmaze-umaze-diverse-v2, env_name: antmaze-umaze-diverse-v2, bc_actor: gaussian, seed: 1}
+  - {group: Exp11_Critic_GaussBC_antmaze-umaze-diverse-v2, env_name: antmaze-umaze-diverse-v2, bc_actor: gaussian, seed: 2}
+  - {group: Exp11_Critic_GaussBC_antmaze-umaze-diverse-v2, env_name: antmaze-umaze-diverse-v2, bc_actor: gaussian, seed: 3}
+  - {group: Exp11_Critic_GaussBC_antmaze-medium-diverse-v2, env_name: antmaze-medium-diverse-v2, bc_actor: gaussian, seed: 1}
+  - {group: Exp11_Critic_GaussBC_antmaze-medium-diverse-v2, env_name: antmaze-medium-diverse-v2, bc_actor: gaussian, seed: 2}
+  - {group: Exp11_Critic_GaussBC_antmaze-medium-diverse-v2, env_name: antmaze-medium-diverse-v2, bc_actor: gaussian, seed: 3}
+  - {group: Exp11_Critic_GaussBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, bc_actor: gaussian, seed: 1}
+  - {group: Exp11_Critic_GaussBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, bc_actor: gaussian, seed: 2}
+  - {group: Exp11_Critic_GaussBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, bc_actor: gaussian, seed: 3}

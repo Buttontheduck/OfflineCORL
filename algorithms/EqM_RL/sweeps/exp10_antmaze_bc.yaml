@@ -1,0 +1,52 @@
+# Experiment 10 (EqM_RL.md, "Experiment 10 (plan)"): EqM-BC vs Gaussian BC on D4RL AntMaze.
+# Actor only, every weight 1, no critic (Aware/fit_actor.py, weights: ones). The EqM actor is Aware's
+# field and sampler (lambda 8, NAG, eta 0.01, momentum 0.3, K 20); the Gaussian actor has the same
+# depth and width (4 x 256), a state-independent std, and is evaluated with its mean.
+# Datasets: antmaze-umaze-v2, -umaze-diverse-v2, -medium-diverse-v2, -large-diverse-v2; 3 seeds.
+# 500k steps (BC reaches its level early), 100 eval episodes every 25k steps; an episode ends at the
+# goal, so the score is the success rate. EqM is also evaluated at K = 10 and K = 30
+# (eval/normalized_score_K10, _K30). Checkpoints every 50k.
+# wandb: project E, one group per actor and dataset (Exp10_EqMBC_<dataset>, Exp10_GaussBC_<dataset>).
+# Listed seed by seed, alternating actor and dataset, so the first runs to start cover every group.
+# 24 runs, hawk env. Started by run_exp10.sh (the summary follows).
+#   python run_sweep.py sweeps/exp10_antmaze_bc.yaml
+target: fit_actor
+parallel: 24
+gpu_gate: {util_max: 97, min_free_mb: 2500, settle_s: 60, window_s: 30}
+untagged: [group]
+
+fixed:
+  name: Exp10_BC
+  weights: ones
+  data_filter: all
+  num_train_ops: 500001     # the extra 1 makes the last eval (and checkpoint) happen at step 500,000
+  eval_frequency: 25000
+  n_test_episodes: 100
+  checkpoint_every: 50000
+  eval_num_steps: "10,30"   # EqM only; ignored by the Gaussian actor
+
+grid:
+  - {group: Exp10_EqMBC_antmaze-umaze-v2, env_name: antmaze-umaze-v2, actor: eqm, seed: 1}
+  - {group: Exp10_GaussBC_antmaze-umaze-v2, env_name: antmaze-umaze-v2, actor: gaussian, seed: 1}
+  - {group: Exp10_EqMBC_antmaze-umaze-diverse-v2, env_name: antmaze-umaze-diverse-v2, actor: eqm, seed: 1}
+  - {group: Exp10_GaussBC_antmaze-umaze-diverse-v2, env_name: antmaze-umaze-diverse-v2, actor: gaussian, seed: 1}
+  - {group: Exp10_EqMBC_antmaze-medium-diverse-v2, env_name: antmaze-medium-diverse-v2, actor: eqm, seed: 1}
+  - {group: Exp10_GaussBC_antmaze-medium-diverse-v2, env_name: antmaze-medium-diverse-v2, actor: gaussian, seed: 1}
+  - {group: Exp10_EqMBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, actor: eqm, seed: 1}
+  - {group: Exp10_GaussBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, actor: gaussian, seed: 1}
+  - {group: Exp10_EqMBC_antmaze-umaze-v2, env_name: antmaze-umaze-v2, actor: eqm, seed: 2}
+  - {group: Exp10_GaussBC_antmaze-umaze-v2, env_name: antmaze-umaze-v2, actor: gaussian, seed: 2}
+  - {group: Exp10_EqMBC_antmaze-umaze-diverse-v2, env_name: antmaze-umaze-diverse-v2, actor: eqm, seed: 2}
+  - {group: Exp10_GaussBC_antmaze-umaze-diverse-v2, env_name: antmaze-umaze-diverse-v2, actor: gaussian, seed: 2}
+  - {group: Exp10_EqMBC_antmaze-medium-diverse-v2, env_name: antmaze-medium-diverse-v2, actor: eqm, seed: 2}
+  - {group: Exp10_GaussBC_antmaze-medium-diverse-v2, env_name: antmaze-medium-diverse-v2, actor: gaussian, seed: 2}
+  - {group: Exp10_EqMBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, actor: eqm, seed: 2}
+  - {group: Exp10_GaussBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, actor: gaussian, seed: 2}
+  - {group: Exp10_EqMBC_antmaze-umaze-v2, env_name: antmaze-umaze-v2, actor: eqm, seed: 3}
+  - {group: Exp10_GaussBC_antmaze-umaze-v2, env_name: antmaze-umaze-v2, actor: gaussian, seed: 3}
+  - {group: Exp10_EqMBC_antmaze-umaze-diverse-v2, env_name: antmaze-umaze-diverse-v2, actor: eqm, seed: 3}
+  - {group: Exp10_GaussBC_antmaze-umaze-diverse-v2, env_name: antmaze-umaze-diverse-v2, actor: gaussian, seed: 3}
+  - {group: Exp10_EqMBC_antmaze-medium-diverse-v2, env_name: antmaze-medium-diverse-v2, actor: eqm, seed: 3}
+  - {group: Exp10_GaussBC_antmaze-medium-diverse-v2, env_name: antmaze-medium-diverse-v2, actor: gaussian, seed: 3}
+  - {group: Exp10_EqMBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, actor: eqm, seed: 3}
+  - {group: Exp10_GaussBC_antmaze-large-diverse-v2, env_name: antmaze-large-diverse-v2, actor: gaussian, seed: 3}

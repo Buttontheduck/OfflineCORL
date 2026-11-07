@@ -1433,7 +1433,7 @@ With −1 per step and γ = 0.99, every true value lies between −100 and 0, so
    - The gap to AWAC (λ = 0.1) therefore mainly measures the temperature, not the action dimension. This is the confound noted in the plan; Experiment 9 tests it.
 2. **No sign yet of the low-dimensional failure modes.**
    - The near-BC Aware scores 20–30, while CORL's Gaussian BC scores 0.4–2.3. A likely reason: the data steers to random goals, so a Gaussian mean averages the action modes away, while EqM picks one mode and moves. This is a hint only; it needs an EqM-BC vs Gaussian-BC comparison.
-   - Samples for one state still spread 0.22–0.25 per dimension (no collapse).
+   - Samples for one state still spread 0.22–0.25 per dimension (no collapse at the sampler as used). ⚠ Experiment 9 shows that at K = 20 the samples have not converged (endpoint ‖f‖ ≈ 2.4), so this does not rule out collapse of the converged field.
    - Open: only 4–7 % of sampled action coordinates fall outside ±1 before clipping, while 32 % of the dataset's sit exactly at ±1. Check with the action diagnostics.
 3. **Gaussian AWAC is unstable on Maze2D, as on CORL.** Large reaches about 200 (CORL 215.5); medium and umaze are below CORL and swing between evals.
 
@@ -1446,7 +1446,7 @@ With −1 per step and γ = 0.99, every true value lies between −100 and 0, so
 - The 9 Experiment 8 Aware runs were closed afterwards by resuming each W&B run and raising KeyboardInterrupt. All 18 Experiment 8 runs show 'killed', with their data intact.
 
 ### Experiment 9 (plan, started 2026-11-06): Aware at T = 0.1 and T = 1 on Maze2D
-> **Status:** running. 18 runs: 2 temperatures × 3 datasets × seeds 1–3, 1M steps each.
+> **Status:** finished on 2026-11-07 at 00:18 German time; all 18 runs reached 1M steps. Results in the next section. 18 runs: 2 temperatures × 3 datasets × seeds 1–3, 1M steps each.
 
 **Goal:** remove the temperature confound of Experiment 8, so that Aware vs Gaussian AWAC on Maze2D says something about the 2-D actions. T = 0.1 matches AWAC's λ on this reward scale; T = 1 is in between.
 
@@ -1466,6 +1466,392 @@ With −1 per step and γ = 0.99, every true value lies between −100 and 0, so
 - Check the effective batch share and A std in the logs, to confirm the weights now concentrate.
 
 - **Code:** `sweeps/exp9_maze2d_aware_T.yaml`, run by `run_exp9.sh` in the foreground. Summary by `diagnostics/summarize_exp8.py`, which now covers Experiments 8 and 9 together. `run_sweep.py` has a new sweep key `untagged` (grid keys left out of run names; default `[group]`).
+
+### Experiment 9: results (3 seeds, 2026-11-07)
+> **Scope.** The 18 runs of the plan above, all to 1M steps. Each checkpoint folder in `/workspace/Trained_Models/checkpoints/` exists twice per run: the first start died with the disk-quota error (05:39 UTC on 2026-11-06, see "Workspace disk quota"), and the complete runs are the restarted ones (wandb ids e6fa7638, a787b75d, ...; 51 checkpoints each).
+> - **Code:** sweep `sweep_runs/exp9_maze2d_aware_T_20261106-103348/`, started by `run_exp9.sh` (`sweep_runs/exp9_20261106-103347/`). Scores from `summary.md` there (`diagnostics/summarize_exp8.py`). Its Experiment 8 columns are empty, because the local wandb files of Experiment 8's Aware runs were deleted in the disk cleanup, so the Experiment 8 numbers below are taken from its section above. Weight, critic and sampler logs (`weighting/*`, `sampler/*`) were read from the runs' local wandb files.
+
+**Run log**
+
+| | |
+|---|---|
+| Wall-clock | `gpu_gate` started 15 runs 3–7 min apart, from 11:34 to 12:26 German time. It then held the last 3 (GPU utilization 92–97 %) until the first run finished, and started them from 17:46 to 17:56. Every run took 359–386 min; the last finished at 00:18 (2026-11-07). All 18 exited normally. |
+
+**Scores** (D4RL normalized; mean of the 5 evals in the 100k steps up to each point, mean ± std over 3 seeds). Experiment 8 was stopped at about 500k, so compare it with the 500k columns.
+
+| Dataset | Aware T = 0.1, 500k | **Aware T = 0.1, 1M** | Aware T = 1, 500k | **Aware T = 1, 1M** | Aware T = 4, ~500k (Exp 8) | Gaussian AWAC, ~500k (Exp 8) | CORL BC / AWAC, 1M |
+|---|---|---|---|---|---|---|---|
+| umaze | 44.4 ± 13.4 | **49.3 ± 4.0** (750k: 82.0 ± 6.6) | 68.3 ± 2.5 | **69.2 ± 3.4** | 28.1 ± 1.0 | 49.0 ± 11.1 | 0.4 / 65.7 |
+| medium | 99.2 ± 26.0 | **129.9 ± 31.1** | 40.5 ± 2.6 | **46.5 ± 2.8** | 21.2 ± 0.7 | 63.2 ± 4.1 | 0.8 / 84.6 |
+| large | 207.0 ± 13.6 | **209.5 ± 7.6** | 50.1 ± 1.3 | **52.0 ± 1.1** | 25.8 ± 2.8 | 201.1 ± 6.9 | 2.3 / 215.5 |
+
+Per seed at 1M (seeds 1 / 2 / 3): T = 0.1: umaze 49.3 / 44.4 / 54.2, medium 85.9 / 151.0 / 152.8, large 212.2 / 217.2 / 199.1. T = 1: umaze 66.4 / 74.0 / 67.2, medium 43.2 / 49.9 / 46.3, large 53.3 / 52.1 / 50.6. Best single evals, T = 0.1: umaze 139 / 139 / 152, medium 167 / 172 / 171, large 226 / 224 / 222.
+
+**Weights, critic and sampler** (600k–1M; mean over seeds, all seeds within a few % of each other except where noted)
+
+| | T = 0.1: umaze / medium / large | T = 1: umaze / medium / large | T = 4 (Exp 8) |
+|---|---|---|---|
+| effective batch share | 0.038 / 0.057 / 0.092 (10–24 of 256 rows) | 0.31 / 0.57 / 0.67 | 0.84–0.98 |
+| A std | 1.44 / 0.66 / 0.50 | 0.89 / 0.50 / 0.39 | 0.4–0.9 |
+| Q mean at dataset actions | 36 / 23 (16–28) / 15 | 23 / 6.8 / 3.5 | – |
+| per-state sample spread (K = 20) | 0.192 / 0.190 / 0.216 | 0.210 / 0.220 / 0.248 | 0.22–0.25 |
+| sample dims outside ±1 before clipping | 14.6 / 13.8 / 10.9 % | 5.3 / 7.1 / 6.3 % | 4–7 % |
+| ‖f‖ at the sampler endpoints (K = 20) / at dataset actions | 2.36–2.40 / 5.6–6.7 | 2.45–2.50 / 4.2–4.6 | – |
+
+(The dataset has 31–33 % of its action coordinates exactly at ±1. With reward ≤ 1 per step and γ = 0.99, no true Q exceeds 100.)
+
+**Medium, T = 0.1: the overestimation phase.** In every seed, Q mean at dataset actions first rose far above 100, then fell to a plausible 25–30. Per eval:
+
+| seed | while Q > 100 | after Q fell to 25–30 |
+|---|---|---|
+| 1 (until about 420k) | Q 90–313; spread 0.08–0.16; outside the box 17–48 %; score 74–91 | spread ≈ 0.20; outside 11–16 %; score mostly 100–167 (single evals down to 43) |
+| 2 (until about 540k) | Q 147–361; spread **0.03–0.10**; outside 26–65 %; score 78–104 | spread ≈ 0.19; outside 13–21 %; score 133–172 |
+| 3 (until about 120k) | Q 151–208; spread 0.12–0.18; outside 32–46 %; score 1–89 | spread ≈ 0.18; outside 11–20 %; score 100–171 |
+
+umaze at T = 0.1 had a milder version early on (Q mean 90–133 in 0–100k), and large never did (Q 15–23 throughout).
+
+**Interpretation**
+1. **The Experiment 8 gap was the temperature, not the 2-D actions.**
+   - At T = 0.1 the weights concentrate (effective share 0.04–0.09, against 0.84–0.98 at T = 4).
+   - Aware then matches Gaussian AWAC on large (209.5 vs our 201.1 at ~500k and CORL's 215.5) and beats it on medium (129.9 vs 63.2 and 84.6).
+   - On umaze it ends level with our AWAC (49.3 vs 49.0) and below CORL's 65.7, but its 750k window is 82.0.
+   - So, as the Experiment 8 plan states, 2-D actions are not a practical problem for this actor on Maze2D.
+2. **T moves Aware steadily from BC to RL:** T = 4 → 1 → 0.1 gives 21–28 → 46–69 → 49–210. The exception is umaze, where T = 1 (69.2, steady across seeds and evals) beats T = 0.1 (49.3) at 1M.
+3. **T = 0.1 is unstable.**
+   - Evals within a run swing widely: umaze seed 1 between −15 and 89; medium seeds from about 165 down to 43–127; large's within-eval episode std is 105–115 raw.
+   - Gaussian AWAC is just as unstable on Maze2D (Experiment 8; CORL medium 84.6 ± 35.5). Read window means, not single evals.
+4. **Overestimation and the actor–critic feedback loop again.**
+   - In all three medium seeds, and briefly on umaze, the AWAC-type critic overestimated far beyond the possible maximum of 100.
+   - During that phase the samples narrowed and were pushed out of the action box, and the score stalled at about 85.
+   - When Q came back down, the spread returned to about 0.19 and the score roughly doubled.
+   - The recovery came without intervention, at different times per seed (about 150k, 450k and 600k). This is the pattern of Experiment 3 (every failing run overestimated), now with a recovery.
+   - The logs show that the two coincide, not which one drives the other.
+
+**What this says about EqM mode collapse**
+1. **The sampler as used gives varied actions.**
+   - At K = 20 the per-state spread is 0.19–0.25 at every T. On HalfCheetah it was 0.06–0.14 (Experiment 3).
+   - The narrowing seen here appears only while the critic overestimates. T = 1, whose weights are flat, never narrows.
+   - So in these runs the narrowing comes with broken weights; nothing in the logs shows a collapse produced by the EqM actor alone.
+2. **The samples at K = 20 have not converged.**
+   - ‖f‖ at the endpoints is still 2.4–2.5 in every run (4.2–6.7 at dataset actions). On HalfCheetah it was 0.05–0.18 once converged (K = 100, Experiment 2).
+   - So part of the 0.2 spread is leftover starting noise. Experiment 2 had exactly this: the spread was 0.087 / 0.32 at K = 20 and 0.029 / 0.052 at K = 100.
+   - Whether the field has a single zero per state on Maze2D, the Experiment 2 sense of collapse, was open here. The follow-up below answers it: yes, at every T.
+3. **The spread is one number.** It cannot tell two modes from one broad blob, or show samples between modes. At T = 0.1, π ∝ μ·exp(A/T) is also meant to be narrow, so narrowing there is not by itself a flaw.
+4. **A hint that EqM does not average modes.** The near-BC runs (T = 4, T = 1) score 21–69, while CORL's BC scores 0.4–2.3. CORL's BC regresses the mean action, which averages the steering directions of the data. But our sampler is also stochastic, so this needs a direct EqM-BC vs Gaussian-BC test.
+
+**Next step:** the action diagnostic on the saved checkpoints (Experiment 8 plan, item 2), written as `diagnostics/maze2d_modes.py`. It also checks how a sampler with K = 30 instead of 20 changes the samples and the score, evaluation only. Results in the next section.
+
+### Experiment 9 follow-up: action diagnostics and sampler steps K on Maze2D (3 seeds, 2026-11-07)
+> **Scope.** Evaluation only, on saved checkpoints: all 27 Maze2D Aware runs. Experiment 9 (T = 0.1, T = 1) at 500k and 1M; Experiment 8's T = 4 at its last checkpoint (440k–540k). Each is compared with Experiment 8's Gaussian AWAC run of the same dataset and seed (checkpoint nearest 500k).
+> - **Code:** `diagnostics/maze2d_modes.py` (one run), `diagnostics/summarize_maze2d_modes.py` (tables), `run_maze2d_modes.sh` (all 27, 9 at a time; 00:36–00:47 German time). Output, including an SVG per checkpoint with data and samples for 6 states: `diagnostics/out/maze2d_modes/` (`summary.md` has the full tables).
+> - **Figures:** `diagnostics/maze2d_mode_figures.py` writes the data for an interactive figure page, `diagnostics/out/maze2d_modes/figures/collapse_page.html` (published as a private artifact: https://claude.ai/artifact/1yvbz1pwHcZsWdfKBQ3jkv). It covers four medium-maze checkpoints (T = 4, 1, 0.1 seed 1; T = 0.1 seed 2 at 500k) and shows the sample trajectories from noise to K = 1000, the field, and the metrics against K. The same folder has the samples at K = 20, 30, 100 and 1000 for all 256 states (`<case>_K20_30_100.npz`) and for the 6 plotted states as CSV. Over all states, the energy distance to the data is smallest around K ≈ 10 (0.07, about the data's own coverage), then grows as the samples contract onto the single zero (0.54–0.69 at K = 1000 for the healthy checkpoints).
+
+**Method**
+
+| | |
+|---|---|
+| States | 256 fixed dataset states (seed 0, the same for every run on a dataset), 256 samples each. |
+| Samples | The run's own sampler (NAG, η = 0.01, momentum 0.3) from N(0, I), with snapshots at K = 20 (as trained and evaluated), 30, 100 and 1000 of the same trajectory. So "K = 1000" is where each K = 20 sample ends up if the sampler runs on. |
+| Data reference | The actions of each state's 128 nearest dataset states (normalized state space; median radius 0.06–0.09), split by rank into two halves of 64. |
+| Distances | Between 64 samples and one half: **recall** (data action → nearest sample; large = parts of the data never sampled), **precision** (sample → nearest data action; large = samples where the data has none, e.g. between modes), **energy distance**, **off-support** (share of samples farther from the data than the 95th percentile of half-vs-half distances). The two data halves against each other give the reference: recall and precision 0.08–0.09, energy 0, off-support 5 %. |
+| Modes | Clusters of a state's samples (radius 0.05) holding ≥ 5 % of them. Meaningful only for converged samples (‖f‖ ≈ 0). |
+| Rollouts | 100 episodes at K = 20, 30 and 100, env seeds as in training's evals (test_seed + i). |
+
+**Samples** (Experiment 9 at 1M, T = 4 at ~500k; ranges over the three mazes, each a mean over 3 seeds)
+
+| | K | ‖f‖ at the samples | per-state spread | states with one mode | recall | precision | off-support | at ±1 |
+|---|---|---|---|---|---|---|---|---|
+| T = 1 | 20 | 2.46–2.51 | 0.22–0.26 | – | 0.19–0.20 | 0.068–0.077 | 0.7–1.4 % | 5–8 % |
+| | 30 | 0.98–1.11 | 0.13–0.17 | – | 0.33–0.34 | 0.047–0.055 | 0.3–0.9 % | 10–16 % |
+| | 100 | 0.07–0.09 | 0.02–0.04 | 63–65 % | 0.60–0.64 | 0.041–0.043 | 0.2–0.3 % | 16–23 % |
+| | 1000 | 0.000 | 0.005–0.024 | **95–99 %** | 0.66–0.71 | **0.041–0.044** | 0.1–0.3 % | 16–23 % |
+| T = 0.1 | 20 | 2.34–2.44 | 0.19–0.23 | – | 0.31–0.33 | 0.079–0.101 | 3.7–5.9 % | 11–17 % |
+| | 30 | 0.97–1.07 | 0.10–0.13 | – | 0.48–0.50 | 0.065–0.086 | 3.3–5.5 % | 19–26 % |
+| | 1000 | 0.000 | 0.002–0.005 | **98–99 %** | 0.75–0.83 | 0.063–0.084 | 3.3–6.2 % | 24–31 % |
+| T = 4 (~500k) | 1000 | 0.000 | 0.009–0.027 | **95–98 %** | 0.65–0.70 | 0.040–0.045 | 0.1–0.2 % | 16–20 % |
+| data (half vs half) | – | – | 0.42–0.47 | – | 0.08–0.09 | 0.08–0.09 | 5 % | 31–34 % |
+| Gaussian AWAC mean | – | – | – | – | – | 0.10–0.12 | 4.4–5.3 % | 3–5 % |
+
+One exception: on medium at T = 0.1 and 500k, seed 2 was still in its overestimation phase (Q ≈ 220, see Experiment 9). Its converged samples are off the data (precision 0.39, off-support 37 %, 53 % at ±1); seeds 1 and 3 there, and all three at 1M, look like the T = 0.1 rows above.
+
+**Rollouts** (D4RL normalized score; Experiment 9 at 1M, T = 4 at ~500k; mean ± std over 3 seeds)
+
+| | K = 20 | K = 30 | K = 100 |
+|---|---|---|---|
+| umaze, T = 0.1 | 51.0 ± 14.7 | 51.4 ± 17.3 | 56.9 ± 22.7 |
+| umaze, T = 1 | 68.2 ± 4.5 | 72.7 ± 1.5 | 73.7 ± 1.8 |
+| umaze, T = 4 | 25.6 ± 1.8 | 25.6 ± 2.4 | 15.3 ± 2.8 |
+| medium, T = 0.1 | 121.7 ± 43.6 | 129.5 ± 44.6 | 132.2 ± 45.6 |
+| medium, T = 1 | 38.6 ± 8.9 | 38.7 ± 8.1 | 37.5 ± 6.7 |
+| medium, T = 4 | 23.5 ± 0.1 | 25.6 ± 0.6 | 25.9 ± 1.0 |
+| large, T = 0.1 | 199.2 ± 30.0 | 202.9 ± 27.3 | 205.9 ± 24.7 |
+| large, T = 1 | 52.2 ± 2.4 | 53.0 ± 1.6 | 51.1 ± 1.9 |
+| large, T = 4 | 24.6 ± 5.1 | 29.4 ± 8.7 | 27.3 ± 9.2 |
+| action change per step, all runs | 0.59–0.73 | 0.40–0.53 | 0.13–0.28 |
+
+- **Paired by run and checkpoint** (same env seeds; 45 pairs over all T, mazes and both checkpoints):
+  - K = 30 − K = 20 is positive in 38 of 45 (mean +3.5, median +2.1 points). The largest gains are +17.8 (medium, T = 0.1, seed 2, 1M), +12 to +13 (umaze, T = 1, seed 1) and +11 (large, T = 0.1, seeds 2 and 3, 500k). The worst is −3.6.
+  - K = 100 − K = 20 is positive in 30 of 45 (mean +4.0, median +1.6), with a wider range: from +38 (large, T = 0.1, seed 3, 500k) to −8 to −14 (umaze, T = 4, all seeds).
+- A single eval's standard error is about 1–4 points (episode std / 10), up to 10 in the unstable T = 0.1 runs.
+
+**Interpretation**
+1. **The converged EqM field collapses on Maze2D too, at every temperature.**
+   - Run to convergence, all 256 samples of a state end at one action in 95–99 % of states, with a spread of 0.002–0.027 against the data's 0.42–0.47.
+   - This holds for the near-BC T = 4 runs as well, so it comes from the EqM training itself, not from the advantage weights. It is the result of Experiment 2 (HalfCheetah), now in 2-D, and what the "low-dimensional actions" caveat predicts: the field has one zero per state.
+2. **It collapses onto a mode of the data, not between modes.**
+   - At T ≥ 1 the single equilibrium lies where the data is densest: precision 0.04, closer to a data action than the data halves are to each other (0.08), and almost never off the data (≤ 0.3 %).
+   - It covers little of the data (recall 0.65–0.71 against 0.08).
+   - At T = 0.1 the weights move the equilibrium to less frequent, more often saturated actions (24–31 % at ±1, about the data's 31–34 %; precision 0.06–0.08, off-support 3–6 %, about the data's own 5 %). That is still on the data.
+   - The Gaussian AWAC mean is also mostly on the data (precision 0.10–0.12, off-support 4–5 %), but it is rarely saturated (3–5 % at ±1).
+   - So on Maze2D the "Gaussian averages the modes" story is not visible in AWAC's mean actions. Whether CORL's BC (0.4–2.3) lands between modes is not measured; there is no BC checkpoint here.
+3. **The variety at K = 20 is leftover starting noise.**
+   - The spread falls by about 40 % from K = 20 to K = 30 and by 85–90 % at K = 100.
+   - Experiment 8's "no collapse" (spread 0.22–0.25) measured unconverged samples. The policy as trained is "the mode plus decaying noise".
+4. **Collapse does not hurt the score on Maze2D.**
+   - Running the sampler longer (K = 100, almost deterministic) scores the same as or better than K = 20 in most settings. The exception is umaze at T = 4 (−8 to −14).
+   - So the stochasticity of K = 20 is not what makes the near-BC Aware runs (15–30) beat CORL's BC (0.4–2.3).
+5. **K = 30 helps a little.**
+   - On average +3.5 points (38 of 45 pairs positive), mostly where the weights concentrate (T = 0.1) and on umaze at T = 1. At T = 1 on medium and large, and at T = 4, it is flat.
+   - It also reduces jitter (action change −30 %) and puts more executed actions at ±1, closer to the data's share.
+   - It costs 50 % more sampler steps. If used in training as well, it changes the actor's samples in the critic target and in V(s), which this evaluation-only test does not cover.
+6. **Consequences.**
+   - (a) Within one state the EqM actor represents one mode, not the data's distribution. Its advantage over a Gaussian mean, where there is one, is mode-seeking, not multimodality.
+   - (b) ~~A QIPO-style scheme would choose among noisy copies of one action.~~ Corrected by the two-group check below: stopped early (K ≈ 10–20), the samples do cover both groups of a two-group state in most cases. The multimodality lives in the sampler's transient, not in the field's equilibria, so K acts like a temperature.
+   - (c) For evaluation alone, K = 30–100 is a safe, small improvement.
+
+**Two-group check: does the transient capture multimodality?** (`diagnostics/maze2d_two_groups.py`; same 256 states, medium maze, the four checkpoints of the figure page. The null's numbers vary by a few points between runs, because it is a random draw.)
+- **Two-group states:** the 128 neighbour actions of a state are split by 2-means. A state counts as two-group when the smaller group holds ≥ 20 % and the group centres are more than 3 within-group stds apart. This holds for 99 of 256 states (smaller group 38 % on average).
+- **Measures:** for those states, the share where the samples (clipped) put ≥ 10 % in each group ("covered"), and the mean |sample share − data share| of the groups ("split error").
+- **Null:** a round Gaussian with the samples' own centre and spread. It shows what width alone achieves, without any shape from the field.
+
+| checkpoint | K = 5 | K = 10 | K = 15 | K = 20 | K = 30 | K = 100 | K = 1000 |
+|---|---|---|---|---|---|---|---|
+| T = 4, covered (null) / split error | 100 % (100 %) / 0.14 | 100 % (100 %) / **0.10** | 98 % (94 %) / **0.08** | 81 % (64 %) / 0.13 | 57 % (34 %) / 0.21 | 17 % (9 %) / 0.35 | 10 % (6 %) / 0.36 |
+| T = 1 | 100 % (100 %) / 0.15 | 100 % (100 %) / **0.10** | 98 % (93 %) / 0.11 | 76 % (63 %) / 0.16 | 55 % (30 %) / 0.24 | 11 % (7 %) / 0.37 | 3 % (2 %) / 0.40 |
+| T = 0.1 | 100 % (100 %) / 0.17 | 99 % (94 %) / 0.18 | 81 % (71 %) / 0.21 | 65 % (51 %) / 0.26 | 43 % (20 %) / 0.33 | 5 % (2 %) / 0.43 | 0 % (0 %) / 0.44 |
+| T = 0.1, seed 2, 500k (critic overestimating) | 97 % (92 %) / 0.27 | 34 % (31 %) / 0.39 | 18 % (10 %) / 0.45 | 9 % (5 %) / 0.46 | 7 % (4 %) / 0.47 | 1 % (0 %) / 0.49 | 1 % (0 %) / 0.49 |
+
+- **At K = 20 the samples partly capture the two groups.**
+  - For T = 4 and T = 1 they cover both groups in 76–81 % of two-group states, against 63–64 % for shapeless noise of the same width.
+  - So the field's flow carries information about the groups while the samples are in transit. It is lost as they converge: 3–10 % at K = 1000.
+- **The best match to the data's split is at K ≈ 10–15 (split error 0.08–0.11), not K = 20 (0.13–0.16).**
+  - This agrees with the energy-distance minimum at K ≈ 10.
+  - At K = 5 the cloud is still too wide (the null covers everything too).
+  - From K = 15 on the samples beat the null, so their shape comes from the field.
+- **"Best K" depends on the job.**
+  - To sample the data's actions (a behaviour model, or candidates for a QIPO-style softmax), K ≈ 10–15.
+  - To act (return on Maze2D), K = 30–100 scored slightly higher than K = 20.
+  - K = 20 sits between the two.
+- **Stronger weights lose the groups sooner.** At T = 0.1 the coverage is lower at every K. With the overestimating critic, both groups are gone already by K = 10.
+
+### Experiment 10 (plan, started 2026-11-07): EqM-BC vs Gaussian BC on AntMaze
+> **Status:** finished on 2026-11-07 at 05:32 German time; all 24 runs reached 500k steps. Results in "Experiment 10: results" below. 24 runs: 2 actors × 4 datasets × seeds 1–3, 500k steps each, actor only (no critic).
+
+**Goal:** can EqM behaviour cloning succeed on AntMaze, and does the actor class matter when there is no critic at all?
+- Experiments 6 and 7 mixed the actor with an AWAC-type critic. Near BC (T = 4) Aware reached 66 % on umaze and 50 % on umaze-diverse, and about 0 on the medium and large mazes.
+- Here the critic is removed entirely. The EqM actor is compared with a Gaussian actor of the same size, trained on the same data with the same weights (all 1).
+
+| | |
+|---|---|
+| Datasets | `antmaze-umaze-v2`, `-umaze-diverse-v2`, `-medium-diverse-v2`, `-large-diverse-v2` (D4RL v2). |
+| EqM-BC | Aware's EqM field and sampler (4 × 256, λ = 8, NAG, η = 0.01, momentum 0.3, K = 20), trained with Aware's EqM loss and every weight 1 (`Aware/fit_actor.py --actor=eqm --weights=ones`). Evaluated with one sample per step at K = 20 (as trained), and also at K = 10 and K = 30 (the Maze2D follow-up showed K acts like a temperature). |
+| Gaussian BC | A Gaussian actor of the same depth and width with a state-independent std (as CORL's AWAC actor), trained by maximum likelihood with every weight 1, evaluated with its mean. With a fixed std this is mean regression, as CORL's BC. |
+| Protocol | 500k steps (BC reaches its level early: Experiment 7's near-BC runs were flat from 20k). 100 eval episodes every 25k steps; an episode ends at the goal, so the score is the success rate in %. Checkpoints every 50k. Batch 256, lr 3·10⁻⁴. Rewards are not used. |
+| Cost | Measured on large-diverse, GPU otherwise idle: training ≈ 1.5 ms per step; one eval of 100 episodes at the three K ≈ 250–350 s when no episode succeeds. About 2 h per EqM run alone; all 24 run at once under `gpu_gate`. |
+| wandb | Project E, groups `Exp10_EqMBC_<dataset>` and `Exp10_GaussBC_<dataset>`; keys `eval/normalized_score` (K = 20, or the Gaussian mean), `eval/normalized_score_K10`, `_K30`. |
+| References | CORL after 1M steps, BC / AWAC / IQL: umaze 55.3 / 56.8 / 77.0; umaze-diverse 47.3 / 54.8 / 54.3; medium-diverse 0.8 / 0.0 / 73.8; large-diverse 0.0 / 0.0 / 30.3. Aware T = 4 with its own critic: 66.5, 50.3, 0.3 (Experiment 7, 400k–500k), 0.0 (Experiment 6, large-diverse T = 4). |
+
+**Expectations and readout.**
+- **umaze and umaze-diverse:** both actors should reach BC level (about 50–65 %).
+  - If EqM-BC beats Gaussian BC, the gain comes from the actor class. Picking one mode instead of the mean is the candidate explanation.
+  - The diverse dataset has more different actions per state. Its gap relative to umaze shows whether either actor handles that better.
+  - If EqM-BC alone matches Aware T = 4 (66.5 / 50.3), the critic added nothing there.
+- **medium-diverse and large-diverse:** both are expected near 0. The data drives the ant to random goals and BC cannot stitch, whatever the policy class. A clear non-zero EqM-BC score would be a surprise worth examining.
+- **K = 10 / 20 / 30:** whether the sampler's temperature effect from Maze2D changes success on AntMaze (8-D actions).
+
+**Not in this experiment:** goal-conditioned EqM-BC (hindsight goal relabelling, goal as an extra actor input). It is the BC variant that can work on the medium and large mazes, and it is the next step if this baseline behaves as expected.
+
+- **Code:**
+  - `Aware/fit_actor.py`: the HalfCheetah flip metric is now logged only on HalfCheetah, and a new `eval_num_steps` option adds EqM evals at other K.
+  - Sweep `sweeps/exp10_antmaze_bc.yaml`, run by `run_exp10.sh`; summary by `diagnostics/summarize_exp10.py` into `sweep_runs/exp10_<date-time>/summary.md`.
+  - Smoke test (antmaze-umaze, 3k steps, 10 episodes): EqM-BC 60 %, Gaussian BC 50 %.
+
+### Experiment 11 (plan, started 2026-11-07): in-support softmax critics for the Experiment 10 BC actors (QIPO phase 2)
+> **Status:** finished on 2026-11-07 at 07:35 German time; all 24 critics reached 1M steps. Results in "Experiment 11: results" below. 24 critics, one per Experiment 10 BC run (2 actors × 4 datasets × seeds 1–3), 1M steps each. Started 04:24 German time, while the EqM-BC runs on medium-diverse and large-diverse were still training; their critics wait for the BC checkpoint.
+> - **Memory crash and restart:** at 05:13 the EqM medium-diverse seed 3 critic died with CUDA out of memory. Its BC run ended just as the sweep started another critic, and both took the freed memory.
+> - **Fix:** `train_critic.py` now has a GPU lock, so critics take turns from the memory check until their memory is allocated.
+> - **Rerun:** that critic and the three EqM large-diverse critics (stopped while still waiting for their BC) were restarted at 05:16 with `sweeps/exp11_antmaze_critic_rerun.yaml`. The main sweep's summary will lack them, so re-run `diagnostics/summarize_exp11.py` when the rerun ends.
+
+**Goal:** QIPO's second phase on our BC actors. The actor stays frozen and only proposes candidate actions; a critic learns which of them lead to the goal.
+- **Main question:** does the critic, built on EqM-BC's samples, carry the goal information that BC lacks? This matters most on medium and large, where BC is at 0.
+- **Control:** whether EqM's samples make a better support set than the Gaussian's.
+- **Interim result that motivated it:** Experiment 10 at 400k–500k (EqM-BC K = 10 / Gaussian BC mean):
+  - umaze: 73.3 / 54.6 %
+  - umaze-diverse: 73.9 / 51.8 %
+  - medium-diverse and large-diverse: ≈ 0 for both
+
+| | |
+|---|---|
+| Critic target | r − 1 + 0.99 · (1 − d) · Σⱼ softmaxⱼ(β Q′(s′, a′ⱼ)) Q′(s′, a′ⱼ), β = 3. Q′ = min of the twin target critics, soft update τ = 0.005. This is QGPO's in-support softmax Q-learning as QIPO uses it (QIPO Algorithm 4). |
+| Candidates a′ⱼ | The dataset's next action (the next row of the same episode; 99 % of rows have one), plus 16 actions sampled once from the frozen BC actor (`checkpoint_500000.pt`) at every next state, as QGPO precomputes them. EqM: Aware's sampler at K = 10, the best BC setting in Experiment 10. Gaussian: draws from N(mean, std). Both clipped. The critic of seed s uses BC seed s. |
+| Critic | TwinQ as IQL and QGPO: 2 hidden layers of 256 units, ReLU. Experiment 7's 4-layer critic diverged. Adam 3·10⁻⁴, batch 256, 1M steps. Rewards r − 1 (CORL), so Q ∈ [−100, 0]. d is the dataset's terminal flag, set at the goal. |
+| Eval | Every 100k steps, 100 episodes. At each step, 16 candidates are drawn from the frozen BC actor and the one with the highest min(Q1, Q2) is taken ("best of 16"). Same test seeds as Experiment 10, so it compares directly with BC alone. No actor is trained; phase 3 comes later. |
+| Logs | TD loss; Q at dataset actions; Q at the start states; how the softmax used the candidates (weight on the dataset next action, effective number, Q range, and "lift" = soft maximum minus Q at the dataset next action); support spread and its distance to the dataset next action. |
+| Cost | ≈ 4.3 ms per step on the shared GPU and ≈ 1.1 GB GPU memory per critic. A critic waits for 2.5 GB free memory before it allocates, and `gpu_gate` holds further starts. Roughly 1.5–2.5 h per critic. |
+| wandb | Project E, groups `Exp11_Critic_EqMBC_<dataset>` and `Exp11_Critic_GaussBC_<dataset>`. Critic checkpoints every 100k in `Trained_Models/checkpoints/Exp11_Critic_*`. |
+
+**Readout.**
+- **Best of 16 above BC alone on medium and large:** the critic has stitched goal information into Q, and phase 3 (Q-weighted EqM fine-tuning) is worth building.
+- **Best of 16 at BC level:** the candidates don't contain the goal-ward action, or Q can't tell them apart. The support diagnostics (Q range, lift, effective number) show which.
+- **EqM support vs Gaussian support:** the same comparison per dataset. It tests the earlier argument that a multimodal BC is needed for good candidates. On umaze, the Gaussian's samples are already as close to the dataset next action as EqM's (smoke test: nearest-candidate distance 0.235 vs 0.253 per √dim; spread 0.25 vs 0.35).
+
+- **Code:**
+  - `Aware/train_critic.py` (new).
+  - `run_sweep.py` target `train_critic`.
+  - Sweep `sweeps/exp11_antmaze_critic.yaml`, run by `run_exp11.sh`.
+  - Summary by `diagnostics/summarize_exp11.py` into `sweep_runs/exp11_<date-time>/summary.md`.
+- **Smoke test** (umaze seed 1, 3k steps, 10 episodes): runs end to end for both actors. Support generation takes 1–4 s; Q falls towards the r − 1 scale as expected.
+
+### Experiment 10: results
+Success rate in %, mean of the evals in 400k–500k (100 episodes each), ± over 3 seeds. Full tables: `sweep_runs/exp10_20261107-011937/summary.md`.
+
+| Dataset | EqM-BC K = 10 | EqM-BC K = 20 (as trained) | EqM-BC K = 30 | Gaussian BC (mean) | CORL BC / IQL | Aware T = 4 |
+|---|---|---|---|---|---|---|
+| umaze | **73.3 ± 2.6** | 55.3 ± 3.3 | 50.4 ± 3.1 | 54.6 ± 4.1 | 55.3 / 77.0 | 66.5 |
+| umaze-diverse | **73.9 ± 1.7** | 55.5 ± 1.5 | 49.4 ± 2.3 | 51.8 ± 1.4 | 47.3 / 54.3 | 50.3 |
+| medium-diverse | 0.0 | 0.2 | 0.3 | 0.0 | 0.8 / 73.8 | 0.3 |
+| large-diverse | 0.0 | 0.0 | 0.1 | 0.0 | 0.0 / 30.3 | 0.0 |
+
+1. **EqM-BC beats Gaussian BC on the two umaze datasets, but only with fewer sampler steps.**
+   - At K = 10, EqM-BC scores about 20 points above Gaussian BC and CORL's BC. That is close to IQL on umaze and well above it on umaze-diverse.
+   - At K = 20 (as trained) it equals Gaussian BC, and at K = 30 it falls below.
+   - So K acts like a temperature on AntMaze too, as on Maze2D. The best setting keeps more of the sampler's spread; the more converged samples behave like the Gaussian's mean action.
+   - The levels are flat from 100k on. BC reaches them early.
+2. **EqM-BC alone (73 %) beats Aware T = 4 with its own critic (66.5 / 50.3).** Near BC, the AWAC-type critic added nothing on umaze, and less than nothing on umaze-diverse.
+3. **Medium-diverse and large-diverse:** every arm is at 0, as expected. The policy class doesn't matter when the data never connects start and goal in one trajectory.
+
+### Experiment 11: results
+Best of 16 = at each step, the highest-Q of 16 candidates from the frozen BC actor. Success rate in %, mean of the evals in the 300k steps up to each step (100 episodes each), ± over 3 seeds. "BC alone" is Experiment 10 at 400k–500k (EqM at K = 10, Gaussian with its mean). Full tables, including per seed: `sweep_runs/exp11_20261107-032407/summary.md`. It was regenerated after the rerun, so it includes all 24 critics.
+
+| Dataset | Candidates | BC alone | 300k | 600k | **1M** | CORL IQL | QIPO-OT / IDQL (paper) |
+|---|---|---|---|---|---|---|---|
+| umaze | EqM-BC | 73.3 | 14.6 ± 5.0 | 35.3 ± 17.1 | **94.6 ± 3.7** | 77.0 | 93.6 / 94.0 |
+| umaze | Gaussian BC | 54.6 | 70.3 ± 3.0 | 92.0 ± 3.6 | **98.7 ± 0.3** | | |
+| umaze-diverse | EqM-BC | 73.9 | 31.1 ± 12.4 | 36.7 ± 9.3 | 44.9 ± 17.2 ⚠ | 54.3 | 76.1 / 80.2 |
+| umaze-diverse | Gaussian BC | 51.8 | 80.0 ± 6.2 | 70.9 ± 6.5 | 62.4 ± 14.4 ⚠ | | |
+| medium-diverse | EqM-BC | 0.0 | 67.6 ± 7.5 | 73.7 ± 15.3 | **78.8 ± 10.0** | 73.8 | 86.4 / 84.8 |
+| medium-diverse | Gaussian BC | 0.0 | 59.1 ± 2.2 | 70.2 ± 3.1 | 61.3 ± 22.1 ⚠ | | |
+| large-diverse | EqM-BC | 0.0 | 1.9 ± 1.5 | 2.4 ± 1.5 | 3.2 ± 3.9 | 30.3 | 32.1 / 67.9 |
+| large-diverse | Gaussian BC | 0.0 | 0.6 ± 0.3 | 1.3 ± 1.0 | 0.3 ± 0.3 | | |
+
+⚠ = at least one critic diverged; see 3. The QIPO and IDQL numbers are the papers' own, and QIPO reports the best eval, so they are optimistic.
+
+1. **The critic stitches on medium-diverse. That was the main question, and the answer is yes.**
+   - BC alone is at 0. With the frozen EqM-BC proposing and the critic choosing, success is 78.8 ± 10.0 (seeds 86 / 86 / 65), above CORL's IQL (73.8).
+   - No actor was trained: the critic only ranks the BC's own samples.
+   - The EqM critics stayed stable (Q at dataset actions −93 throughout).
+2. **EqM vs Gaussian candidates.**
+   - On medium-diverse at 1M, EqM is ahead (78.8 vs 61.3). The Gaussian's lower mean comes from seed 3: its critic began to drift at 900k (Q from −96 to −54) and success fell from 79 to 6 %. Up to 600k the two were level (74 vs 70).
+   - On umaze both end near 95–99 %. EqM, however, started far below BC (9–20 % at 100k–300k) and recovered only after 600k.
+   - Early on I took that low start as a sign the critic couldn't tell actions apart. The Gaussian-candidate critics had the same statistics and steered well from the start, so that reading was wrong.
+   - The slow start fits the wider EqM candidates at K = 10 (spread 0.35 vs 0.25 per dimension). The critic needs longer before its ranking of off-data candidates becomes reliable.
+3. **All six umaze-diverse critics diverged, with both candidate sets.**
+   - Q at dataset actions rises above 0, which is impossible with r − 1 rewards. The rise starts at 300k–900k and ends at 71 to 26,000 by 1M.
+   - Success falls with it: Gaussian from 80–91 to 43–77, EqM to 19–64.
+   - It is the soft maximum's overestimation feeding itself, the max-backup failure. umaze-diverse has many different actions per state.
+   - Cheap fixes, in order: clip the target to [−100, 0]; LayerNorm in the critic; a smaller learning rate or slower target update.
+4. **Large-diverse: the goal's value never reaches the start.**
+   - Q at dataset actions stays at −98 and at the start states at −108, below the −100 floor of "never reaches the goal".
+   - The softmax over the 17 candidates stays almost uniform (effective number 15.3, Q range 0.55, lift 0.13), so the target is close to an average over BC actions, not a maximum.
+   - With β = 3 and Q differences this small, the soft maximum is too soft to carry value over the long maze. QIPO's ablation found β = 10 better on AntMaze. Larger β, n-step targets or more steps are the candidates.
+   - Best single evals: EqM 3 / 26 / 6, Gaussian 3 / 1 / 4.
+5. **For QIPO phase 3 (Q-weighted EqM fine-tuning).**
+   - On umaze and medium-diverse the critic is good enough to steer.
+   - First fix the divergence (target clipping) and the soft maximum on large (β).
+   - The eval rule here, picking the highest-Q candidate each step, is a strong baseline in its own right: "EqM-BC + critic selection", as in IDQL. A phase-3 actor has to beat it.
+
+### Experiment 12 (plan, started 2026-11-07): QIPO phase 3, EqM-BC fine-tuned with the frozen Experiment 11 critics
+> **Status:** finished on 2026-11-07 at 20:03 German time; all 18 runs reached 400k steps, none failed. Results in "Experiment 12: results" below. 18 runs: 2 datasets × β ∈ {3, 10, 0} × seeds 1–3, 400k steps each.
+
+**Goal:** turn the critic's knowledge into the actor itself.
+- In Experiment 11 the frozen BC actor plus the critic's pick reached 78.8 % on medium-diverse and 94.6 % on umaze, but only with the critic at test time.
+- Here the EqM field is fine-tuned with QIPO's Q-weighted loss and evaluated alone: one sample per step, no critic.
+
+| | |
+|---|---|
+| Start | Actor: the Experiment 10 EqM-BC `checkpoint_500000.pt`. Critic: the Experiment 11 critic of the same seed (`critic_1000000.pt`, trained on that actor's samples), frozen, min(Q1, Q2). `Aware/finetune_actor.py` pairs them through the critic's `config.yaml`. |
+| Loss | QIPO Algorithm 4, lines 14–22: L = (1/B) Σᵢ Σⱼ gᵢⱼ · EqM loss(sᵢ, aᵢⱼ), with gᵢⱼ = softmaxⱼ(β Q(sᵢ, aᵢⱼ)) over j = 0…16. aᵢ₀ is the dataset action; aᵢ₁…₁₆ are samples of the current actor at K = 10. It runs as Aware's `_actor_loss` with per-row weights 17·gᵢⱼ. |
+| Support renewal | Support set and weights are recomputed for all 1M dataset states every 40k steps (QIPO K_renew = 10 epochs; 1 epoch ≈ 3.9k steps). Each renewal tilts the policy again: π_l ∝ μ · exp(l β Q) (QIPO eq. 5.4). |
+| Training | 400k steps (QIPO K3 = 100 epochs), batch of 256 states × 17 candidates, Adam at 1·10⁻⁴ (QIPO's fine-tuning rate), EMA τ = 0.005. The EMA field is evaluated and saved. |
+| Arms | β = 3 (QIPO) and β = 10 (QIPO's AntMaze ablation). β = 0 gives uniform weights: the actor trains on its own samples plus the data with no Q, the control for drift (see smoke test). |
+| Datasets | medium-diverse (stable critics) and umaze. Left out: umaze-diverse (all critics diverged) and large-diverse (the critics learned no goal values). |
+| Eval | Every 20k steps, 100 episodes, the test seeds of Experiments 10–11. One sample per step at K = 10 (main) and K = 20. Every 100k, also the critic's best of 16 samples of the fine-tuned field. Step 0 is the BC actor. |
+| Logs | At each renewal (`ft/*`): Q at the actor's samples vs. at the dataset action, weight on the dataset action, effective number of candidates, sample spread, distance to the dataset action, share at the action bound. |
+| wandb | Project E, groups `Exp12_FT_<dataset>_beta<β>`. Checkpoints (EMA and raw field) every 100k in `Trained_Models/checkpoints/Exp12_FT_*`. |
+
+**Readout.**
+- **Success:** the fine-tuned actor alone at K = 10 beats BC alone on both datasets. On medium-diverse BC alone is 0, so any clear success there is stitching moved into the actor. It should approach Experiment 11's best of 16 (78.8 / 94.6).
+- **β = 0 vs β > 0:** separates Q-guided improvement from the effect of training on the actor's own samples.
+- **ft/dist_data and ft/spread:** show whether the actor leaves the data. Its samples are then queried where the critic was never trained.
+
+**Smoke test** (umaze seed 1, 600 steps, renewal every 200, 20 episodes):
+- At step 0 it reproduces the earlier numbers: K = 10 80 %, K = 20 60 %, best of 16 100 % (Experiments 10/11: 73, 55, 95).
+- Over three quick renewals at β = 3:
+  - the actor's samples spread out (0.35 → 0.40 per dimension) and moved away from the dataset action (nearest-sample distance 0.25 → 0.44);
+  - Q at the samples rose only slightly (−60.62 → −60.36).
+- Training an EqM field on its own unconverged K = 10 samples may widen it each round. The β = 0 arm measures this.
+
+- **Code:**
+  - `Aware/finetune_actor.py` (new).
+  - `run_sweep.py` target `finetune_actor`.
+  - Sweep `sweeps/exp12_antmaze_finetune.yaml`, run by `run_exp12.sh`.
+  - Summary by `diagnostics/summarize_exp12.py` into `sweep_runs/exp12_<date-time>/summary.md`.
+
+### Experiment 12: results
+Success rate in %, 100 episodes per eval, mean over 3 seeds; per-seed values after the slash where given. Full tables: `sweep_runs/exp12_20261107-171007/summary.md`.
+
+**At each phase of training** (single evals, one sample per step, no critic at test time):
+
+| Dataset | β | BC (step 0), K = 10 / K = 20 | 40k (before the first renewal), K = 10 | 40k, K = 20 | 60k (after it), K = 10 | 400k, K = 10 / K = 20 | best of 16: step 0 → 400k |
+|---|---|---|---|---|---|---|---|
+| medium-diverse | 10 | 0 / 0 | **53** (29 / 84 / 46) | **59** (48 / 68 / 62) | 7 | 6 / 27 | 80 → 14 |
+| medium-diverse | 3 | 0 / 0 | 27 (19 / 43 / 18) | 33 | 2 | 0 / 36 | 82 → 15 |
+| medium-diverse | 0 | 0 / 1 | 0 | 0 | 0 | 0 / 0 | 77 → 11 |
+| umaze | 3 | 71 / 56 | **96** (97 / 94 / 96) | 93 | 93 | 17 / 62 | 99 → 8 |
+| umaze | 10 | 68 / 59 | 94 | 91 | 94 | 1 / 6 | 98 → 0 |
+| umaze | 0 | 78 / 57 | 72 | 66 | 54 | 0 / 7 | 99 → 10 |
+
+References: Experiment 11 best of 16 (critic at test time) 78.8 / 94.6; CORL IQL 73.8 / 77.0; QIPO-OT (paper, best eval) 86.4 / 93.6 (medium-diverse / umaze).
+
+**The support set drifts away from the data at every renewal** (seed means, at renewals 0 → 40k → 400k):
+
+| | β = 0 | β = 3 | β = 10 |
+|---|---|---|---|
+| Distance from the dataset action to the nearest sample (per √dim), medium / umaze | 0.26 → 0.33 → 0.45 / 0.25 → 0.33 → 0.45 | 0.26 → 0.34 → 0.52 / 0.25 → 0.34 → 0.56 | 0.26 → 0.35 → 0.57 / 0.25 → 0.35 → 0.61 |
+| Q at the samples − Q at the dataset action, medium / umaze | 0.02 → 0.03 → 0.02 / 0.02 → 0.02 → −0.04 | 0.02 → 0.12 → 0.39 / 0.02 → 0.29 → 0.85 | 0.02 → 0.16 → 0.50 / 0.02 → 0.36 → 1.03 |
+| Sample spread per dimension (both datasets) | 0.36 → 0.38 → 0.43 | 0.36 → 0.38 → 0.39–0.41 | 0.36 → 0.38 → 0.37–0.39 |
+
+1. **One round of Q-weighting moves the critic's knowledge into the actor.**
+   - In the first 40k steps the support set comes from the frozen BC actor, so this is QIPO's first round, π ∝ μ·exp(βQ). The actor alone (no critic at test time) then reaches:
+     - 53 % on medium-diverse at β = 10 (59 % at K = 20; one seed 84 %). BC alone: 0.
+     - 96 % on umaze at β = 3. BC alone: 71.
+   - These are above CORL's IQL on both datasets and at QIPO's level on umaze.
+   - The β = 0 control stays at 0 / 72 over the same steps, so the gain comes from the Q weights, not from the extra training.
+   - Caveat: these are the best phase of the run, chosen after the fact, like QIPO's best-eval reporting. The end-of-run numbers are much lower.
+2. **QIPO's iteration breaks the EqM actor.**
+   - From the first renewal on, the actor trains on its own K = 10 samples.
+   - On medium-diverse, K = 10 falls from 53 to 7 within the next 20k steps.
+   - On umaze it holds at 91–96 until 120k–160k (β = 10 / 3), then decays to 1–17 by 400k.
+3. **The decay is EqM-specific, and β = 0 shows it without any critic.**
+   - With uniform weights, umaze falls from 78 to 0 by 140k. The samples' distance to the dataset action grows from 0.25 to 0.45 and their spread from 0.35 to 0.43.
+   - QIPO's argument (eq. 5.4) assumes the support samples are draws from the current policy. An EqM sampler stopped after K = 10 steps is not at the field's equilibria. Training the field on these points shifts its equilibria towards them, so each renewal widens the policy and moves it off the data.
+   - With β > 0 the actor also climbs the critic into those regions: Q at its samples ends 0.4–1.0 above Q at the dataset action, where the critic was never trained. That's also why the critic's best of 16 collapses (80–99 → 0–15): its candidates are no longer in-data actions.
+4. **K = 20 holds up longer than K = 10** (umaze β = 3: 62 vs 17 at 400k; medium-diverse β = 3: 36 vs 0). More sampler steps bring the samples closer to the field's equilibria, which the drift moves less.
+
+**What follows:**
+- **First candidate fix:** no renewal from the actor. Keep the support from the frozen BC (sampled once, or redrawn from the BC), which is exactly what the successful first 40k steps used, and train longer to see whether the peak holds.
+- **Second candidate fix:** generate the support with converged samples (larger K).
+- **Not tested yet.**
 
 ## Later phases
 - **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.

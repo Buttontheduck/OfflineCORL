@@ -72,7 +72,9 @@ class TrainConfig:
     eval_frequency: int = 1000
     n_test_episodes: int = 10
     test_seed: int = 69
-    flip_angle: float = 2.0
+    flip_angle: float = 2.0               # HalfCheetah only: an episode 'flips' when |obs[1]| exceeds it
+    eval_num_steps: str = ""              # EqM only: extra sampler step counts K to evaluate at, e.g. "10,30";
+                                          # logged as eval/normalized_score_K<k>. The main score uses num_step.
     checkpoints_path: Optional[str] = "/workspace/Trained_Models/checkpoints/"
     checkpoint_every: int = 10000
     seed: int = 1
@@ -165,6 +167,16 @@ def train(cfg: TrainConfig):
 
     # ------------------------------------------------------------ evaluation (episodes side by side)
     eval_envs = [env] + [gym.make(cfg.env_name) for _ in range(cfg.n_test_episodes - 1)]
+    track_flips = "halfcheetah" in cfg.env_name
+    extra_K = [int(k) for k in cfg.eval_num_steps.split(",") if k.strip()] if cfg.actor == "eqm" else []
+
+    def evaluate_at(K: int):
+        """evaluate() with the EqM sampler set to K steps."""
+        sampler.num_step = K
+        try:
+            return evaluate()
+        finally:
+            sampler.num_step = cfg.num_step
 
     def evaluate():
         model.eval()
@@ -214,12 +226,17 @@ def train(cfg: TrainConfig):
                 ret, flipped = evaluate()
                 log = {"train/actor_loss": float(np.mean(losses)), "eval/score": ret.mean(),
                        "eval/score_std": ret.std(), "eval/score_min": ret.min(),
-                       "eval/normalized_score": env.get_normalized_score(ret.mean()) * 100.0,
-                       "eval/flip_rate": flipped.mean()}
+                       "eval/normalized_score": env.get_normalized_score(ret.mean()) * 100.0}
+                if track_flips:
+                    log["eval/flip_rate"] = flipped.mean()
+                for K in extra_K:
+                    rK, _ = evaluate_at(K)
+                    log[f"eval/normalized_score_K{K}"] = env.get_normalized_score(rK.mean()) * 100.0
                 wandb.log(log, step=t)
                 losses = []
-                print(f"{t:>7}  score {log['eval/score']:8.0f}  normalized {log['eval/normalized_score']:6.1f}  "
-                      f"flips {log['eval/flip_rate']:.0%}", flush=True)
+                print(f"{t:>7}  score {log['eval/score']:8.2f}  normalized {log['eval/normalized_score']:6.1f}"
+                      + (f"  flips {log['eval/flip_rate']:.0%}" if track_flips else "")
+                      + "".join(f"  K={K}: {log[f'eval/normalized_score_K{K}']:.1f}" for K in extra_K), flush=True)
             if cfg.checkpoints_path is not None and (t % cfg.checkpoint_every == 0 or t == cfg.num_train_ops - 1):
                 torch.save(ckpt_state(), os.path.join(cfg.checkpoints_path, f"checkpoint_{t}.pt"))
     finally:

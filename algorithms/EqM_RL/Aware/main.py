@@ -246,7 +246,10 @@ def train(cfg: DictConfig):
             update_result = agent.update(batch)
             for key, val in update_result.items():
                 gl.log(f"train/{key}", val)
-            gl.dump(step=t)
+            # One wandb row per log_frequency steps, the mean over them (logging every step wrote
+            # ~1.3 GB of local wandb data per 1M-step run and filled the disk in Exp 9)
+            if t % cfg.log_frequency == 0:
+                gl.dump(step=t)
             if (t) % cfg.eval_frequency == 0:
                 eval_scores = eval_actor(eval_envs, cfg.test_seed)
 

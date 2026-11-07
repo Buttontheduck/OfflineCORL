@@ -1,0 +1,5602 @@
+[
+  {
+    "run_id": "081f7086-7e58-4dcf-bbd3-1be25baef1cb",
+    "url": "https://wandb.ai/duck13/E/runs/081f7086-7e58-4dcf-bbd3-1be25baef1cb",
+    "group": "AWAC_halfcheetah_simple_v0",
+    "state": "killed",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 42,
+    "weighting": "gaussian",
+    "scale": null,
+    "eta": null,
+    "K": null,
+    "temperature": 1,
+    "mean": 7470.271354518225,
+    "eval_std_population": 40.42384429759146,
+    "first_step": 100999,
+    "last_step": 119999,
+    "last20": [
+      {
+        "_step": 100999,
+        "eval_score": 7492.132618017931
+      },
+      {
+        "_step": 101999,
+        "eval_score": 7540.869234332569
+      },
+      {
+        "_step": 102999,
+        "eval_score": 7467.786175911894
+      },
+      {
+        "_step": 103999,
+        "eval_score": 7495.208713328514
+      },
+      {
+        "_step": 104999,
+        "eval_score": 7455.706047551404
+      },
+      {
+        "_step": 105999,
+        "eval_score": 7531.242566741258
+      },
+      {
+        "_step": 106999,
+        "eval_score": 7476.663940762398
+      },
+      {
+        "_step": 107999,
+        "eval_score": 7466.558913742607
+      },
+      {
+        "_step": 108999,
+        "eval_score": 7422.792895466986
+      },
+      {
+        "_step": 109999,
+        "eval_score": 7535.23179403975
+      },
+      {
+        "_step": 110999,
+        "eval_score": 7434.373426840609
+      },
+      {
+        "_step": 111999,
+        "eval_score": 7433.435683889274
+      },
+      {
+        "_step": 112999,
+        "eval_score": 7439.517881785813
+      },
+      {
+        "_step": 113999,
+        "eval_score": 7426.152282976107
+      },
+      {
+        "_step": 114999,
+        "eval_score": 7500.582299605725
+      },
+      {
+        "_step": 115999,
+        "eval_score": 7422.414213890591
+      },
+      {
+        "_step": 116999,
+        "eval_score": 7478.641327298954
+      },
+      {
+        "_step": 117999,
+        "eval_score": 7457.488243330957
+      },
+      {
+        "_step": 118999,
+        "eval_score": 7404.807764794355
+      },
+      {
+        "_step": 119999,
+        "eval_score": 7523.8210660568
+      }
+    ],
+    "metric": "eval_score"
+  },
+  {
+    "run_id": "3097a554-31aa-4b10-943e-cf9b2f40e00c",
+    "url": "https://wandb.ai/duck13/E/runs/3097a554-31aa-4b10-943e-cf9b2f40e00c",
+    "group": "exp3_awac_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 1,
+    "weighting": "gaussian",
+    "scale": null,
+    "eta": null,
+    "K": null,
+    "temperature": 1,
+    "mean": 7495.640743433283,
+    "eval_std_population": 2150.113812596537,
+    "first_step": 131999,
+    "last_step": 150999,
+    "last20": [
+      {
+        "_step": 131999,
+        "eval/score": 7869.376646171941
+      },
+      {
+        "_step": 132999,
+        "eval/score": 5962.270349277582
+      },
+      {
+        "_step": 133999,
+        "eval/score": 10362.149124551517
+      },
+      {
+        "_step": 134999,
+        "eval/score": 7613.546064966172
+      },
+      {
+        "_step": 135999,
+        "eval/score": 4410.183287525613
+      },
+      {
+        "_step": 136999,
+        "eval/score": 5512.311671216974
+      },
+      {
+        "_step": 137999,
+        "eval/score": 10016.399916034648
+      },
+      {
+        "_step": 138999,
+        "eval/score": 8409.999024273537
+      },
+      {
+        "_step": 139999,
+        "eval/score": 7255.420543510036
+      },
+      {
+        "_step": 140999,
+        "eval/score": 10226.660117490357
+      },
+      {
+        "_step": 141999,
+        "eval/score": 3902.328996733334
+      },
+      {
+        "_step": 142999,
+        "eval/score": 7421.635606978571
+      },
+      {
+        "_step": 143999,
+        "eval/score": 7402.888725628598
+      },
+      {
+        "_step": 144999,
+        "eval/score": 6112.86323625616
+      },
+      {
+        "_step": 145999,
+        "eval/score": 9553.702939922438
+      },
+      {
+        "_step": 146999,
+        "eval/score": 9319.730817139807
+      },
+      {
+        "_step": 147999,
+        "eval/score": 6462.595730846998
+      },
+      {
+        "_step": 148999,
+        "eval/score": 4705.168372699205
+      },
+      {
+        "_step": 149999,
+        "eval/score": 11814.291430252795
+      },
+      {
+        "_step": 150999,
+        "eval/score": 5579.292267189375
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "95291a25-892c-4272-b707-c37c2af70c35",
+    "url": "https://wandb.ai/duck13/E/runs/95291a25-892c-4272-b707-c37c2af70c35",
+    "group": "exp3_awac_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 2,
+    "weighting": "gaussian",
+    "scale": null,
+    "eta": null,
+    "K": null,
+    "temperature": 1,
+    "mean": 7207.535328768393,
+    "eval_std_population": 1621.3198525657972,
+    "first_step": 131999,
+    "last_step": 150999,
+    "last20": [
+      {
+        "_step": 131999,
+        "eval/score": 3650.857689405093
+      },
+      {
+        "_step": 132999,
+        "eval/score": 7023.2041875764135
+      },
+      {
+        "_step": 133999,
+        "eval/score": 6656.553725099363
+      },
+      {
+        "_step": 134999,
+        "eval/score": 6398.905268669277
+      },
+      {
+        "_step": 135999,
+        "eval/score": 7968.971321209168
+      },
+      {
+        "_step": 136999,
+        "eval/score": 9147.170547113836
+      },
+      {
+        "_step": 137999,
+        "eval/score": 8228.720223879067
+      },
+      {
+        "_step": 138999,
+        "eval/score": 7372.454087847356
+      },
+      {
+        "_step": 139999,
+        "eval/score": 6687.928581133028
+      },
+      {
+        "_step": 140999,
+        "eval/score": 9178.529102034527
+      },
+      {
+        "_step": 141999,
+        "eval/score": 6041.426064364382
+      },
+      {
+        "_step": 142999,
+        "eval/score": 6035.062468798087
+      },
+      {
+        "_step": 143999,
+        "eval/score": 11636.355498373834
+      },
+      {
+        "_step": 144999,
+        "eval/score": 5707.773592921791
+      },
+      {
+        "_step": 145999,
+        "eval/score": 5627.280967831821
+      },
+      {
+        "_step": 146999,
+        "eval/score": 6145.512371178506
+      },
+      {
+        "_step": 147999,
+        "eval/score": 7979.37956877167
+      },
+      {
+        "_step": 148999,
+        "eval/score": 7585.629498680712
+      },
+      {
+        "_step": 149999,
+        "eval/score": 7237.053804132763
+      },
+      {
+        "_step": 150999,
+        "eval/score": 7841.938006347157
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "63660f42-1f69-4cc9-8656-f3f337a086c0",
+    "url": "https://wandb.ai/duck13/E/runs/63660f42-1f69-4cc9-8656-f3f337a086c0",
+    "group": "exp3_awac_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 3,
+    "weighting": "gaussian",
+    "scale": null,
+    "eta": null,
+    "K": null,
+    "temperature": 1,
+    "mean": 6919.118638911016,
+    "eval_std_population": 1620.9836677627745,
+    "first_step": 131999,
+    "last_step": 150999,
+    "last20": [
+      {
+        "_step": 131999,
+        "eval/score": 7527.782092738331
+      },
+      {
+        "_step": 132999,
+        "eval/score": 6973.431101775321
+      },
+      {
+        "_step": 133999,
+        "eval/score": 4802.812404454084
+      },
+      {
+        "_step": 134999,
+        "eval/score": 8373.045808392857
+      },
+      {
+        "_step": 135999,
+        "eval/score": 9014.994950315328
+      },
+      {
+        "_step": 136999,
+        "eval/score": 5868.214887713826
+      },
+      {
+        "_step": 137999,
+        "eval/score": 9805.212494603447
+      },
+      {
+        "_step": 138999,
+        "eval/score": 4046.968992933364
+      },
+      {
+        "_step": 139999,
+        "eval/score": 7792.706864626952
+      },
+      {
+        "_step": 140999,
+        "eval/score": 6415.165594104034
+      },
+      {
+        "_step": 141999,
+        "eval/score": 5191.135286513314
+      },
+      {
+        "_step": 142999,
+        "eval/score": 7080.763408114314
+      },
+      {
+        "_step": 143999,
+        "eval/score": 8133.433292577055
+      },
+      {
+        "_step": 144999,
+        "eval/score": 9409.633994128153
+      },
+      {
+        "_step": 145999,
+        "eval/score": 5416.5524167344065
+      },
+      {
+        "_step": 146999,
+        "eval/score": 5548.862389735994
+      },
+      {
+        "_step": 147999,
+        "eval/score": 8078.7350977653605
+      },
+      {
+        "_step": 148999,
+        "eval/score": 8005.429833532791
+      },
+      {
+        "_step": 149999,
+        "eval/score": 4808.700150260137
+      },
+      {
+        "_step": 150999,
+        "eval/score": 6088.791717201259
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "c5b93da0-0525-4d63-b0ad-8219fa26fdaa",
+    "url": "https://wandb.ai/duck13/E/runs/c5b93da0-0525-4d63-b0ad-8219fa26fdaa",
+    "group": "exp3_awac_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 1,
+    "weighting": "gaussian",
+    "scale": null,
+    "eta": null,
+    "K": null,
+    "temperature": 1,
+    "mean": 7562.539241014149,
+    "eval_std_population": 68.05175231859309,
+    "first_step": 131999,
+    "last_step": 150999,
+    "last20": [
+      {
+        "_step": 131999,
+        "eval/score": 7565.894592399098
+      },
+      {
+        "_step": 132999,
+        "eval/score": 7691.336384612749
+      },
+      {
+        "_step": 133999,
+        "eval/score": 7545.229530760154
+      },
+      {
+        "_step": 134999,
+        "eval/score": 7437.749513347735
+      },
+      {
+        "_step": 135999,
+        "eval/score": 7491.044229795289
+      },
+      {
+        "_step": 136999,
+        "eval/score": 7559.039496030999
+      },
+      {
+        "_step": 137999,
+        "eval/score": 7462.140125166082
+      },
+      {
+        "_step": 138999,
+        "eval/score": 7515.442518169206
+      },
+      {
+        "_step": 139999,
+        "eval/score": 7482.508435936697
+      },
+      {
+        "_step": 140999,
+        "eval/score": 7535.446217622588
+      },
+      {
+        "_step": 141999,
+        "eval/score": 7640.051558991833
+      },
+      {
+        "_step": 142999,
+        "eval/score": 7516.966100186053
+      },
+      {
+        "_step": 143999,
+        "eval/score": 7546.807128951768
+      },
+      {
+        "_step": 144999,
+        "eval/score": 7539.591959644464
+      },
+      {
+        "_step": 145999,
+        "eval/score": 7616.041904367897
+      },
+      {
+        "_step": 146999,
+        "eval/score": 7599.382521870987
+      },
+      {
+        "_step": 147999,
+        "eval/score": 7560.951592382276
+      },
+      {
+        "_step": 148999,
+        "eval/score": 7636.421394234612
+      },
+      {
+        "_step": 149999,
+        "eval/score": 7644.830007780995
+      },
+      {
+        "_step": 150999,
+        "eval/score": 7663.909608031504
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "36c3d47c-9ae3-4302-9246-691297d793d7",
+    "url": "https://wandb.ai/duck13/E/runs/36c3d47c-9ae3-4302-9246-691297d793d7",
+    "group": "exp3_awac_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 2,
+    "weighting": "gaussian",
+    "scale": null,
+    "eta": null,
+    "K": null,
+    "temperature": 1,
+    "mean": 7522.066265868328,
+    "eval_std_population": 57.57371777833605,
+    "first_step": 131999,
+    "last_step": 150999,
+    "last20": [
+      {
+        "_step": 131999,
+        "eval/score": 7440.573940963994
+      },
+      {
+        "_step": 132999,
+        "eval/score": 7529.849104612132
+      },
+      {
+        "_step": 133999,
+        "eval/score": 7520.94559566914
+      },
+      {
+        "_step": 134999,
+        "eval/score": 7624.786800760427
+      },
+      {
+        "_step": 135999,
+        "eval/score": 7493.254612726514
+      },
+      {
+        "_step": 136999,
+        "eval/score": 7610.419120231223
+      },
+      {
+        "_step": 137999,
+        "eval/score": 7530.3769433808675
+      },
+      {
+        "_step": 138999,
+        "eval/score": 7550.673843769041
+      },
+      {
+        "_step": 139999,
+        "eval/score": 7568.927980355575
+      },
+      {
+        "_step": 140999,
+        "eval/score": 7473.572602211521
+      },
+      {
+        "_step": 141999,
+        "eval/score": 7530.221967028946
+      },
+      {
+        "_step": 142999,
+        "eval/score": 7490.39014826753
+      },
+      {
+        "_step": 143999,
+        "eval/score": 7498.862082395686
+      },
+      {
+        "_step": 144999,
+        "eval/score": 7560.076498938457
+      },
+      {
+        "_step": 145999,
+        "eval/score": 7539.069809732498
+      },
+      {
+        "_step": 146999,
+        "eval/score": 7439.652997220503
+      },
+      {
+        "_step": 147999,
+        "eval/score": 7529.138858502274
+      },
+      {
+        "_step": 148999,
+        "eval/score": 7555.273282486744
+      },
+      {
+        "_step": 149999,
+        "eval/score": 7378.29998804852
+      },
+      {
+        "_step": 150999,
+        "eval/score": 7576.959140064956
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "5adf7dba-b37e-41ae-818c-20ecf1ff7676",
+    "url": "https://wandb.ai/duck13/E/runs/5adf7dba-b37e-41ae-818c-20ecf1ff7676",
+    "group": "exp3_awac_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 3,
+    "weighting": "gaussian",
+    "scale": null,
+    "eta": null,
+    "K": null,
+    "temperature": 1,
+    "mean": 7526.741690435559,
+    "eval_std_population": 53.031453533039304,
+    "first_step": 131999,
+    "last_step": 150999,
+    "last20": [
+      {
+        "_step": 131999,
+        "eval/score": 7572.303872715798
+      },
+      {
+        "_step": 132999,
+        "eval/score": 7507.634021590375
+      },
+      {
+        "_step": 133999,
+        "eval/score": 7510.8880666870045
+      },
+      {
+        "_step": 134999,
+        "eval/score": 7582.5662791008335
+      },
+      {
+        "_step": 135999,
+        "eval/score": 7511.8318443503085
+      },
+      {
+        "_step": 136999,
+        "eval/score": 7506.6845780598815
+      },
+      {
+        "_step": 137999,
+        "eval/score": 7594.629679122062
+      },
+      {
+        "_step": 138999,
+        "eval/score": 7542.745731649518
+      },
+      {
+        "_step": 139999,
+        "eval/score": 7494.810019121889
+      },
+      {
+        "_step": 140999,
+        "eval/score": 7553.909869687542
+      },
+      {
+        "_step": 141999,
+        "eval/score": 7471.221699361515
+      },
+      {
+        "_step": 142999,
+        "eval/score": 7484.196340479835
+      },
+      {
+        "_step": 143999,
+        "eval/score": 7527.5778256669855
+      },
+      {
+        "_step": 144999,
+        "eval/score": 7595.091023824089
+      },
+      {
+        "_step": 145999,
+        "eval/score": 7437.40826348364
+      },
+      {
+        "_step": 146999,
+        "eval/score": 7588.69546534277
+      },
+      {
+        "_step": 147999,
+        "eval/score": 7589.554604932619
+      },
+      {
+        "_step": 148999,
+        "eval/score": 7453.063238811112
+      },
+      {
+        "_step": 149999,
+        "eval/score": 7429.2194151576505
+      },
+      {
+        "_step": 150999,
+        "eval/score": 7580.8019695657395
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "d2194dd9-f213-4bc4-8d92-ee34a8fbc47a",
+    "url": "https://wandb.ai/duck13/E/runs/d2194dd9-f213-4bc4-8d92-ee34a8fbc47a",
+    "group": "exp3_d4rl_awac",
+    "state": "finished",
+    "env": "halfcheetah-medium-expert-v2",
+    "seed": 1,
+    "weighting": "gaussian",
+    "scale": null,
+    "eta": null,
+    "K": null,
+    "temperature": 0.3333,
+    "mean": 11277.498291066804,
+    "eval_std_population": 286.20291523144493,
+    "first_step": 131999,
+    "last_step": 150999,
+    "last20": [
+      {
+        "_step": 131999,
+        "eval_score": 11370.0855014276
+      },
+      {
+        "_step": 132999,
+        "eval_score": 11312.098527150303
+      },
+      {
+        "_step": 133999,
+        "eval_score": 11483.470954635595
+      },
+      {
+        "_step": 134999,
+        "eval_score": 11485.048181872284
+      },
+      {
+        "_step": 135999,
+        "eval_score": 10458.979686936786
+      },
+      {
+        "_step": 136999,
+        "eval_score": 11079.798756036584
+      },
+      {
+        "_step": 137999,
+        "eval_score": 11422.282325738644
+      },
+      {
+        "_step": 138999,
+        "eval_score": 11213.488660659514
+      },
+      {
+        "_step": 139999,
+        "eval_score": 11240.27284695232
+      },
+      {
+        "_step": 140999,
+        "eval_score": 11691.953810352825
+      },
+      {
+        "_step": 141999,
+        "eval_score": 10558.584932256239
+      },
+      {
+        "_step": 142999,
+        "eval_score": 11310.089301101707
+      },
+      {
+        "_step": 143999,
+        "eval_score": 11330.443614439006
+      },
+      {
+        "_step": 144999,
+        "eval_score": 11397.316566623176
+      },
+      {
+        "_step": 145999,
+        "eval_score": 11462.714619228223
+      },
+      {
+        "_step": 146999,
+        "eval_score": 11358.820105889154
+      },
+      {
+        "_step": 147999,
+        "eval_score": 11216.545178987677
+      },
+      {
+        "_step": 148999,
+        "eval_score": 11270.013370229184
+      },
+      {
+        "_step": 149999,
+        "eval_score": 11427.939758839257
+      },
+      {
+        "_step": 150999,
+        "eval_score": 11460.019121979985
+      }
+    ],
+    "metric": "eval_score"
+  },
+  {
+    "run_id": "088332a1-ad1d-47b2-b3e9-4d1732af2bb5",
+    "url": "https://wandb.ai/duck13/E/runs/088332a1-ad1d-47b2-b3e9-4d1732af2bb5",
+    "group": "exp3_d4rl_awac",
+    "state": "finished",
+    "env": "halfcheetah-medium-expert-v2",
+    "seed": 2,
+    "weighting": "gaussian",
+    "scale": null,
+    "eta": null,
+    "K": null,
+    "temperature": 0.3333,
+    "mean": 11340.73421626276,
+    "eval_std_population": 158.1195929845007,
+    "first_step": 131999,
+    "last_step": 150999,
+    "last20": [
+      {
+        "_step": 131999,
+        "eval_score": 10887.16531723386
+      },
+      {
+        "_step": 132999,
+        "eval_score": 11320.927131768509
+      },
+      {
+        "_step": 133999,
+        "eval_score": 11469.211648485552
+      },
+      {
+        "_step": 134999,
+        "eval_score": 11009.450888871597
+      },
+      {
+        "_step": 135999,
+        "eval_score": 11381.204252480387
+      },
+      {
+        "_step": 136999,
+        "eval_score": 11422.144399690882
+      },
+      {
+        "_step": 137999,
+        "eval_score": 11343.753163952384
+      },
+      {
+        "_step": 138999,
+        "eval_score": 11400.700367844069
+      },
+      {
+        "_step": 139999,
+        "eval_score": 11371.891663328575
+      },
+      {
+        "_step": 140999,
+        "eval_score": 11422.20335562259
+      },
+      {
+        "_step": 141999,
+        "eval_score": 11568.139731161695
+      },
+      {
+        "_step": 142999,
+        "eval_score": 11465.80918081444
+      },
+      {
+        "_step": 143999,
+        "eval_score": 11242.115781895362
+      },
+      {
+        "_step": 144999,
+        "eval_score": 11366.385828030678
+      },
+      {
+        "_step": 145999,
+        "eval_score": 11478.65472604601
+      },
+      {
+        "_step": 146999,
+        "eval_score": 11368.145566368166
+      },
+      {
+        "_step": 147999,
+        "eval_score": 11148.559518150045
+      },
+      {
+        "_step": 148999,
+        "eval_score": 11444.004834885476
+      },
+      {
+        "_step": 149999,
+        "eval_score": 11389.636493212985
+      },
+      {
+        "_step": 150999,
+        "eval_score": 11314.580475411909
+      }
+    ],
+    "metric": "eval_score"
+  },
+  {
+    "run_id": "b0e131f4-14e8-46b9-80e3-ff7720cb5b19",
+    "url": "https://wandb.ai/duck13/E/runs/b0e131f4-14e8-46b9-80e3-ff7720cb5b19",
+    "group": "exp3_d4rl_awac",
+    "state": "finished",
+    "env": "halfcheetah-medium-expert-v2",
+    "seed": 3,
+    "weighting": "gaussian",
+    "scale": null,
+    "eta": null,
+    "K": null,
+    "temperature": 0.3333,
+    "mean": 11319.216852301943,
+    "eval_std_population": 240.1611584976101,
+    "first_step": 131999,
+    "last_step": 150999,
+    "last20": [
+      {
+        "_step": 131999,
+        "eval_score": 11492.796124030408
+      },
+      {
+        "_step": 132999,
+        "eval_score": 11421.423484777502
+      },
+      {
+        "_step": 133999,
+        "eval_score": 11440.488429312161
+      },
+      {
+        "_step": 134999,
+        "eval_score": 11217.310010912832
+      },
+      {
+        "_step": 135999,
+        "eval_score": 11374.138464482498
+      },
+      {
+        "_step": 136999,
+        "eval_score": 11240.864955239344
+      },
+      {
+        "_step": 137999,
+        "eval_score": 11516.971887491298
+      },
+      {
+        "_step": 138999,
+        "eval_score": 11364.31079226077
+      },
+      {
+        "_step": 139999,
+        "eval_score": 11567.492213913996
+      },
+      {
+        "_step": 140999,
+        "eval_score": 10905.17762068512
+      },
+      {
+        "_step": 141999,
+        "eval_score": 11490.629597686791
+      },
+      {
+        "_step": 142999,
+        "eval_score": 11365.29248971568
+      },
+      {
+        "_step": 143999,
+        "eval_score": 11514.428994603582
+      },
+      {
+        "_step": 144999,
+        "eval_score": 11459.802458295679
+      },
+      {
+        "_step": 145999,
+        "eval_score": 11475.621318844405
+      },
+      {
+        "_step": 146999,
+        "eval_score": 11409.51865222739
+      },
+      {
+        "_step": 147999,
+        "eval_score": 10915.030063734912
+      },
+      {
+        "_step": 148999,
+        "eval_score": 11464.831071905086
+      },
+      {
+        "_step": 149999,
+        "eval_score": 11099.603286223111
+      },
+      {
+        "_step": 150999,
+        "eval_score": 10648.605129696283
+      }
+    ],
+    "metric": "eval_score"
+  },
+  {
+    "run_id": "59c6b3b8-a126-4703-b27d-bb400076ce9e",
+    "url": "https://wandb.ai/duck13/E/runs/59c6b3b8-a126-4703-b27d-bb400076ce9e",
+    "group": "exp3_d4rl_awac",
+    "state": "finished",
+    "env": "halfcheetah-medium-replay-v2",
+    "seed": 1,
+    "weighting": "gaussian",
+    "scale": null,
+    "eta": null,
+    "K": null,
+    "temperature": 0.3333,
+    "mean": 5307.857916666293,
+    "eval_std_population": 59.642518850695005,
+    "first_step": 131999,
+    "last_step": 150999,
+    "last20": [
+      {
+        "_step": 131999,
+        "eval_score": 5441.649044104422
+      },
+      {
+        "_step": 132999,
+        "eval_score": 5257.5247256669745
+      },
+      {
+        "_step": 133999,
+        "eval_score": 5384.441530377075
+      },
+      {
+        "_step": 134999,
+        "eval_score": 5270.974603181117
+      },
+      {
+        "_step": 135999,
+        "eval_score": 5252.655306344653
+      },
+      {
+        "_step": 136999,
+        "eval_score": 5380.645091384761
+      },
+      {
+        "_step": 137999,
+        "eval_score": 5258.549227748276
+      },
+      {
+        "_step": 138999,
+        "eval_score": 5250.175558852354
+      },
+      {
+        "_step": 139999,
+        "eval_score": 5252.68576732483
+      },
+      {
+        "_step": 140999,
+        "eval_score": 5407.715694705181
+      },
+      {
+        "_step": 141999,
+        "eval_score": 5259.15501956411
+      },
+      {
+        "_step": 142999,
+        "eval_score": 5326.3986267473465
+      },
+      {
+        "_step": 143999,
+        "eval_score": 5246.1387440581075
+      },
+      {
+        "_step": 144999,
+        "eval_score": 5304.173537762732
+      },
+      {
+        "_step": 145999,
+        "eval_score": 5286.354350866656
+      },
+      {
+        "_step": 146999,
+        "eval_score": 5289.476279931302
+      },
+      {
+        "_step": 147999,
+        "eval_score": 5268.529912748394
+      },
+      {
+        "_step": 148999,
+        "eval_score": 5295.272309995089
+      },
+      {
+        "_step": 149999,
+        "eval_score": 5335.961208490209
+      },
+      {
+        "_step": 150999,
+        "eval_score": 5388.681793472277
+      }
+    ],
+    "metric": "eval_score"
+  },
+  {
+    "run_id": "610bd0e2-e1d0-4b0a-82a6-703ac60d1593",
+    "url": "https://wandb.ai/duck13/E/runs/610bd0e2-e1d0-4b0a-82a6-703ac60d1593",
+    "group": "exp3_d4rl_awac",
+    "state": "finished",
+    "env": "halfcheetah-medium-replay-v2",
+    "seed": 2,
+    "weighting": "gaussian",
+    "scale": null,
+    "eta": null,
+    "K": null,
+    "temperature": 0.3333,
+    "mean": 5307.473306880534,
+    "eval_std_population": 62.4352693592726,
+    "first_step": 131999,
+    "last_step": 150999,
+    "last20": [
+      {
+        "_step": 131999,
+        "eval_score": 5233.0107457259055
+      },
+      {
+        "_step": 132999,
+        "eval_score": 5377.087027709893
+      },
+      {
+        "_step": 133999,
+        "eval_score": 5284.171982748426
+      },
+      {
+        "_step": 134999,
+        "eval_score": 5397.292798559
+      },
+      {
+        "_step": 135999,
+        "eval_score": 5207.450164415114
+      },
+      {
+        "_step": 136999,
+        "eval_score": 5255.63646365448
+      },
+      {
+        "_step": 137999,
+        "eval_score": 5341.456555630204
+      },
+      {
+        "_step": 138999,
+        "eval_score": 5322.1720907499375
+      },
+      {
+        "_step": 139999,
+        "eval_score": 5408.473472420253
+      },
+      {
+        "_step": 140999,
+        "eval_score": 5319.896798658794
+      },
+      {
+        "_step": 141999,
+        "eval_score": 5188.194049877944
+      },
+      {
+        "_step": 142999,
+        "eval_score": 5257.845696465463
+      },
+      {
+        "_step": 143999,
+        "eval_score": 5378.316101886339
+      },
+      {
+        "_step": 144999,
+        "eval_score": 5326.579996856605
+      },
+      {
+        "_step": 145999,
+        "eval_score": 5345.804857530367
+      },
+      {
+        "_step": 146999,
+        "eval_score": 5227.368763657337
+      },
+      {
+        "_step": 147999,
+        "eval_score": 5372.074367301388
+      },
+      {
+        "_step": 148999,
+        "eval_score": 5314.110700168234
+      },
+      {
+        "_step": 149999,
+        "eval_score": 5303.84588877054
+      },
+      {
+        "_step": 150999,
+        "eval_score": 5288.677614824469
+      }
+    ],
+    "metric": "eval_score"
+  },
+  {
+    "run_id": "1cb2cc42-82c7-456a-9ecc-2572388a6d89",
+    "url": "https://wandb.ai/duck13/E/runs/1cb2cc42-82c7-456a-9ecc-2572388a6d89",
+    "group": "exp3_d4rl_awac",
+    "state": "finished",
+    "env": "halfcheetah-medium-replay-v2",
+    "seed": 3,
+    "weighting": "gaussian",
+    "scale": null,
+    "eta": null,
+    "K": null,
+    "temperature": 0.3333,
+    "mean": 5393.59948347619,
+    "eval_std_population": 46.123434396499725,
+    "first_step": 131999,
+    "last_step": 150999,
+    "last20": [
+      {
+        "_step": 131999,
+        "eval_score": 5424.3882679163235
+      },
+      {
+        "_step": 132999,
+        "eval_score": 5410.688759400861
+      },
+      {
+        "_step": 133999,
+        "eval_score": 5423.686636519818
+      },
+      {
+        "_step": 134999,
+        "eval_score": 5330.55979735366
+      },
+      {
+        "_step": 135999,
+        "eval_score": 5381.978364845728
+      },
+      {
+        "_step": 136999,
+        "eval_score": 5428.5926449185445
+      },
+      {
+        "_step": 137999,
+        "eval_score": 5294.404473239351
+      },
+      {
+        "_step": 138999,
+        "eval_score": 5380.618467393504
+      },
+      {
+        "_step": 139999,
+        "eval_score": 5457.652129023949
+      },
+      {
+        "_step": 140999,
+        "eval_score": 5399.300133655209
+      },
+      {
+        "_step": 141999,
+        "eval_score": 5420.252466471
+      },
+      {
+        "_step": 142999,
+        "eval_score": 5428.462175501898
+      },
+      {
+        "_step": 143999,
+        "eval_score": 5364.088647396293
+      },
+      {
+        "_step": 144999,
+        "eval_score": 5457.290732268348
+      },
+      {
+        "_step": 145999,
+        "eval_score": 5308.310188306034
+      },
+      {
+        "_step": 146999,
+        "eval_score": 5390.83696508506
+      },
+      {
+        "_step": 147999,
+        "eval_score": 5376.611096811261
+      },
+      {
+        "_step": 148999,
+        "eval_score": 5434.347132357255
+      },
+      {
+        "_step": 149999,
+        "eval_score": 5427.231033575803
+      },
+      {
+        "_step": 150999,
+        "eval_score": 5332.689557483884
+      }
+    ],
+    "metric": "eval_score"
+  },
+  {
+    "run_id": "48c68a69-d7bf-4b62-80c8-dedbf53c175c",
+    "url": "https://wandb.ai/duck13/E/runs/48c68a69-d7bf-4b62-80c8-dedbf53c175c",
+    "group": "exp3_d4rl_aware",
+    "state": "finished",
+    "env": "halfcheetah-medium-expert-v2",
+    "seed": 1,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 5903.871827976425,
+    "eval_std_population": 1354.2138926496134,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 6490.835616112881
+      },
+      {
+        "_step": 132000,
+        "eval/score": 6756.7919489569995
+      },
+      {
+        "_step": 133000,
+        "eval/score": 8148.013306535302
+      },
+      {
+        "_step": 134000,
+        "eval/score": 6252.545772206186
+      },
+      {
+        "_step": 135000,
+        "eval/score": 5006.183902545278
+      },
+      {
+        "_step": 136000,
+        "eval/score": 5090.351650496427
+      },
+      {
+        "_step": 137000,
+        "eval/score": 3533.1897538851604
+      },
+      {
+        "_step": 138000,
+        "eval/score": 6341.385582660135
+      },
+      {
+        "_step": 139000,
+        "eval/score": 5147.381913038626
+      },
+      {
+        "_step": 140000,
+        "eval/score": 5548.803258303973
+      },
+      {
+        "_step": 141000,
+        "eval/score": 4228.0488030525385
+      },
+      {
+        "_step": 142000,
+        "eval/score": 4995.999165152289
+      },
+      {
+        "_step": 143000,
+        "eval/score": 5607.716071931081
+      },
+      {
+        "_step": 144000,
+        "eval/score": 3669.4656906003283
+      },
+      {
+        "_step": 145000,
+        "eval/score": 7020.200639105082
+      },
+      {
+        "_step": 146000,
+        "eval/score": 8626.988532354584
+      },
+      {
+        "_step": 147000,
+        "eval/score": 5314.3039432708265
+      },
+      {
+        "_step": 148000,
+        "eval/score": 8004.2677722801745
+      },
+      {
+        "_step": 149000,
+        "eval/score": 6477.789350811936
+      },
+      {
+        "_step": 150000,
+        "eval/score": 5817.173886228705
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "8275750b-fc29-45f5-b284-98444fb61899",
+    "url": "https://wandb.ai/duck13/E/runs/8275750b-fc29-45f5-b284-98444fb61899",
+    "group": "exp3_d4rl_aware",
+    "state": "finished",
+    "env": "halfcheetah-medium-expert-v2",
+    "seed": 2,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 7076.66435901854,
+    "eval_std_population": 994.8001138556021,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 6674.0429693981105
+      },
+      {
+        "_step": 132000,
+        "eval/score": 7281.854221089506
+      },
+      {
+        "_step": 133000,
+        "eval/score": 7448.118737106495
+      },
+      {
+        "_step": 134000,
+        "eval/score": 6214.785813975637
+      },
+      {
+        "_step": 135000,
+        "eval/score": 6091.73409068899
+      },
+      {
+        "_step": 136000,
+        "eval/score": 7712.625230203276
+      },
+      {
+        "_step": 137000,
+        "eval/score": 7710.935696506455
+      },
+      {
+        "_step": 138000,
+        "eval/score": 7946.076084598601
+      },
+      {
+        "_step": 139000,
+        "eval/score": 8279.30666958577
+      },
+      {
+        "_step": 140000,
+        "eval/score": 5199.124198300822
+      },
+      {
+        "_step": 141000,
+        "eval/score": 7780.544671913068
+      },
+      {
+        "_step": 142000,
+        "eval/score": 4874.648393335219
+      },
+      {
+        "_step": 143000,
+        "eval/score": 8387.124786579723
+      },
+      {
+        "_step": 144000,
+        "eval/score": 6543.287779995036
+      },
+      {
+        "_step": 145000,
+        "eval/score": 6675.848147597772
+      },
+      {
+        "_step": 146000,
+        "eval/score": 8229.779419359267
+      },
+      {
+        "_step": 147000,
+        "eval/score": 6646.222515023075
+      },
+      {
+        "_step": 148000,
+        "eval/score": 8421.07315213497
+      },
+      {
+        "_step": 149000,
+        "eval/score": 6481.765295961382
+      },
+      {
+        "_step": 150000,
+        "eval/score": 6934.389307017627
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "0529df38-2f22-4402-a9bb-e545700b0722",
+    "url": "https://wandb.ai/duck13/E/runs/0529df38-2f22-4402-a9bb-e545700b0722",
+    "group": "exp3_d4rl_aware",
+    "state": "finished",
+    "env": "halfcheetah-medium-expert-v2",
+    "seed": 3,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 8346.957125716639,
+    "eval_std_population": 1035.6920894120888,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 7899.023591349326
+      },
+      {
+        "_step": 132000,
+        "eval/score": 6142.391920596148
+      },
+      {
+        "_step": 133000,
+        "eval/score": 8563.954615538098
+      },
+      {
+        "_step": 134000,
+        "eval/score": 9507.828015083538
+      },
+      {
+        "_step": 135000,
+        "eval/score": 9455.911334411294
+      },
+      {
+        "_step": 136000,
+        "eval/score": 6982.22666669329
+      },
+      {
+        "_step": 137000,
+        "eval/score": 9019.891309979177
+      },
+      {
+        "_step": 138000,
+        "eval/score": 7947.385466333716
+      },
+      {
+        "_step": 139000,
+        "eval/score": 9540.260331367062
+      },
+      {
+        "_step": 140000,
+        "eval/score": 8030.507904669948
+      },
+      {
+        "_step": 141000,
+        "eval/score": 9371.061182691172
+      },
+      {
+        "_step": 142000,
+        "eval/score": 8397.293030425946
+      },
+      {
+        "_step": 143000,
+        "eval/score": 6370.647484453852
+      },
+      {
+        "_step": 144000,
+        "eval/score": 9711.752111496611
+      },
+      {
+        "_step": 145000,
+        "eval/score": 7907.347110939974
+      },
+      {
+        "_step": 146000,
+        "eval/score": 8796.067381403473
+      },
+      {
+        "_step": 147000,
+        "eval/score": 8900.871003905442
+      },
+      {
+        "_step": 148000,
+        "eval/score": 8633.345410228072
+      },
+      {
+        "_step": 149000,
+        "eval/score": 6950.520453947375
+      },
+      {
+        "_step": 150000,
+        "eval/score": 8810.856188819253
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "c23d2b38-3112-49d3-a7e7-268efb1990d8",
+    "url": "https://wandb.ai/duck13/E/runs/c23d2b38-3112-49d3-a7e7-268efb1990d8",
+    "group": "exp3_d4rl_aware",
+    "state": "finished",
+    "env": "halfcheetah-medium-replay-v2",
+    "seed": 1,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 5535.603384483728,
+    "eval_std_population": 104.49438326966927,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 5489.639861249039
+      },
+      {
+        "_step": 132000,
+        "eval/score": 5384.5791166580475
+      },
+      {
+        "_step": 133000,
+        "eval/score": 5609.36043052608
+      },
+      {
+        "_step": 134000,
+        "eval/score": 5642.079145696378
+      },
+      {
+        "_step": 135000,
+        "eval/score": 5274.405562874471
+      },
+      {
+        "_step": 136000,
+        "eval/score": 5504.875494149867
+      },
+      {
+        "_step": 137000,
+        "eval/score": 5573.979494800443
+      },
+      {
+        "_step": 138000,
+        "eval/score": 5568.437641370538
+      },
+      {
+        "_step": 139000,
+        "eval/score": 5398.194638812543
+      },
+      {
+        "_step": 140000,
+        "eval/score": 5621.296855893184
+      },
+      {
+        "_step": 141000,
+        "eval/score": 5591.215340430086
+      },
+      {
+        "_step": 142000,
+        "eval/score": 5676.124823303877
+      },
+      {
+        "_step": 143000,
+        "eval/score": 5585.8560875841695
+      },
+      {
+        "_step": 144000,
+        "eval/score": 5687.212795939988
+      },
+      {
+        "_step": 145000,
+        "eval/score": 5607.4632311322075
+      },
+      {
+        "_step": 146000,
+        "eval/score": 5458.40948669788
+      },
+      {
+        "_step": 147000,
+        "eval/score": 5408.00085289689
+      },
+      {
+        "_step": 148000,
+        "eval/score": 5579.907175109541
+      },
+      {
+        "_step": 149000,
+        "eval/score": 5505.287782353795
+      },
+      {
+        "_step": 150000,
+        "eval/score": 5545.741872195549
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "69816690-4cac-431f-ae6e-0162719f0e96",
+    "url": "https://wandb.ai/duck13/E/runs/69816690-4cac-431f-ae6e-0162719f0e96",
+    "group": "exp3_d4rl_aware",
+    "state": "finished",
+    "env": "halfcheetah-medium-replay-v2",
+    "seed": 2,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 5501.140722952246,
+    "eval_std_population": 100.59931451172794,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 5425.965116314837
+      },
+      {
+        "_step": 132000,
+        "eval/score": 5579.741010023109
+      },
+      {
+        "_step": 133000,
+        "eval/score": 5183.1772757456765
+      },
+      {
+        "_step": 134000,
+        "eval/score": 5473.517371163378
+      },
+      {
+        "_step": 135000,
+        "eval/score": 5329.348807798469
+      },
+      {
+        "_step": 136000,
+        "eval/score": 5507.007022715359
+      },
+      {
+        "_step": 137000,
+        "eval/score": 5506.190709334292
+      },
+      {
+        "_step": 138000,
+        "eval/score": 5590.466704253194
+      },
+      {
+        "_step": 139000,
+        "eval/score": 5512.428840389036
+      },
+      {
+        "_step": 140000,
+        "eval/score": 5570.890106751588
+      },
+      {
+        "_step": 141000,
+        "eval/score": 5463.5268424504475
+      },
+      {
+        "_step": 142000,
+        "eval/score": 5591.303141283364
+      },
+      {
+        "_step": 143000,
+        "eval/score": 5575.225476272379
+      },
+      {
+        "_step": 144000,
+        "eval/score": 5554.654594933579
+      },
+      {
+        "_step": 145000,
+        "eval/score": 5590.842449992722
+      },
+      {
+        "_step": 146000,
+        "eval/score": 5442.341694496252
+      },
+      {
+        "_step": 147000,
+        "eval/score": 5589.346633836197
+      },
+      {
+        "_step": 148000,
+        "eval/score": 5436.496917700254
+      },
+      {
+        "_step": 149000,
+        "eval/score": 5549.989554253448
+      },
+      {
+        "_step": 150000,
+        "eval/score": 5550.3541893373385
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "e300ccd6-bc8a-4829-9293-fd76ed4fb948",
+    "url": "https://wandb.ai/duck13/E/runs/e300ccd6-bc8a-4829-9293-fd76ed4fb948",
+    "group": "exp3_d4rl_aware",
+    "state": "finished",
+    "env": "halfcheetah-medium-replay-v2",
+    "seed": 3,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 5588.038476290899,
+    "eval_std_population": 74.93272475878841,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 5548.933503271042
+      },
+      {
+        "_step": 132000,
+        "eval/score": 5638.613494624362
+      },
+      {
+        "_step": 133000,
+        "eval/score": 5571.361007392114
+      },
+      {
+        "_step": 134000,
+        "eval/score": 5592.8148468383915
+      },
+      {
+        "_step": 135000,
+        "eval/score": 5593.896996899257
+      },
+      {
+        "_step": 136000,
+        "eval/score": 5617.982121990039
+      },
+      {
+        "_step": 137000,
+        "eval/score": 5573.147545787917
+      },
+      {
+        "_step": 138000,
+        "eval/score": 5549.978611798201
+      },
+      {
+        "_step": 139000,
+        "eval/score": 5533.644418634902
+      },
+      {
+        "_step": 140000,
+        "eval/score": 5603.50826827164
+      },
+      {
+        "_step": 141000,
+        "eval/score": 5684.250348244651
+      },
+      {
+        "_step": 142000,
+        "eval/score": 5670.983482887897
+      },
+      {
+        "_step": 143000,
+        "eval/score": 5521.008445856654
+      },
+      {
+        "_step": 144000,
+        "eval/score": 5633.2476121008285
+      },
+      {
+        "_step": 145000,
+        "eval/score": 5580.24964886922
+      },
+      {
+        "_step": 146000,
+        "eval/score": 5576.137986018508
+      },
+      {
+        "_step": 147000,
+        "eval/score": 5370.345599572036
+      },
+      {
+        "_step": 148000,
+        "eval/score": 5703.247707029261
+      },
+      {
+        "_step": 149000,
+        "eval/score": 5694.479933890606
+      },
+      {
+        "_step": 150000,
+        "eval/score": 5502.9379458404455
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "79273e39-cc72-4036-b207-f6d326fc8aaa",
+    "url": "https://wandb.ai/duck13/E/runs/79273e39-cc72-4036-b207-f6d326fc8aaa",
+    "group": "exp3_d4rl_me_controls",
+    "state": "finished",
+    "env": "halfcheetah-medium-expert-v2",
+    "seed": 1,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 0.3333,
+    "mean": 6133.421042703158,
+    "eval_std_population": 1408.3650822581585,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 6047.9623599155975
+      },
+      {
+        "_step": 132000,
+        "eval/score": 5023.703876707999
+      },
+      {
+        "_step": 133000,
+        "eval/score": 6166.374123255583
+      },
+      {
+        "_step": 134000,
+        "eval/score": 6418.261395003505
+      },
+      {
+        "_step": 135000,
+        "eval/score": 4274.084330344939
+      },
+      {
+        "_step": 136000,
+        "eval/score": 4263.06688045069
+      },
+      {
+        "_step": 137000,
+        "eval/score": 6014.298415326201
+      },
+      {
+        "_step": 138000,
+        "eval/score": 6288.356168825841
+      },
+      {
+        "_step": 139000,
+        "eval/score": 7883.575139830331
+      },
+      {
+        "_step": 140000,
+        "eval/score": 6428.659781145917
+      },
+      {
+        "_step": 141000,
+        "eval/score": 4608.259423866632
+      },
+      {
+        "_step": 142000,
+        "eval/score": 5464.6148925484995
+      },
+      {
+        "_step": 143000,
+        "eval/score": 5358.65220182166
+      },
+      {
+        "_step": 144000,
+        "eval/score": 4565.410921940365
+      },
+      {
+        "_step": 145000,
+        "eval/score": 4075.0984948442165
+      },
+      {
+        "_step": 146000,
+        "eval/score": 8355.065064726217
+      },
+      {
+        "_step": 147000,
+        "eval/score": 8145.091867525984
+      },
+      {
+        "_step": 148000,
+        "eval/score": 7022.081788883935
+      },
+      {
+        "_step": 149000,
+        "eval/score": 8561.836699562744
+      },
+      {
+        "_step": 150000,
+        "eval/score": 7703.967027536293
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "7be3b192-7a57-4eab-bda4-304b21350d99",
+    "url": "https://wandb.ai/duck13/E/runs/7be3b192-7a57-4eab-bda4-304b21350d99",
+    "group": "exp3_d4rl_me_controls",
+    "state": "finished",
+    "env": "halfcheetah-medium-expert-v2",
+    "seed": 2,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 0.3333,
+    "mean": 7054.067856733967,
+    "eval_std_population": 901.6598183070585,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 6447.987671799351
+      },
+      {
+        "_step": 132000,
+        "eval/score": 7235.605966839508
+      },
+      {
+        "_step": 133000,
+        "eval/score": 7116.513577367055
+      },
+      {
+        "_step": 134000,
+        "eval/score": 7575.245555015281
+      },
+      {
+        "_step": 135000,
+        "eval/score": 4833.763135937911
+      },
+      {
+        "_step": 136000,
+        "eval/score": 7107.343003029705
+      },
+      {
+        "_step": 137000,
+        "eval/score": 7681.027453539634
+      },
+      {
+        "_step": 138000,
+        "eval/score": 8980.805805376865
+      },
+      {
+        "_step": 139000,
+        "eval/score": 6681.040837566679
+      },
+      {
+        "_step": 140000,
+        "eval/score": 6472.0868473711635
+      },
+      {
+        "_step": 141000,
+        "eval/score": 7344.12254834869
+      },
+      {
+        "_step": 142000,
+        "eval/score": 8097.028628531855
+      },
+      {
+        "_step": 143000,
+        "eval/score": 7957.987638853297
+      },
+      {
+        "_step": 144000,
+        "eval/score": 7217.386800996721
+      },
+      {
+        "_step": 145000,
+        "eval/score": 6132.016337989463
+      },
+      {
+        "_step": 146000,
+        "eval/score": 5756.317758132442
+      },
+      {
+        "_step": 147000,
+        "eval/score": 7866.627048517136
+      },
+      {
+        "_step": 148000,
+        "eval/score": 7534.773272483321
+      },
+      {
+        "_step": 149000,
+        "eval/score": 6348.185954817483
+      },
+      {
+        "_step": 150000,
+        "eval/score": 6695.491292165787
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "73a518e0-7028-4728-90ed-4f71c415cf5a",
+    "url": "https://wandb.ai/duck13/E/runs/73a518e0-7028-4728-90ed-4f71c415cf5a",
+    "group": "exp3_d4rl_me_controls",
+    "state": "finished",
+    "env": "halfcheetah-medium-expert-v2",
+    "seed": 3,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 0.3333,
+    "mean": 5862.137704975736,
+    "eval_std_population": 1406.4071266660865,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 6541.8183269175715
+      },
+      {
+        "_step": 132000,
+        "eval/score": 6604.912288062054
+      },
+      {
+        "_step": 133000,
+        "eval/score": 5460.989641195497
+      },
+      {
+        "_step": 134000,
+        "eval/score": 8945.155576549541
+      },
+      {
+        "_step": 135000,
+        "eval/score": 4316.225645773435
+      },
+      {
+        "_step": 136000,
+        "eval/score": 5320.120874253078
+      },
+      {
+        "_step": 137000,
+        "eval/score": 6830.653360752156
+      },
+      {
+        "_step": 138000,
+        "eval/score": 3706.547769526849
+      },
+      {
+        "_step": 139000,
+        "eval/score": 5195.195280703787
+      },
+      {
+        "_step": 140000,
+        "eval/score": 5506.945558034281
+      },
+      {
+        "_step": 141000,
+        "eval/score": 6453.959154559397
+      },
+      {
+        "_step": 142000,
+        "eval/score": 7529.371763964009
+      },
+      {
+        "_step": 143000,
+        "eval/score": 3902.0093557841733
+      },
+      {
+        "_step": 144000,
+        "eval/score": 5273.566491319867
+      },
+      {
+        "_step": 145000,
+        "eval/score": 6385.590421623678
+      },
+      {
+        "_step": 146000,
+        "eval/score": 6882.568183053675
+      },
+      {
+        "_step": 147000,
+        "eval/score": 4056.6436976541445
+      },
+      {
+        "_step": 148000,
+        "eval/score": 6806.587598020024
+      },
+      {
+        "_step": 149000,
+        "eval/score": 7663.950456430805
+      },
+      {
+        "_step": 150000,
+        "eval/score": 3859.9426553366916
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "b2888ad0-264a-4060-a991-044e786627d9",
+    "url": "https://wandb.ai/duck13/E/runs/b2888ad0-264a-4060-a991-044e786627d9",
+    "group": "exp3_d4rl_me_controls",
+    "state": "finished",
+    "env": "halfcheetah-medium-expert-v2",
+    "seed": 1,
+    "weighting": "bc",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 5900.865838114717,
+    "eval_std_population": 810.9380502706211,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 6874.152146779967
+      },
+      {
+        "_step": 132000,
+        "eval/score": 4964.267745894801
+      },
+      {
+        "_step": 133000,
+        "eval/score": 5654.181184154719
+      },
+      {
+        "_step": 134000,
+        "eval/score": 5433.576858632374
+      },
+      {
+        "_step": 135000,
+        "eval/score": 5184.6291767728635
+      },
+      {
+        "_step": 136000,
+        "eval/score": 6724.8024824884515
+      },
+      {
+        "_step": 137000,
+        "eval/score": 6239.622189717671
+      },
+      {
+        "_step": 138000,
+        "eval/score": 6681.2796005450555
+      },
+      {
+        "_step": 139000,
+        "eval/score": 7326.2615074831
+      },
+      {
+        "_step": 140000,
+        "eval/score": 7383.984832649078
+      },
+      {
+        "_step": 141000,
+        "eval/score": 6280.261369759361
+      },
+      {
+        "_step": 142000,
+        "eval/score": 5795.4113485502185
+      },
+      {
+        "_step": 143000,
+        "eval/score": 6922.466182376362
+      },
+      {
+        "_step": 144000,
+        "eval/score": 4903.896863712874
+      },
+      {
+        "_step": 145000,
+        "eval/score": 4996.5324137043835
+      },
+      {
+        "_step": 146000,
+        "eval/score": 5272.68212124221
+      },
+      {
+        "_step": 147000,
+        "eval/score": 5567.973489094837
+      },
+      {
+        "_step": 148000,
+        "eval/score": 5565.886991366031
+      },
+      {
+        "_step": 149000,
+        "eval/score": 5299.4812299395035
+      },
+      {
+        "_step": 150000,
+        "eval/score": 4945.967027430486
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "d9f902af-cf5c-4b08-9e4a-70f6c30765d8",
+    "url": "https://wandb.ai/duck13/E/runs/d9f902af-cf5c-4b08-9e4a-70f6c30765d8",
+    "group": "exp3_d4rl_me_controls",
+    "state": "finished",
+    "env": "halfcheetah-medium-expert-v2",
+    "seed": 2,
+    "weighting": "bc",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 5876.657194343411,
+    "eval_std_population": 561.5276600626639,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 6275.286224865742
+      },
+      {
+        "_step": 132000,
+        "eval/score": 6603.125267679595
+      },
+      {
+        "_step": 133000,
+        "eval/score": 5550.81328690553
+      },
+      {
+        "_step": 134000,
+        "eval/score": 5481.120434535605
+      },
+      {
+        "_step": 135000,
+        "eval/score": 5322.197158798793
+      },
+      {
+        "_step": 136000,
+        "eval/score": 5560.0555360303315
+      },
+      {
+        "_step": 137000,
+        "eval/score": 5988.52212593367
+      },
+      {
+        "_step": 138000,
+        "eval/score": 5783.289336184391
+      },
+      {
+        "_step": 139000,
+        "eval/score": 4903.96081510837
+      },
+      {
+        "_step": 140000,
+        "eval/score": 5579.974821750225
+      },
+      {
+        "_step": 141000,
+        "eval/score": 5082.032716145134
+      },
+      {
+        "_step": 142000,
+        "eval/score": 6698.273688269372
+      },
+      {
+        "_step": 143000,
+        "eval/score": 6116.3127505463335
+      },
+      {
+        "_step": 144000,
+        "eval/score": 6171.7981424097015
+      },
+      {
+        "_step": 145000,
+        "eval/score": 4969.161863090865
+      },
+      {
+        "_step": 146000,
+        "eval/score": 6558.439292059922
+      },
+      {
+        "_step": 147000,
+        "eval/score": 6879.305923656009
+      },
+      {
+        "_step": 148000,
+        "eval/score": 6099.101765241341
+      },
+      {
+        "_step": 149000,
+        "eval/score": 5746.128770575027
+      },
+      {
+        "_step": 150000,
+        "eval/score": 6164.243967082253
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "999e0ee7-311a-4701-9222-7e50341b4b32",
+    "url": "https://wandb.ai/duck13/E/runs/999e0ee7-311a-4701-9222-7e50341b4b32",
+    "group": "exp3_d4rl_me_controls",
+    "state": "finished",
+    "env": "halfcheetah-medium-expert-v2",
+    "seed": 3,
+    "weighting": "bc",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 6034.473616270492,
+    "eval_std_population": 696.7943702975199,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 4957.014290345615
+      },
+      {
+        "_step": 132000,
+        "eval/score": 5913.485266071171
+      },
+      {
+        "_step": 133000,
+        "eval/score": 7203.133320367417
+      },
+      {
+        "_step": 134000,
+        "eval/score": 5189.419252160337
+      },
+      {
+        "_step": 135000,
+        "eval/score": 5848.734942167952
+      },
+      {
+        "_step": 136000,
+        "eval/score": 6011.404548506196
+      },
+      {
+        "_step": 137000,
+        "eval/score": 7140.948536171922
+      },
+      {
+        "_step": 138000,
+        "eval/score": 6263.1935344517315
+      },
+      {
+        "_step": 139000,
+        "eval/score": 4745.008131424622
+      },
+      {
+        "_step": 140000,
+        "eval/score": 5765.696534374106
+      },
+      {
+        "_step": 141000,
+        "eval/score": 6407.6605653155675
+      },
+      {
+        "_step": 142000,
+        "eval/score": 6436.090802356283
+      },
+      {
+        "_step": 143000,
+        "eval/score": 5892.268246631541
+      },
+      {
+        "_step": 144000,
+        "eval/score": 5174.651924265111
+      },
+      {
+        "_step": 145000,
+        "eval/score": 6158.278446014843
+      },
+      {
+        "_step": 146000,
+        "eval/score": 6931.704941143612
+      },
+      {
+        "_step": 147000,
+        "eval/score": 5543.275066920237
+      },
+      {
+        "_step": 148000,
+        "eval/score": 5683.721908413018
+      },
+      {
+        "_step": 149000,
+        "eval/score": 6361.254445448064
+      },
+      {
+        "_step": 150000,
+        "eval/score": 7062.527622860491
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "7ed95a50-acfa-4fea-b505-4062a4ab2754",
+    "url": "https://wandb.ai/duck13/E/runs/7ed95a50-acfa-4fea-b505-4062a4ab2754",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 1,
+    "weighting": "awac",
+    "scale": 4,
+    "eta": 0.01,
+    "K": 40,
+    "temperature": 1,
+    "mean": 2716.7166803087116,
+    "eval_std_population": 815.2102585379273,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 2536.2774761832798
+      },
+      {
+        "_step": 132000,
+        "eval/score": 3098.905293667832
+      },
+      {
+        "_step": 133000,
+        "eval/score": 2132.611788977237
+      },
+      {
+        "_step": 134000,
+        "eval/score": 2127.673566545998
+      },
+      {
+        "_step": 135000,
+        "eval/score": 1574.7420429422484
+      },
+      {
+        "_step": 136000,
+        "eval/score": 763.6092471727914
+      },
+      {
+        "_step": 137000,
+        "eval/score": 2675.1150736400145
+      },
+      {
+        "_step": 138000,
+        "eval/score": 3754.111792385331
+      },
+      {
+        "_step": 139000,
+        "eval/score": 2391.343645269059
+      },
+      {
+        "_step": 140000,
+        "eval/score": 3825.0461406698414
+      },
+      {
+        "_step": 141000,
+        "eval/score": 2816.079925281215
+      },
+      {
+        "_step": 142000,
+        "eval/score": 2814.6538762266837
+      },
+      {
+        "_step": 143000,
+        "eval/score": 1792.9899025681084
+      },
+      {
+        "_step": 144000,
+        "eval/score": 2157.795193913747
+      },
+      {
+        "_step": 145000,
+        "eval/score": 3418.397368045683
+      },
+      {
+        "_step": 146000,
+        "eval/score": 3593.8148159108578
+      },
+      {
+        "_step": 147000,
+        "eval/score": 3169.1632006045775
+      },
+      {
+        "_step": 148000,
+        "eval/score": 3849.962321967617
+      },
+      {
+        "_step": 149000,
+        "eval/score": 3582.2477521608853
+      },
+      {
+        "_step": 150000,
+        "eval/score": 2259.7931820412246
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "67101dd8-af4e-4954-b1db-a03db9c2efc4",
+    "url": "https://wandb.ai/duck13/E/runs/67101dd8-af4e-4954-b1db-a03db9c2efc4",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 2,
+    "weighting": "awac",
+    "scale": 4,
+    "eta": 0.01,
+    "K": 40,
+    "temperature": 1,
+    "mean": 3025.023722122368,
+    "eval_std_population": 1081.377759927622,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 3047.798320771596
+      },
+      {
+        "_step": 132000,
+        "eval/score": 252.27438065731513
+      },
+      {
+        "_step": 133000,
+        "eval/score": 1978.612059228586
+      },
+      {
+        "_step": 134000,
+        "eval/score": 3373.332268402348
+      },
+      {
+        "_step": 135000,
+        "eval/score": 2670.2025930100513
+      },
+      {
+        "_step": 136000,
+        "eval/score": 3561.7075436180844
+      },
+      {
+        "_step": 137000,
+        "eval/score": 4241.5463794474
+      },
+      {
+        "_step": 138000,
+        "eval/score": 3498.440482777548
+      },
+      {
+        "_step": 139000,
+        "eval/score": 2586.114843272864
+      },
+      {
+        "_step": 140000,
+        "eval/score": 2970.344498043234
+      },
+      {
+        "_step": 141000,
+        "eval/score": 4941.979583592681
+      },
+      {
+        "_step": 142000,
+        "eval/score": 2106.2958982268765
+      },
+      {
+        "_step": 143000,
+        "eval/score": 4032.8832608815524
+      },
+      {
+        "_step": 144000,
+        "eval/score": 982.3413967198458
+      },
+      {
+        "_step": 145000,
+        "eval/score": 3943.684741593936
+      },
+      {
+        "_step": 146000,
+        "eval/score": 2836.821982810915
+      },
+      {
+        "_step": 147000,
+        "eval/score": 4101.748661299512
+      },
+      {
+        "_step": 148000,
+        "eval/score": 3483.0268039951275
+      },
+      {
+        "_step": 149000,
+        "eval/score": 3262.5370310286503
+      },
+      {
+        "_step": 150000,
+        "eval/score": 2628.781713069239
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "368b2ddb-ae5c-4d95-822f-5762290ddbbc",
+    "url": "https://wandb.ai/duck13/E/runs/368b2ddb-ae5c-4d95-822f-5762290ddbbc",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 3,
+    "weighting": "awac",
+    "scale": 4,
+    "eta": 0.01,
+    "K": 40,
+    "temperature": 1,
+    "mean": 2483.307779377665,
+    "eval_std_population": 965.3450274802933,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 1774.9273442584204
+      },
+      {
+        "_step": 132000,
+        "eval/score": 1235.3247702394979
+      },
+      {
+        "_step": 133000,
+        "eval/score": 2853.970206450433
+      },
+      {
+        "_step": 134000,
+        "eval/score": 2057.2594066985157
+      },
+      {
+        "_step": 135000,
+        "eval/score": 3270.44571153118
+      },
+      {
+        "_step": 136000,
+        "eval/score": 1566.4127317555658
+      },
+      {
+        "_step": 137000,
+        "eval/score": 1508.1419074396256
+      },
+      {
+        "_step": 138000,
+        "eval/score": 3214.3706017493323
+      },
+      {
+        "_step": 139000,
+        "eval/score": 1940.029661118632
+      },
+      {
+        "_step": 140000,
+        "eval/score": 3758.7994599849094
+      },
+      {
+        "_step": 141000,
+        "eval/score": 2242.717385778891
+      },
+      {
+        "_step": 142000,
+        "eval/score": 1665.5455952604673
+      },
+      {
+        "_step": 143000,
+        "eval/score": 3605.4258134408747
+      },
+      {
+        "_step": 144000,
+        "eval/score": 4618.663810773888
+      },
+      {
+        "_step": 145000,
+        "eval/score": 3691.622101409109
+      },
+      {
+        "_step": 146000,
+        "eval/score": 1790.444152271693
+      },
+      {
+        "_step": 147000,
+        "eval/score": 1769.625358662791
+      },
+      {
+        "_step": 148000,
+        "eval/score": 1299.8911948987038
+      },
+      {
+        "_step": 149000,
+        "eval/score": 3470.0998531756595
+      },
+      {
+        "_step": 150000,
+        "eval/score": 2332.438520655115
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "173a7c25-fdd3-4638-98cc-d43b241661be",
+    "url": "https://wandb.ai/duck13/E/runs/173a7c25-fdd3-4638-98cc-d43b241661be",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 1,
+    "weighting": "awac",
+    "scale": 4,
+    "eta": 0.02,
+    "K": 20,
+    "temperature": 1,
+    "mean": 2891.297440415187,
+    "eval_std_population": 971.2661842230975,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 1986.2058410570135
+      },
+      {
+        "_step": 132000,
+        "eval/score": 3176.6996309749807
+      },
+      {
+        "_step": 133000,
+        "eval/score": 3211.014325248385
+      },
+      {
+        "_step": 134000,
+        "eval/score": 3092.746683150998
+      },
+      {
+        "_step": 135000,
+        "eval/score": 1283.1181237074793
+      },
+      {
+        "_step": 136000,
+        "eval/score": 487.33735796592975
+      },
+      {
+        "_step": 137000,
+        "eval/score": 4124.804709315957
+      },
+      {
+        "_step": 138000,
+        "eval/score": 4126.877991071784
+      },
+      {
+        "_step": 139000,
+        "eval/score": 2420.6750699486497
+      },
+      {
+        "_step": 140000,
+        "eval/score": 3534.2914042315197
+      },
+      {
+        "_step": 141000,
+        "eval/score": 2768.37560508225
+      },
+      {
+        "_step": 142000,
+        "eval/score": 2499.0745983642178
+      },
+      {
+        "_step": 143000,
+        "eval/score": 1633.4730412315653
+      },
+      {
+        "_step": 144000,
+        "eval/score": 3261.7840513600995
+      },
+      {
+        "_step": 145000,
+        "eval/score": 3657.9604957703586
+      },
+      {
+        "_step": 146000,
+        "eval/score": 3025.5976069442295
+      },
+      {
+        "_step": 147000,
+        "eval/score": 3294.2304854208282
+      },
+      {
+        "_step": 148000,
+        "eval/score": 3165.6480663653124
+      },
+      {
+        "_step": 149000,
+        "eval/score": 4588.509128327689
+      },
+      {
+        "_step": 150000,
+        "eval/score": 2487.524592764496
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "259990ea-23e3-44d6-a0db-f2ce76190559",
+    "url": "https://wandb.ai/duck13/E/runs/259990ea-23e3-44d6-a0db-f2ce76190559",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 2,
+    "weighting": "awac",
+    "scale": 4,
+    "eta": 0.02,
+    "K": 20,
+    "temperature": 1,
+    "mean": 2888.5760082015986,
+    "eval_std_population": 869.8686421651015,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 2173.5556340477115
+      },
+      {
+        "_step": 132000,
+        "eval/score": 3057.763094888645
+      },
+      {
+        "_step": 133000,
+        "eval/score": 3408.133959049278
+      },
+      {
+        "_step": 134000,
+        "eval/score": 2822.39911857743
+      },
+      {
+        "_step": 135000,
+        "eval/score": 3348.2430205371697
+      },
+      {
+        "_step": 136000,
+        "eval/score": 4594.884960335341
+      },
+      {
+        "_step": 137000,
+        "eval/score": 3467.10714447277
+      },
+      {
+        "_step": 138000,
+        "eval/score": 4442.619491348019
+      },
+      {
+        "_step": 139000,
+        "eval/score": 3460.4503341218165
+      },
+      {
+        "_step": 140000,
+        "eval/score": 2455.2738003328823
+      },
+      {
+        "_step": 141000,
+        "eval/score": 3599.145934349303
+      },
+      {
+        "_step": 142000,
+        "eval/score": 1160.5432589640889
+      },
+      {
+        "_step": 143000,
+        "eval/score": 1776.1975640392957
+      },
+      {
+        "_step": 144000,
+        "eval/score": 1223.0093602786515
+      },
+      {
+        "_step": 145000,
+        "eval/score": 2601.5640375306075
+      },
+      {
+        "_step": 146000,
+        "eval/score": 2553.1891980025434
+      },
+      {
+        "_step": 147000,
+        "eval/score": 3092.7357015989683
+      },
+      {
+        "_step": 148000,
+        "eval/score": 2959.7398055184854
+      },
+      {
+        "_step": 149000,
+        "eval/score": 2498.210867580723
+      },
+      {
+        "_step": 150000,
+        "eval/score": 3076.753878458246
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "7f0d33ae-8dde-451b-bebb-9219cb79d25e",
+    "url": "https://wandb.ai/duck13/E/runs/7f0d33ae-8dde-451b-bebb-9219cb79d25e",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 3,
+    "weighting": "awac",
+    "scale": 4,
+    "eta": 0.02,
+    "K": 20,
+    "temperature": 1,
+    "mean": 3666.4967310842476,
+    "eval_std_population": 895.989796549241,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 3077.966478087251
+      },
+      {
+        "_step": 132000,
+        "eval/score": 3875.3991608849674
+      },
+      {
+        "_step": 133000,
+        "eval/score": 4640.909263443586
+      },
+      {
+        "_step": 134000,
+        "eval/score": 3571.67417109496
+      },
+      {
+        "_step": 135000,
+        "eval/score": 3858.150606446394
+      },
+      {
+        "_step": 136000,
+        "eval/score": 1084.0552723006683
+      },
+      {
+        "_step": 137000,
+        "eval/score": 3327.5859022340023
+      },
+      {
+        "_step": 138000,
+        "eval/score": 4344.831059875773
+      },
+      {
+        "_step": 139000,
+        "eval/score": 4004.764313018778
+      },
+      {
+        "_step": 140000,
+        "eval/score": 3534.1873083235305
+      },
+      {
+        "_step": 141000,
+        "eval/score": 1890.4987943455694
+      },
+      {
+        "_step": 142000,
+        "eval/score": 3820.4854578466793
+      },
+      {
+        "_step": 143000,
+        "eval/score": 4430.798880905065
+      },
+      {
+        "_step": 144000,
+        "eval/score": 5049.387531163577
+      },
+      {
+        "_step": 145000,
+        "eval/score": 3708.6915250359584
+      },
+      {
+        "_step": 146000,
+        "eval/score": 4207.477492536866
+      },
+      {
+        "_step": 147000,
+        "eval/score": 3088.3707522911614
+      },
+      {
+        "_step": 148000,
+        "eval/score": 3529.615296190075
+      },
+      {
+        "_step": 149000,
+        "eval/score": 3632.7686637568927
+      },
+      {
+        "_step": 150000,
+        "eval/score": 4652.316691903202
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "a407fc2a-876d-4025-93e0-5190a2db8744",
+    "url": "https://wandb.ai/duck13/E/runs/a407fc2a-876d-4025-93e0-5190a2db8744",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 1,
+    "weighting": "bc",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 12083.112492661005,
+    "eval_std_population": 1318.1857233020073,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 11429.545078182715
+      },
+      {
+        "_step": 132000,
+        "eval/score": 10491.61104735195
+      },
+      {
+        "_step": 133000,
+        "eval/score": 12599.59714793624
+      },
+      {
+        "_step": 134000,
+        "eval/score": 13471.516336822324
+      },
+      {
+        "_step": 135000,
+        "eval/score": 12958.527926193603
+      },
+      {
+        "_step": 136000,
+        "eval/score": 11258.598747960225
+      },
+      {
+        "_step": 137000,
+        "eval/score": 13158.032229876586
+      },
+      {
+        "_step": 138000,
+        "eval/score": 12820.747793430824
+      },
+      {
+        "_step": 139000,
+        "eval/score": 12609.421054313196
+      },
+      {
+        "_step": 140000,
+        "eval/score": 12905.384785717482
+      },
+      {
+        "_step": 141000,
+        "eval/score": 9557.39093055865
+      },
+      {
+        "_step": 142000,
+        "eval/score": 9624.3631118657
+      },
+      {
+        "_step": 143000,
+        "eval/score": 12424.156754356536
+      },
+      {
+        "_step": 144000,
+        "eval/score": 11746.28711877741
+      },
+      {
+        "_step": 145000,
+        "eval/score": 14579.101001538616
+      },
+      {
+        "_step": 146000,
+        "eval/score": 10639.983704775465
+      },
+      {
+        "_step": 147000,
+        "eval/score": 11063.319638625842
+      },
+      {
+        "_step": 148000,
+        "eval/score": 12549.570987972153
+      },
+      {
+        "_step": 149000,
+        "eval/score": 13882.561325911665
+      },
+      {
+        "_step": 150000,
+        "eval/score": 11892.533131052896
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "900ba646-e456-4931-a64f-d18cd072961a",
+    "url": "https://wandb.ai/duck13/E/runs/900ba646-e456-4931-a64f-d18cd072961a",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 2,
+    "weighting": "bc",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 12098.511559154078,
+    "eval_std_population": 1543.7017332304351,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 9585.781158641792
+      },
+      {
+        "_step": 132000,
+        "eval/score": 11153.28865296263
+      },
+      {
+        "_step": 133000,
+        "eval/score": 11518.554211040759
+      },
+      {
+        "_step": 134000,
+        "eval/score": 10992.688738644138
+      },
+      {
+        "_step": 135000,
+        "eval/score": 13850.602271290636
+      },
+      {
+        "_step": 136000,
+        "eval/score": 12165.606879576546
+      },
+      {
+        "_step": 137000,
+        "eval/score": 14055.211269541542
+      },
+      {
+        "_step": 138000,
+        "eval/score": 12241.963490651455
+      },
+      {
+        "_step": 139000,
+        "eval/score": 14060.115440909247
+      },
+      {
+        "_step": 140000,
+        "eval/score": 12217.55611424172
+      },
+      {
+        "_step": 141000,
+        "eval/score": 12224.601611768769
+      },
+      {
+        "_step": 142000,
+        "eval/score": 13287.225219937493
+      },
+      {
+        "_step": 143000,
+        "eval/score": 9050.207916974858
+      },
+      {
+        "_step": 144000,
+        "eval/score": 12777.307571905247
+      },
+      {
+        "_step": 145000,
+        "eval/score": 14651.97009592655
+      },
+      {
+        "_step": 146000,
+        "eval/score": 9487.619430936527
+      },
+      {
+        "_step": 147000,
+        "eval/score": 11066.56880540987
+      },
+      {
+        "_step": 148000,
+        "eval/score": 13144.353315094088
+      },
+      {
+        "_step": 149000,
+        "eval/score": 13056.604525159746
+      },
+      {
+        "_step": 150000,
+        "eval/score": 11382.40446246794
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "eeacd2a6-5685-4300-8b39-7a82d7ba2fc5",
+    "url": "https://wandb.ai/duck13/E/runs/eeacd2a6-5685-4300-8b39-7a82d7ba2fc5",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 3,
+    "weighting": "bc",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 11565.2571873943,
+    "eval_std_population": 1559.3887848956665,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 11518.802871978329
+      },
+      {
+        "_step": 132000,
+        "eval/score": 13423.84012084119
+      },
+      {
+        "_step": 133000,
+        "eval/score": 9427.881951337713
+      },
+      {
+        "_step": 134000,
+        "eval/score": 12403.908369500847
+      },
+      {
+        "_step": 135000,
+        "eval/score": 14446.921752385602
+      },
+      {
+        "_step": 136000,
+        "eval/score": 11374.177672271879
+      },
+      {
+        "_step": 137000,
+        "eval/score": 12740.04479408353
+      },
+      {
+        "_step": 138000,
+        "eval/score": 12777.082660383549
+      },
+      {
+        "_step": 139000,
+        "eval/score": 13340.742995514234
+      },
+      {
+        "_step": 140000,
+        "eval/score": 10678.010975135392
+      },
+      {
+        "_step": 141000,
+        "eval/score": 11585.759250710675
+      },
+      {
+        "_step": 142000,
+        "eval/score": 11373.42589269089
+      },
+      {
+        "_step": 143000,
+        "eval/score": 10209.453676559167
+      },
+      {
+        "_step": 144000,
+        "eval/score": 10965.560302944828
+      },
+      {
+        "_step": 145000,
+        "eval/score": 11917.62090708584
+      },
+      {
+        "_step": 146000,
+        "eval/score": 11905.910351839624
+      },
+      {
+        "_step": 147000,
+        "eval/score": 12570.03236883952
+      },
+      {
+        "_step": 148000,
+        "eval/score": 8623.855309732779
+      },
+      {
+        "_step": 149000,
+        "eval/score": 8035.049739133731
+      },
+      {
+        "_step": 150000,
+        "eval/score": 11987.06178491667
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "6a7923da-d9b4-4659-863a-a6198464dec0",
+    "url": "https://wandb.ai/duck13/E/runs/6a7923da-d9b4-4659-863a-a6198464dec0",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 1,
+    "weighting": "awac",
+    "scale": 2,
+    "eta": 0.04,
+    "K": 20,
+    "temperature": 1,
+    "mean": 7492.05339051715,
+    "eval_std_population": 41.37774299401299,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 7488.189232023275
+      },
+      {
+        "_step": 132000,
+        "eval/score": 7425.460369565715
+      },
+      {
+        "_step": 133000,
+        "eval/score": 7479.751818459505
+      },
+      {
+        "_step": 134000,
+        "eval/score": 7525.8462075328325
+      },
+      {
+        "_step": 135000,
+        "eval/score": 7402.952126846921
+      },
+      {
+        "_step": 136000,
+        "eval/score": 7444.662831705052
+      },
+      {
+        "_step": 137000,
+        "eval/score": 7491.211206362852
+      },
+      {
+        "_step": 138000,
+        "eval/score": 7479.46144398389
+      },
+      {
+        "_step": 139000,
+        "eval/score": 7535.690666823703
+      },
+      {
+        "_step": 140000,
+        "eval/score": 7461.803579440762
+      },
+      {
+        "_step": 141000,
+        "eval/score": 7472.453883728352
+      },
+      {
+        "_step": 142000,
+        "eval/score": 7528.069547947131
+      },
+      {
+        "_step": 143000,
+        "eval/score": 7518.448547353293
+      },
+      {
+        "_step": 144000,
+        "eval/score": 7503.5734203760485
+      },
+      {
+        "_step": 145000,
+        "eval/score": 7444.554291865503
+      },
+      {
+        "_step": 146000,
+        "eval/score": 7497.461088799505
+      },
+      {
+        "_step": 147000,
+        "eval/score": 7550.10700140875
+      },
+      {
+        "_step": 148000,
+        "eval/score": 7565.330684400925
+      },
+      {
+        "_step": 149000,
+        "eval/score": 7534.478903323268
+      },
+      {
+        "_step": 150000,
+        "eval/score": 7491.560958395719
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "b7071f4c-dc5a-405a-b446-b6ce469a4398",
+    "url": "https://wandb.ai/duck13/E/runs/b7071f4c-dc5a-405a-b446-b6ce469a4398",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 2,
+    "weighting": "awac",
+    "scale": 2,
+    "eta": 0.04,
+    "K": 20,
+    "temperature": 1,
+    "mean": 7509.9606587283315,
+    "eval_std_population": 39.58785912924726,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 7525.523529538863
+      },
+      {
+        "_step": 132000,
+        "eval/score": 7474.593203765998
+      },
+      {
+        "_step": 133000,
+        "eval/score": 7546.76106554311
+      },
+      {
+        "_step": 134000,
+        "eval/score": 7501.746992508872
+      },
+      {
+        "_step": 135000,
+        "eval/score": 7481.333622774144
+      },
+      {
+        "_step": 136000,
+        "eval/score": 7464.7585998998375
+      },
+      {
+        "_step": 137000,
+        "eval/score": 7442.558527439175
+      },
+      {
+        "_step": 138000,
+        "eval/score": 7498.441575021061
+      },
+      {
+        "_step": 139000,
+        "eval/score": 7543.802883519437
+      },
+      {
+        "_step": 140000,
+        "eval/score": 7502.270430355666
+      },
+      {
+        "_step": 141000,
+        "eval/score": 7552.844689400756
+      },
+      {
+        "_step": 142000,
+        "eval/score": 7493.485665718717
+      },
+      {
+        "_step": 143000,
+        "eval/score": 7525.986060426039
+      },
+      {
+        "_step": 144000,
+        "eval/score": 7456.970541622521
+      },
+      {
+        "_step": 145000,
+        "eval/score": 7475.597315402882
+      },
+      {
+        "_step": 146000,
+        "eval/score": 7570.419968281919
+      },
+      {
+        "_step": 147000,
+        "eval/score": 7484.88219410952
+      },
+      {
+        "_step": 148000,
+        "eval/score": 7581.695595714904
+      },
+      {
+        "_step": 149000,
+        "eval/score": 7503.468141866275
+      },
+      {
+        "_step": 150000,
+        "eval/score": 7572.07257165693
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "b9af8c45-e2d5-4f05-9e2a-6c17d1259a52",
+    "url": "https://wandb.ai/duck13/E/runs/b9af8c45-e2d5-4f05-9e2a-6c17d1259a52",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 3,
+    "weighting": "awac",
+    "scale": 2,
+    "eta": 0.04,
+    "K": 20,
+    "temperature": 1,
+    "mean": 7470.525660301713,
+    "eval_std_population": 79.67391837903769,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 7545.9369451387365
+      },
+      {
+        "_step": 132000,
+        "eval/score": 7528.204339498732
+      },
+      {
+        "_step": 133000,
+        "eval/score": 7463.46059595033
+      },
+      {
+        "_step": 134000,
+        "eval/score": 7481.736968557942
+      },
+      {
+        "_step": 135000,
+        "eval/score": 7460.640666559625
+      },
+      {
+        "_step": 136000,
+        "eval/score": 7460.44082283566
+      },
+      {
+        "_step": 137000,
+        "eval/score": 7444.599009028845
+      },
+      {
+        "_step": 138000,
+        "eval/score": 7355.031888669124
+      },
+      {
+        "_step": 139000,
+        "eval/score": 7549.9122854593825
+      },
+      {
+        "_step": 140000,
+        "eval/score": 7378.327407626374
+      },
+      {
+        "_step": 141000,
+        "eval/score": 7520.201477207387
+      },
+      {
+        "_step": 142000,
+        "eval/score": 7530.924212437933
+      },
+      {
+        "_step": 143000,
+        "eval/score": 7482.2364086962825
+      },
+      {
+        "_step": 144000,
+        "eval/score": 7515.774414739461
+      },
+      {
+        "_step": 145000,
+        "eval/score": 7549.69819320107
+      },
+      {
+        "_step": 146000,
+        "eval/score": 7207.833653658333
+      },
+      {
+        "_step": 147000,
+        "eval/score": 7491.004669737924
+      },
+      {
+        "_step": 148000,
+        "eval/score": 7518.467165764397
+      },
+      {
+        "_step": 149000,
+        "eval/score": 7428.757437869643
+      },
+      {
+        "_step": 150000,
+        "eval/score": 7497.324643397075
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "7ac2b6a0-24dd-4f57-8690-2deb887df40a",
+    "url": "https://wandb.ai/duck13/E/runs/7ac2b6a0-24dd-4f57-8690-2deb887df40a",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 1,
+    "weighting": "bc",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 7085.71258776485,
+    "eval_std_population": 53.923332109729515,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 7112.42135788161
+      },
+      {
+        "_step": 132000,
+        "eval/score": 7129.086942793385
+      },
+      {
+        "_step": 133000,
+        "eval/score": 6997.965584478128
+      },
+      {
+        "_step": 134000,
+        "eval/score": 7038.801615274422
+      },
+      {
+        "_step": 135000,
+        "eval/score": 7041.605570106415
+      },
+      {
+        "_step": 136000,
+        "eval/score": 7128.2427483745605
+      },
+      {
+        "_step": 137000,
+        "eval/score": 7065.009650766131
+      },
+      {
+        "_step": 138000,
+        "eval/score": 7122.4049319261585
+      },
+      {
+        "_step": 139000,
+        "eval/score": 7066.3796662038585
+      },
+      {
+        "_step": 140000,
+        "eval/score": 6950.236626100513
+      },
+      {
+        "_step": 141000,
+        "eval/score": 7041.471766725265
+      },
+      {
+        "_step": 142000,
+        "eval/score": 7106.265013768427
+      },
+      {
+        "_step": 143000,
+        "eval/score": 7108.411555024841
+      },
+      {
+        "_step": 144000,
+        "eval/score": 7121.230884731415
+      },
+      {
+        "_step": 145000,
+        "eval/score": 7119.18284120287
+      },
+      {
+        "_step": 146000,
+        "eval/score": 7085.660867379423
+      },
+      {
+        "_step": 147000,
+        "eval/score": 7168.305983750661
+      },
+      {
+        "_step": 148000,
+        "eval/score": 7111.127860873379
+      },
+      {
+        "_step": 149000,
+        "eval/score": 7164.398471714989
+      },
+      {
+        "_step": 150000,
+        "eval/score": 7036.041816220534
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "2d5d1899-cdf1-47ea-8884-551f23c5da29",
+    "url": "https://wandb.ai/duck13/E/runs/2d5d1899-cdf1-47ea-8884-551f23c5da29",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 2,
+    "weighting": "bc",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 7103.138960350826,
+    "eval_std_population": 54.45152344704791,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 7101.548720786843
+      },
+      {
+        "_step": 132000,
+        "eval/score": 7121.6866597807775
+      },
+      {
+        "_step": 133000,
+        "eval/score": 7019.114002301465
+      },
+      {
+        "_step": 134000,
+        "eval/score": 7203.603348852113
+      },
+      {
+        "_step": 135000,
+        "eval/score": 7001.041010008293
+      },
+      {
+        "_step": 136000,
+        "eval/score": 7107.134372598966
+      },
+      {
+        "_step": 137000,
+        "eval/score": 7154.006492226887
+      },
+      {
+        "_step": 138000,
+        "eval/score": 7139.192809439786
+      },
+      {
+        "_step": 139000,
+        "eval/score": 7191.051272615632
+      },
+      {
+        "_step": 140000,
+        "eval/score": 7117.754435309549
+      },
+      {
+        "_step": 141000,
+        "eval/score": 7171.413785745603
+      },
+      {
+        "_step": 142000,
+        "eval/score": 7060.204263609072
+      },
+      {
+        "_step": 143000,
+        "eval/score": 7025.330608976574
+      },
+      {
+        "_step": 144000,
+        "eval/score": 7083.752811490029
+      },
+      {
+        "_step": 145000,
+        "eval/score": 7064.945253451833
+      },
+      {
+        "_step": 146000,
+        "eval/score": 7092.664369204778
+      },
+      {
+        "_step": 147000,
+        "eval/score": 7129.193306977077
+      },
+      {
+        "_step": 148000,
+        "eval/score": 7138.1570214379635
+      },
+      {
+        "_step": 149000,
+        "eval/score": 7092.741272939119
+      },
+      {
+        "_step": 150000,
+        "eval/score": 7048.243389264162
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "41f814e9-4ff9-47d5-970c-99bcda5020fe",
+    "url": "https://wandb.ai/duck13/E/runs/41f814e9-4ff9-47d5-970c-99bcda5020fe",
+    "group": "exp3_minari",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 3,
+    "weighting": "bc",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 7100.783597611899,
+    "eval_std_population": 37.26152058564678,
+    "first_step": 131000,
+    "last_step": 150000,
+    "last20": [
+      {
+        "_step": 131000,
+        "eval/score": 7064.495391253891
+      },
+      {
+        "_step": 132000,
+        "eval/score": 7091.195571708829
+      },
+      {
+        "_step": 133000,
+        "eval/score": 7045.546711435338
+      },
+      {
+        "_step": 134000,
+        "eval/score": 7094.814840170795
+      },
+      {
+        "_step": 135000,
+        "eval/score": 7070.499843082644
+      },
+      {
+        "_step": 136000,
+        "eval/score": 7165.155274091568
+      },
+      {
+        "_step": 137000,
+        "eval/score": 7078.1187083441055
+      },
+      {
+        "_step": 138000,
+        "eval/score": 7144.54593478776
+      },
+      {
+        "_step": 139000,
+        "eval/score": 7094.076893361834
+      },
+      {
+        "_step": 140000,
+        "eval/score": 7076.1423002325955
+      },
+      {
+        "_step": 141000,
+        "eval/score": 7059.272710735396
+      },
+      {
+        "_step": 142000,
+        "eval/score": 7134.331048748127
+      },
+      {
+        "_step": 143000,
+        "eval/score": 7198.975665249061
+      },
+      {
+        "_step": 144000,
+        "eval/score": 7107.09917864996
+      },
+      {
+        "_step": 145000,
+        "eval/score": 7106.949163092055
+      },
+      {
+        "_step": 146000,
+        "eval/score": 7124.597687277807
+      },
+      {
+        "_step": 147000,
+        "eval/score": 7109.972316217119
+      },
+      {
+        "_step": 148000,
+        "eval/score": 7071.41438188163
+      },
+      {
+        "_step": 149000,
+        "eval/score": 7069.459913781803
+      },
+      {
+        "_step": 150000,
+        "eval/score": 7109.008418135653
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "d5f2e77a-c14b-4655-a628-89f94dd22d9f",
+    "url": "https://wandb.ai/duck13/E/runs/d5f2e77a-c14b-4655-a628-89f94dd22d9f",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 1,
+    "weighting": "awac",
+    "scale": 4,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 2198.4060841679557,
+    "eval_std_population": 552.423542507599,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 2190.48491158145
+      },
+      {
+        "_step": 102000,
+        "eval/score": 1329.402742248602
+      },
+      {
+        "_step": 103000,
+        "eval/score": 2366.82034322986
+      },
+      {
+        "_step": 104000,
+        "eval/score": 2008.8725899927824
+      },
+      {
+        "_step": 105000,
+        "eval/score": 1962.8141569474674
+      },
+      {
+        "_step": 106000,
+        "eval/score": 2300.3437202889754
+      },
+      {
+        "_step": 107000,
+        "eval/score": 2250.2695416472043
+      },
+      {
+        "_step": 108000,
+        "eval/score": 1341.7986038123272
+      },
+      {
+        "_step": 109000,
+        "eval/score": 1429.7012653901124
+      },
+      {
+        "_step": 110000,
+        "eval/score": 2280.943525288117
+      },
+      {
+        "_step": 111000,
+        "eval/score": 2507.987276029017
+      },
+      {
+        "_step": 112000,
+        "eval/score": 3032.494767912042
+      },
+      {
+        "_step": 113000,
+        "eval/score": 2653.1289481562485
+      },
+      {
+        "_step": 114000,
+        "eval/score": 2295.4263153366983
+      },
+      {
+        "_step": 115000,
+        "eval/score": 2408.092136453316
+      },
+      {
+        "_step": 116000,
+        "eval/score": 1282.447405658279
+      },
+      {
+        "_step": 117000,
+        "eval/score": 2807.5198094619427
+      },
+      {
+        "_step": 118000,
+        "eval/score": 3311.281324089613
+      },
+      {
+        "_step": 119000,
+        "eval/score": 2531.860709719888
+      },
+      {
+        "_step": 120000,
+        "eval/score": 1676.4315901151735
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "a370fc07-d449-490f-86f1-f3393d9f28da",
+    "url": "https://wandb.ai/duck13/E/runs/a370fc07-d449-490f-86f1-f3393d9f28da",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 2,
+    "weighting": "awac",
+    "scale": 4,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 1860.2975303173364,
+    "eval_std_population": 902.6532421908269,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 1768.1604837253574
+      },
+      {
+        "_step": 102000,
+        "eval/score": 2767.0909866594593
+      },
+      {
+        "_step": 103000,
+        "eval/score": 110.93958689825544
+      },
+      {
+        "_step": 104000,
+        "eval/score": 1477.6701969068365
+      },
+      {
+        "_step": 105000,
+        "eval/score": 2341.5977930701256
+      },
+      {
+        "_step": 106000,
+        "eval/score": 2296.6716106330305
+      },
+      {
+        "_step": 107000,
+        "eval/score": 3135.313314472228
+      },
+      {
+        "_step": 108000,
+        "eval/score": 2772.41254545345
+      },
+      {
+        "_step": 109000,
+        "eval/score": 2452.796146048646
+      },
+      {
+        "_step": 110000,
+        "eval/score": 1548.2198868403216
+      },
+      {
+        "_step": 111000,
+        "eval/score": 2546.639791888296
+      },
+      {
+        "_step": 112000,
+        "eval/score": 894.1693934483778
+      },
+      {
+        "_step": 113000,
+        "eval/score": 827.3113747829914
+      },
+      {
+        "_step": 114000,
+        "eval/score": 2625.8746281496756
+      },
+      {
+        "_step": 115000,
+        "eval/score": 727.7777874216813
+      },
+      {
+        "_step": 116000,
+        "eval/score": 2743.5917733347633
+      },
+      {
+        "_step": 117000,
+        "eval/score": 2511.742227204865
+      },
+      {
+        "_step": 118000,
+        "eval/score": 2398.6213687670406
+      },
+      {
+        "_step": 119000,
+        "eval/score": 447.17296740835707
+      },
+      {
+        "_step": 120000,
+        "eval/score": 812.1767432329721
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "9faed1da-c481-4a50-b105-099822f9ca0e",
+    "url": "https://wandb.ai/duck13/E/runs/9faed1da-c481-4a50-b105-099822f9ca0e",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 3,
+    "weighting": "awac",
+    "scale": 4,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 1849.1703301242412,
+    "eval_std_population": 842.4913077051887,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 2185.493592780955
+      },
+      {
+        "_step": 102000,
+        "eval/score": 1528.7880172560226
+      },
+      {
+        "_step": 103000,
+        "eval/score": 1636.6730185838835
+      },
+      {
+        "_step": 104000,
+        "eval/score": 1932.9619120638852
+      },
+      {
+        "_step": 105000,
+        "eval/score": 2175.3302853523887
+      },
+      {
+        "_step": 106000,
+        "eval/score": 2187.928907129769
+      },
+      {
+        "_step": 107000,
+        "eval/score": 2746.9763944812125
+      },
+      {
+        "_step": 108000,
+        "eval/score": 2045.7612488284944
+      },
+      {
+        "_step": 109000,
+        "eval/score": 2248.961090777859
+      },
+      {
+        "_step": 110000,
+        "eval/score": 2019.726468585987
+      },
+      {
+        "_step": 111000,
+        "eval/score": 271.6637957449802
+      },
+      {
+        "_step": 112000,
+        "eval/score": 428.42578820778664
+      },
+      {
+        "_step": 113000,
+        "eval/score": 2796.9501890518345
+      },
+      {
+        "_step": 114000,
+        "eval/score": 1399.3540124889435
+      },
+      {
+        "_step": 115000,
+        "eval/score": 2909.1343420366006
+      },
+      {
+        "_step": 116000,
+        "eval/score": 225.5320107726199
+      },
+      {
+        "_step": 117000,
+        "eval/score": 1134.9400868557532
+      },
+      {
+        "_step": 118000,
+        "eval/score": 2891.907096506345
+      },
+      {
+        "_step": 119000,
+        "eval/score": 2995.542762510565
+      },
+      {
+        "_step": 120000,
+        "eval/score": 1221.3555824689388
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "f3db1382-ded6-4df0-83f0-dbba11045fd6",
+    "url": "https://wandb.ai/duck13/E/runs/f3db1382-ded6-4df0-83f0-dbba11045fd6",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 1,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 1702.7619462636826,
+    "eval_std_population": 1248.2757445081218,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 4275.808408758844
+      },
+      {
+        "_step": 102000,
+        "eval/score": -112.5341668599672
+      },
+      {
+        "_step": 103000,
+        "eval/score": -74.58638687420722
+      },
+      {
+        "_step": 104000,
+        "eval/score": 686.0282964869008
+      },
+      {
+        "_step": 105000,
+        "eval/score": 3445.9017026470415
+      },
+      {
+        "_step": 106000,
+        "eval/score": 528.8856518795159
+      },
+      {
+        "_step": 107000,
+        "eval/score": 2002.7903130835873
+      },
+      {
+        "_step": 108000,
+        "eval/score": 1112.296676126219
+      },
+      {
+        "_step": 109000,
+        "eval/score": 822.8994758472465
+      },
+      {
+        "_step": 110000,
+        "eval/score": 1142.6104519887256
+      },
+      {
+        "_step": 111000,
+        "eval/score": 833.4648250315098
+      },
+      {
+        "_step": 112000,
+        "eval/score": 1120.2884441391777
+      },
+      {
+        "_step": 113000,
+        "eval/score": 2135.565264142593
+      },
+      {
+        "_step": 114000,
+        "eval/score": 2364.03028469086
+      },
+      {
+        "_step": 115000,
+        "eval/score": 2046.347466356282
+      },
+      {
+        "_step": 116000,
+        "eval/score": 2310.6859163101917
+      },
+      {
+        "_step": 117000,
+        "eval/score": 4045.4425148554333
+      },
+      {
+        "_step": 118000,
+        "eval/score": 3085.8093887509403
+      },
+      {
+        "_step": 119000,
+        "eval/score": 1803.016975753023
+      },
+      {
+        "_step": 120000,
+        "eval/score": 480.4874221597368
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "a79206cc-fead-4b93-887c-80aced6cf716",
+    "url": "https://wandb.ai/duck13/E/runs/a79206cc-fead-4b93-887c-80aced6cf716",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 2,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 1538.9433001988782,
+    "eval_std_population": 1030.66849608057,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 1433.6895058053417
+      },
+      {
+        "_step": 102000,
+        "eval/score": 1423.449680079424
+      },
+      {
+        "_step": 103000,
+        "eval/score": 1037.8610529469731
+      },
+      {
+        "_step": 104000,
+        "eval/score": 398.03082205811126
+      },
+      {
+        "_step": 105000,
+        "eval/score": 59.30003692789342
+      },
+      {
+        "_step": 106000,
+        "eval/score": 4230.219119372701
+      },
+      {
+        "_step": 107000,
+        "eval/score": 704.2972094181649
+      },
+      {
+        "_step": 108000,
+        "eval/score": 560.7029875933741
+      },
+      {
+        "_step": 109000,
+        "eval/score": 947.6991333989332
+      },
+      {
+        "_step": 110000,
+        "eval/score": 1909.629799595867
+      },
+      {
+        "_step": 111000,
+        "eval/score": 1506.639151104606
+      },
+      {
+        "_step": 112000,
+        "eval/score": 736.6052138969512
+      },
+      {
+        "_step": 113000,
+        "eval/score": 3381.231088765283
+      },
+      {
+        "_step": 114000,
+        "eval/score": 2524.8519341092147
+      },
+      {
+        "_step": 115000,
+        "eval/score": 739.0298312572227
+      },
+      {
+        "_step": 116000,
+        "eval/score": 2942.551415753991
+      },
+      {
+        "_step": 117000,
+        "eval/score": 2094.6490040946933
+      },
+      {
+        "_step": 118000,
+        "eval/score": 1165.0198117801885
+      },
+      {
+        "_step": 119000,
+        "eval/score": 1387.7933960579487
+      },
+      {
+        "_step": 120000,
+        "eval/score": 1595.6158099606828
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "b938ff36-4771-40c8-b016-c98d10cce2dc",
+    "url": "https://wandb.ai/duck13/E/runs/b938ff36-4771-40c8-b016-c98d10cce2dc",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/medium-v0",
+    "seed": 3,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 597.9787793902032,
+    "eval_std_population": 873.3140365747146,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 204.79444335963734
+      },
+      {
+        "_step": 102000,
+        "eval/score": -145.09757711769623
+      },
+      {
+        "_step": 103000,
+        "eval/score": 215.95632602650966
+      },
+      {
+        "_step": 104000,
+        "eval/score": -317.7227039159725
+      },
+      {
+        "_step": 105000,
+        "eval/score": 24.67501764562941
+      },
+      {
+        "_step": 106000,
+        "eval/score": 370.2778292821455
+      },
+      {
+        "_step": 107000,
+        "eval/score": 3062.678456213628
+      },
+      {
+        "_step": 108000,
+        "eval/score": 1031.1340861583415
+      },
+      {
+        "_step": 109000,
+        "eval/score": 557.5014950274256
+      },
+      {
+        "_step": 110000,
+        "eval/score": 572.118182703327
+      },
+      {
+        "_step": 111000,
+        "eval/score": -267.37349416108816
+      },
+      {
+        "_step": 112000,
+        "eval/score": 789.488694759016
+      },
+      {
+        "_step": 113000,
+        "eval/score": 102.10729177353723
+      },
+      {
+        "_step": 114000,
+        "eval/score": 2632.911388366849
+      },
+      {
+        "_step": 115000,
+        "eval/score": 383.9040874675318
+      },
+      {
+        "_step": 116000,
+        "eval/score": 172.47613666049446
+      },
+      {
+        "_step": 117000,
+        "eval/score": -388.79994252738595
+      },
+      {
+        "_step": 118000,
+        "eval/score": 832.4590547053093
+      },
+      {
+        "_step": 119000,
+        "eval/score": 1231.310242321279
+      },
+      {
+        "_step": 120000,
+        "eval/score": 894.7765730555446
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "47853967-9fb9-4edb-88c9-7101382040ce",
+    "url": "https://wandb.ai/duck13/E/runs/47853967-9fb9-4edb-88c9-7101382040ce",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 1,
+    "weighting": "awac",
+    "scale": 2,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 317.41438542818935,
+    "eval_std_population": 162.89738281068887,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 423.2212671535883
+      },
+      {
+        "_step": 102000,
+        "eval/score": 499.9906684025852
+      },
+      {
+        "_step": 103000,
+        "eval/score": 391.5670888091369
+      },
+      {
+        "_step": 104000,
+        "eval/score": 318.1044962447465
+      },
+      {
+        "_step": 105000,
+        "eval/score": 372.3843232060763
+      },
+      {
+        "_step": 106000,
+        "eval/score": 354.5480194986256
+      },
+      {
+        "_step": 107000,
+        "eval/score": 382.3605626817694
+      },
+      {
+        "_step": 108000,
+        "eval/score": 476.20642563451213
+      },
+      {
+        "_step": 109000,
+        "eval/score": 34.90627615180465
+      },
+      {
+        "_step": 110000,
+        "eval/score": 333.6876466920786
+      },
+      {
+        "_step": 111000,
+        "eval/score": -145.5273620635233
+      },
+      {
+        "_step": 112000,
+        "eval/score": 286.20100376386193
+      },
+      {
+        "_step": 113000,
+        "eval/score": 478.6690238761001
+      },
+      {
+        "_step": 114000,
+        "eval/score": 382.1057165292927
+      },
+      {
+        "_step": 115000,
+        "eval/score": 349.41943720782945
+      },
+      {
+        "_step": 116000,
+        "eval/score": 10.92935541846732
+      },
+      {
+        "_step": 117000,
+        "eval/score": 342.86948042285513
+      },
+      {
+        "_step": 118000,
+        "eval/score": 248.3358440739403
+      },
+      {
+        "_step": 119000,
+        "eval/score": 458.3368611929852
+      },
+      {
+        "_step": 120000,
+        "eval/score": 349.9715736670547
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "a6c0e56f-0b58-45b6-a7a9-bb38b82c39cf",
+    "url": "https://wandb.ai/duck13/E/runs/a6c0e56f-0b58-45b6-a7a9-bb38b82c39cf",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 2,
+    "weighting": "awac",
+    "scale": 2,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 326.4470895416352,
+    "eval_std_population": 159.6695433511648,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 361.47149660814324
+      },
+      {
+        "_step": 102000,
+        "eval/score": -196.9415800231406
+      },
+      {
+        "_step": 103000,
+        "eval/score": 362.8486341585221
+      },
+      {
+        "_step": 104000,
+        "eval/score": 393.16973144134863
+      },
+      {
+        "_step": 105000,
+        "eval/score": 507.12191951533646
+      },
+      {
+        "_step": 106000,
+        "eval/score": 429.069635752704
+      },
+      {
+        "_step": 107000,
+        "eval/score": 333.0712676895812
+      },
+      {
+        "_step": 108000,
+        "eval/score": 237.52835124828323
+      },
+      {
+        "_step": 109000,
+        "eval/score": 194.08915406029416
+      },
+      {
+        "_step": 110000,
+        "eval/score": 422.59344519779626
+      },
+      {
+        "_step": 111000,
+        "eval/score": 384.09598558926797
+      },
+      {
+        "_step": 112000,
+        "eval/score": 203.65490230343835
+      },
+      {
+        "_step": 113000,
+        "eval/score": 306.05232079544953
+      },
+      {
+        "_step": 114000,
+        "eval/score": 378.15444018514705
+      },
+      {
+        "_step": 115000,
+        "eval/score": 419.1373949059748
+      },
+      {
+        "_step": 116000,
+        "eval/score": 203.92098688475642
+      },
+      {
+        "_step": 117000,
+        "eval/score": 330.3896928843653
+      },
+      {
+        "_step": 118000,
+        "eval/score": 511.7055858809407
+      },
+      {
+        "_step": 119000,
+        "eval/score": 557.1039105307752
+      },
+      {
+        "_step": 120000,
+        "eval/score": 190.70451522371965
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "3c37920e-5ac7-460c-8f63-d5cc2c06611f",
+    "url": "https://wandb.ai/duck13/E/runs/3c37920e-5ac7-460c-8f63-d5cc2c06611f",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 3,
+    "weighting": "awac",
+    "scale": 2,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 244.323959854374,
+    "eval_std_population": 149.6814557919468,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 249.34454024502114
+      },
+      {
+        "_step": 102000,
+        "eval/score": 399.8045342690094
+      },
+      {
+        "_step": 103000,
+        "eval/score": 281.16367849020645
+      },
+      {
+        "_step": 104000,
+        "eval/score": 261.1500742356847
+      },
+      {
+        "_step": 105000,
+        "eval/score": 307.89741215644085
+      },
+      {
+        "_step": 106000,
+        "eval/score": 183.07584061156146
+      },
+      {
+        "_step": 107000,
+        "eval/score": 190.5974940997058
+      },
+      {
+        "_step": 108000,
+        "eval/score": 480.3707120556604
+      },
+      {
+        "_step": 109000,
+        "eval/score": 291.2542082466813
+      },
+      {
+        "_step": 110000,
+        "eval/score": 167.2671840003506
+      },
+      {
+        "_step": 111000,
+        "eval/score": 277.2297932799604
+      },
+      {
+        "_step": 112000,
+        "eval/score": 137.5131666838165
+      },
+      {
+        "_step": 113000,
+        "eval/score": 284.91447561924923
+      },
+      {
+        "_step": 114000,
+        "eval/score": -207.47408907159183
+      },
+      {
+        "_step": 115000,
+        "eval/score": 190.7950225749135
+      },
+      {
+        "_step": 116000,
+        "eval/score": 149.34709182088946
+      },
+      {
+        "_step": 117000,
+        "eval/score": 260.2709324902919
+      },
+      {
+        "_step": 118000,
+        "eval/score": 580.4947720941179
+      },
+      {
+        "_step": 119000,
+        "eval/score": 184.90064789681105
+      },
+      {
+        "_step": 120000,
+        "eval/score": 216.5617052886999
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "2525213a-34aa-4293-8675-3eef21dce31f",
+    "url": "https://wandb.ai/duck13/E/runs/2525213a-34aa-4293-8675-3eef21dce31f",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 1,
+    "weighting": "awac",
+    "scale": 4,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 3248.8164841841162,
+    "eval_std_population": 150.4325127858341,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 3228.742961986558
+      },
+      {
+        "_step": 102000,
+        "eval/score": 3447.6626513691667
+      },
+      {
+        "_step": 103000,
+        "eval/score": 3076.0230773487424
+      },
+      {
+        "_step": 104000,
+        "eval/score": 3361.2629706456396
+      },
+      {
+        "_step": 105000,
+        "eval/score": 3402.1680612640484
+      },
+      {
+        "_step": 106000,
+        "eval/score": 3084.4846236140324
+      },
+      {
+        "_step": 107000,
+        "eval/score": 3018.163342196829
+      },
+      {
+        "_step": 108000,
+        "eval/score": 3343.8035166414493
+      },
+      {
+        "_step": 109000,
+        "eval/score": 3340.035034347491
+      },
+      {
+        "_step": 110000,
+        "eval/score": 3055.904410250298
+      },
+      {
+        "_step": 111000,
+        "eval/score": 3231.982238209978
+      },
+      {
+        "_step": 112000,
+        "eval/score": 3320.186070350434
+      },
+      {
+        "_step": 113000,
+        "eval/score": 3296.7408415235136
+      },
+      {
+        "_step": 114000,
+        "eval/score": 3048.4987514671507
+      },
+      {
+        "_step": 115000,
+        "eval/score": 3600.932079720054
+      },
+      {
+        "_step": 116000,
+        "eval/score": 3160.1771545802017
+      },
+      {
+        "_step": 117000,
+        "eval/score": 3140.154543727014
+      },
+      {
+        "_step": 118000,
+        "eval/score": 3311.6703835084295
+      },
+      {
+        "_step": 119000,
+        "eval/score": 3344.4802570444135
+      },
+      {
+        "_step": 120000,
+        "eval/score": 3163.2567138868835
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "c7217210-06de-4690-a132-2a8eb2625711",
+    "url": "https://wandb.ai/duck13/E/runs/c7217210-06de-4690-a132-2a8eb2625711",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 2,
+    "weighting": "awac",
+    "scale": 4,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 3226.5758240099276,
+    "eval_std_population": 453.6294417773068,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 3103.535364169194
+      },
+      {
+        "_step": 102000,
+        "eval/score": 3190.705154248232
+      },
+      {
+        "_step": 103000,
+        "eval/score": 3252.7741847106777
+      },
+      {
+        "_step": 104000,
+        "eval/score": 3477.975338613431
+      },
+      {
+        "_step": 105000,
+        "eval/score": 3164.2941532680907
+      },
+      {
+        "_step": 106000,
+        "eval/score": 3008.4017939457026
+      },
+      {
+        "_step": 107000,
+        "eval/score": 3344.6860641645767
+      },
+      {
+        "_step": 108000,
+        "eval/score": 3332.340736765423
+      },
+      {
+        "_step": 109000,
+        "eval/score": 3189.171796506024
+      },
+      {
+        "_step": 110000,
+        "eval/score": 3541.631384020269
+      },
+      {
+        "_step": 111000,
+        "eval/score": 2997.196350622478
+      },
+      {
+        "_step": 112000,
+        "eval/score": 3628.481215643231
+      },
+      {
+        "_step": 113000,
+        "eval/score": 3353.1136107054235
+      },
+      {
+        "_step": 114000,
+        "eval/score": 3632.6197156805997
+      },
+      {
+        "_step": 115000,
+        "eval/score": 3064.2961027420715
+      },
+      {
+        "_step": 116000,
+        "eval/score": 3567.411424033437
+      },
+      {
+        "_step": 117000,
+        "eval/score": 3274.9778879594655
+      },
+      {
+        "_step": 118000,
+        "eval/score": 3456.305634499038
+      },
+      {
+        "_step": 119000,
+        "eval/score": 1441.8684046235746
+      },
+      {
+        "_step": 120000,
+        "eval/score": 3509.7301632776157
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "bf8484bc-02ab-497c-8a84-fe8f56107c3a",
+    "url": "https://wandb.ai/duck13/E/runs/bf8484bc-02ab-497c-8a84-fe8f56107c3a",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 3,
+    "weighting": "awac",
+    "scale": 4,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 3330.1456565171407,
+    "eval_std_population": 124.17900325293337,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 3218.55612231473
+      },
+      {
+        "_step": 102000,
+        "eval/score": 3322.2613545585887
+      },
+      {
+        "_step": 103000,
+        "eval/score": 3159.600453471799
+      },
+      {
+        "_step": 104000,
+        "eval/score": 3411.9867868938163
+      },
+      {
+        "_step": 105000,
+        "eval/score": 3371.9728763016865
+      },
+      {
+        "_step": 106000,
+        "eval/score": 3295.210283195922
+      },
+      {
+        "_step": 107000,
+        "eval/score": 3745.186230827495
+      },
+      {
+        "_step": 108000,
+        "eval/score": 3249.140526435304
+      },
+      {
+        "_step": 109000,
+        "eval/score": 3225.2973222653422
+      },
+      {
+        "_step": 110000,
+        "eval/score": 3463.185024911411
+      },
+      {
+        "_step": 111000,
+        "eval/score": 3321.1482923027916
+      },
+      {
+        "_step": 112000,
+        "eval/score": 3390.26088864943
+      },
+      {
+        "_step": 113000,
+        "eval/score": 3284.026727430276
+      },
+      {
+        "_step": 114000,
+        "eval/score": 3177.824161587794
+      },
+      {
+        "_step": 115000,
+        "eval/score": 3445.8456104105817
+      },
+      {
+        "_step": 116000,
+        "eval/score": 3249.953501077404
+      },
+      {
+        "_step": 117000,
+        "eval/score": 3310.735583620647
+      },
+      {
+        "_step": 118000,
+        "eval/score": 3324.612136680789
+      },
+      {
+        "_step": 119000,
+        "eval/score": 3311.469954088218
+      },
+      {
+        "_step": 120000,
+        "eval/score": 3324.639293318785
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "ab098f7f-944c-449b-b6ca-8d038b0fdbfa",
+    "url": "https://wandb.ai/duck13/E/runs/ab098f7f-944c-449b-b6ca-8d038b0fdbfa",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 1,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 7402.682995275722,
+    "eval_std_population": 123.52477305932032,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 7452.00580601145
+      },
+      {
+        "_step": 102000,
+        "eval/score": 7234.914321633284
+      },
+      {
+        "_step": 103000,
+        "eval/score": 7468.317703063168
+      },
+      {
+        "_step": 104000,
+        "eval/score": 7499.950389636103
+      },
+      {
+        "_step": 105000,
+        "eval/score": 7208.795411800439
+      },
+      {
+        "_step": 106000,
+        "eval/score": 7420.4115296896325
+      },
+      {
+        "_step": 107000,
+        "eval/score": 7594.434691838531
+      },
+      {
+        "_step": 108000,
+        "eval/score": 7289.530309854868
+      },
+      {
+        "_step": 109000,
+        "eval/score": 7427.934844512407
+      },
+      {
+        "_step": 110000,
+        "eval/score": 7377.365037995694
+      },
+      {
+        "_step": 111000,
+        "eval/score": 7407.705553878417
+      },
+      {
+        "_step": 112000,
+        "eval/score": 7331.707765646833
+      },
+      {
+        "_step": 113000,
+        "eval/score": 7453.257061960076
+      },
+      {
+        "_step": 114000,
+        "eval/score": 7234.219254004137
+      },
+      {
+        "_step": 115000,
+        "eval/score": 7272.33945324995
+      },
+      {
+        "_step": 116000,
+        "eval/score": 7452.707782628809
+      },
+      {
+        "_step": 117000,
+        "eval/score": 7334.430989005208
+      },
+      {
+        "_step": 118000,
+        "eval/score": 7403.182153912339
+      },
+      {
+        "_step": 119000,
+        "eval/score": 7732.640532352343
+      },
+      {
+        "_step": 120000,
+        "eval/score": 7457.809312840738
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "b7b0c828-3e44-4243-8e88-b3e711f3c4e2",
+    "url": "https://wandb.ai/duck13/E/runs/b7b0c828-3e44-4243-8e88-b3e711f3c4e2",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 2,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 7404.80126949496,
+    "eval_std_population": 100.07128634364034,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 7376.315547642821
+      },
+      {
+        "_step": 102000,
+        "eval/score": 7301.932414704008
+      },
+      {
+        "_step": 103000,
+        "eval/score": 7495.892855552389
+      },
+      {
+        "_step": 104000,
+        "eval/score": 7442.383188466831
+      },
+      {
+        "_step": 105000,
+        "eval/score": 7469.172942394241
+      },
+      {
+        "_step": 106000,
+        "eval/score": 7222.5564516755985
+      },
+      {
+        "_step": 107000,
+        "eval/score": 7455.7169132717945
+      },
+      {
+        "_step": 108000,
+        "eval/score": 7500.2278512765015
+      },
+      {
+        "_step": 109000,
+        "eval/score": 7530.879913531879
+      },
+      {
+        "_step": 110000,
+        "eval/score": 7480.440783044772
+      },
+      {
+        "_step": 111000,
+        "eval/score": 7478.414300960462
+      },
+      {
+        "_step": 112000,
+        "eval/score": 7183.357427259783
+      },
+      {
+        "_step": 113000,
+        "eval/score": 7392.182268580249
+      },
+      {
+        "_step": 114000,
+        "eval/score": 7519.469839104042
+      },
+      {
+        "_step": 115000,
+        "eval/score": 7503.120337616347
+      },
+      {
+        "_step": 116000,
+        "eval/score": 7361.159218534214
+      },
+      {
+        "_step": 117000,
+        "eval/score": 7266.7118050157205
+      },
+      {
+        "_step": 118000,
+        "eval/score": 7393.546035535862
+      },
+      {
+        "_step": 119000,
+        "eval/score": 7305.646456891744
+      },
+      {
+        "_step": 120000,
+        "eval/score": 7416.898838839949
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "cf761d7f-e99d-47ac-82e2-ad91070fdbfa",
+    "url": "https://wandb.ai/duck13/E/runs/cf761d7f-e99d-47ac-82e2-ad91070fdbfa",
+    "group": "scale_minari_simple_medium",
+    "state": "finished",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 3,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 7358.598996275625,
+    "eval_std_population": 111.91626497422213,
+    "first_step": 101000,
+    "last_step": 120000,
+    "last20": [
+      {
+        "_step": 101000,
+        "eval/score": 7541.907757667263
+      },
+      {
+        "_step": 102000,
+        "eval/score": 7567.735460586401
+      },
+      {
+        "_step": 103000,
+        "eval/score": 7266.958159718672
+      },
+      {
+        "_step": 104000,
+        "eval/score": 7272.28110576989
+      },
+      {
+        "_step": 105000,
+        "eval/score": 7466.364234548462
+      },
+      {
+        "_step": 106000,
+        "eval/score": 7284.096158554062
+      },
+      {
+        "_step": 107000,
+        "eval/score": 7376.2103518108
+      },
+      {
+        "_step": 108000,
+        "eval/score": 7192.311238152359
+      },
+      {
+        "_step": 109000,
+        "eval/score": 7293.1604208808885
+      },
+      {
+        "_step": 110000,
+        "eval/score": 7411.119481462479
+      },
+      {
+        "_step": 111000,
+        "eval/score": 7237.560959078635
+      },
+      {
+        "_step": 112000,
+        "eval/score": 7205.847675698718
+      },
+      {
+        "_step": 113000,
+        "eval/score": 7279.1921901153755
+      },
+      {
+        "_step": 114000,
+        "eval/score": 7362.124631328652
+      },
+      {
+        "_step": 115000,
+        "eval/score": 7479.319581467551
+      },
+      {
+        "_step": 116000,
+        "eval/score": 7283.149173065498
+      },
+      {
+        "_step": 117000,
+        "eval/score": 7420.80171850393
+      },
+      {
+        "_step": 118000,
+        "eval/score": 7309.062783336638
+      },
+      {
+        "_step": 119000,
+        "eval/score": 7542.40721985796
+      },
+      {
+        "_step": 120000,
+        "eval/score": 7380.36962390826
+      }
+    ],
+    "metric": "eval/score"
+  },
+  {
+    "run_id": "test_halfcheetah_simple_v0",
+    "url": "https://wandb.ai/duck13/E/runs/test_halfcheetah_simple_v0",
+    "group": "test_halfcheetah_simple_v0",
+    "state": "crashed",
+    "env": "mujoco/halfcheetah/simple-v0",
+    "seed": 42,
+    "weighting": "awac",
+    "scale": 8,
+    "eta": 0.01,
+    "K": 20,
+    "temperature": 1,
+    "mean": 7465.005001976131,
+    "eval_std_population": 116.54206935428452,
+    "first_step": 99000,
+    "last_step": 118000,
+    "last20": [
+      {
+        "_step": 99000,
+        "eval/score": 7459.386430380118
+      },
+      {
+        "_step": 100000,
+        "eval/score": 7587.877981741296
+      },
+      {
+        "_step": 101000,
+        "eval/score": 7452.634142024538
+      },
+      {
+        "_step": 102000,
+        "eval/score": 7473.5910344866015
+      },
+      {
+        "_step": 103000,
+        "eval/score": 7372.0126281049415
+      },
+      {
+        "_step": 104000,
+        "eval/score": 7481.380281801282
+      },
+      {
+        "_step": 105000,
+        "eval/score": 7579.875492917403
+      },
+      {
+        "_step": 106000,
+        "eval/score": 7313.8104492241
+      },
+      {
+        "_step": 107000,
+        "eval/score": 7482.52497241733
+      },
+      {
+        "_step": 108000,
+        "eval/score": 7629.219115616335
+      },
+      {
+        "_step": 109000,
+        "eval/score": 7581.720873243008
+      },
+      {
+        "_step": 110000,
+        "eval/score": 7460.489966750993
+      },
+      {
+        "_step": 111000,
+        "eval/score": 7626.99940472653
+      },
+      {
+        "_step": 112000,
+        "eval/score": 7244.373945220732
+      },
+      {
+        "_step": 113000,
+        "eval/score": 7593.5048918826715
+      },
+      {
+        "_step": 114000,
+        "eval/score": 7433.6877036184715
+      },
+      {
+        "_step": 115000,
+        "eval/score": 7220.233667571037
+      },
+      {
+        "_step": 116000,
+        "eval/score": 7469.551204177661
+      },
+      {
+        "_step": 117000,
+        "eval/score": 7501.518464852595
+      },
+      {
+        "_step": 118000,
+        "eval/score": 7335.707388764974
+      }
+    ],
+    "metric": "eval/score"
+  }
+]

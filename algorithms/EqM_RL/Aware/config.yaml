@@ -28,6 +28,7 @@ temperature: 1.0
 # training flags and evaluation
 normalize_reward: false
 eval_frequency: 1000
+log_frequency: 1000       # train/* and weighting/* go to wandb every this many steps, averaged over them
 n_test_episodes: 10       # eval episodes, run side by side (batched sampler), so 10 cost about as much as 1
 num_actions_inference: 1
 diag_states: 256          # dataset states for the sampler/* logs at each eval (0 = off)

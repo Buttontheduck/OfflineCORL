@@ -7,7 +7,7 @@ Usage (from algorithms/EqM_RL/):
 
 Any Python with PyYAML can start this file (the hawk, eagle or base env). Each training
 run is started with the Python of the conda env its target needs: `aware`, `awac_d4rl`,
-`iql_d4rl` and `fit_actor` (D4RL) run in hawk, `aware_minari` and `awac_minari` run in
+`iql_d4rl`, `fit_actor`, `train_critic` and `finetune_actor` (D4RL) run in hawk, `aware_minari` and `awac_minari` run in
 eagle. The sweep file format is described in sweeps/README.md.
 
 Output: sweep_runs/<sweep name>_<date-time>/ with a copy of the sweep file, plan.txt
@@ -52,6 +52,12 @@ TARGETS = {
     # Actor-only fits on frozen weights, Gaussian or EqM (Aware/fit_actor.py, pyrallis)
     "fit_actor": dict(script=HERE / "Aware" / "fit_actor.py", conda_env="hawk",
                       style="pyrallis", data="d4rl", name_prefix="Fit"),
+    # In-support softmax critics for frozen BC actors (Aware/train_critic.py, pyrallis)
+    "train_critic": dict(script=HERE / "Aware" / "train_critic.py", conda_env="hawk",
+                         style="pyrallis", data="d4rl", name_prefix="Critic"),
+    # QIPO phase 3: Q-weighted fine-tuning of an EqM-BC actor with a frozen critic (Aware/finetune_actor.py)
+    "finetune_actor": dict(script=HERE / "Aware" / "finetune_actor.py", conda_env="hawk",
+                           style="pyrallis", data="d4rl", name_prefix="FT"),
 }
 SWEEP_KEYS = {"target", "parallel", "stagger", "conda_env", "fixed", "grid", "gpu_gate", "untagged"}
 # untagged (optional): grid keys left out of the run tag and name, e.g. [group, buffer_size]

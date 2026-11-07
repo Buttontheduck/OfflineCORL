@@ -16,6 +16,7 @@ need nothing else, so they don't retrain anything. Run them from `algorithms/EqM
 | `interventions.py` | **Experiment 4, priority 1:** evaluation-only action interventions on one D4RL Aware run and the AWAC run of the same seed: executed bounds ±1 / ±0.95 / ±0.9 (Aware and AWAC) and the average of 4 or 16 clipped EqM samples. Per episode: return, flip, speed, raw dims outside the box, executed dims at the bound, action change; and the same quantities over the 50 steps before each flip vs the same steps of episodes without a flip. |
 | `handoff.py` | **Experiment 4, priority 1 (plan 5a):** saves the full MuJoCo state of AWAC and Aware episodes at steps 100 / 300 / 500 and continues every saved state for 200 steps with each policy (2 × 2: state source × continuation). Flips, return and speed per cell, upright and already-flipped states apart; first checks that every restored state replays the source's recorded actions exactly (20 steps, tolerance 1e-6), and stops otherwise. |
 | `summarize_exp4.py` | Markdown tables of Experiment 4, priority 1 and 2: interventions (screening and confirmation), handoff cells, Minari flips, the weight files, and the last-20-eval scores and flip rates of the training sweeps. `run_exp4.sh` runs it at the end. |
+| `maze2d_modes.py` | **Maze2D action diagnostics** (Experiments 8 and 9; 2-D actions). On 256 fixed dataset states × 256 samples, at K = 20 / 30 / 100 / 1000 of one sampler trajectory: ‖f‖ at the samples (convergence), spread, number of modes (clusters, radius 0.05) and the mass of the largest, and recall / precision / energy distance / off-support share against the actions of the 128 nearest dataset states (with the data's own half-vs-half values as reference). The Gaussian AWAC mean action of the same dataset and seed as reference. Rollouts (100 episodes) at K = 20 / 30 / 100: score, executed actions at ±1, action change per step. An SVG per checkpoint with data and samples for 6 states. `summarize_maze2d_modes.py` makes the tables; `run_maze2d_modes.sh` runs all 27 Maze2D runs. |
 | `common.py` | Loads a run (config, dataset, state normalization, EqM field, optionally the critics; Minari or D4RL from the run's `env_name`) and samples with exactly the sampler of `Actor._implicit` (NAG), also with per-row K, η and momentum. Also loads a Gaussian policy (`AwacPolicy`: a CORL AWAC run, or a Gaussian fit of `Aware/fit_actor.py`; critics only if the checkpoint has them) and saves / restores the MuJoCo state of a D4RL env. |
 
 ## Reproducing Experiment 2
@@ -124,3 +125,17 @@ Notes:
 - **Sampler:** only the `nag` sampler (the default) is implemented.
 - **Same critic:** changing K at evaluation keeps the critic and the weights that training
   produced with the training K.
+
+## Maze2D action diagnostics (Experiments 8 and 9; evaluation only)
+
+`EqM_RL.md`, "Experiment 9: results", next step. All 27 Maze2D Aware runs (Experiment 9 at 500k and 1M,
+Experiment 8's T = 4 at its last checkpoint), each with the Gaussian AWAC run of the same dataset and seed:
+
+```bash
+cd algorithms/EqM_RL
+setsid nohup bash run_maze2d_modes.sh > /dev/null 2>&1 < /dev/null &   # 9 jobs at a time (PARALLEL=9)
+# progress: diagnostics/out/maze2d_modes/orchestrator.log; tables: diagnostics/out/maze2d_modes/summary.md
+# one run by hand:
+python diagnostics/maze2d_modes.py <Aware checkpoint folder> <out.json> --awac <AWAC checkpoint folder> \
+    --checkpoints 500000 last --K 20 30 100 1000 --rollout-K 20 30 100
+```
