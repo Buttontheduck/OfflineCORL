@@ -1850,8 +1850,88 @@ References: Experiment 11 best of 16 (critic at test time) 78.8 / 94.6; CORL IQL
 
 **What follows:**
 - **First candidate fix:** no renewal from the actor. Keep the support from the frozen BC (sampled once, or redrawn from the BC), which is exactly what the successful first 40k steps used, and train longer to see whether the peak holds.
-- **Second candidate fix:** generate the support with converged samples (larger K).
-- **Not tested yet.**
+- **Second candidate fix:** generate the support with converged samples (larger K). Tested in Experiment 12b below, with K = 20: it stops the collapse.
+- The first fix is not tested yet.
+
+### Experiment 12b: Experiment 12 with support samples at K = 20 (3 seeds, 2026-11-08)
+> **Status:** finished on 2026-11-08 at 03:20 German time (started 01:21); all 18 runs reached 400k steps, none failed. Full tables: `sweep_runs/exp12b_20261108-002139/summary.md`, with Experiment 12 in the same layout below it.
+
+**Goal:** test the second candidate fix from Experiment 12. Are K = 20 support samples close enough to the field's equilibria that renewing the support from the actor stops pulling it off the data?
+
+| | |
+|---|---|
+| Change | `support_K: 20` instead of 10, nothing else. The support samples (16 per state, at every renewal, including the first from the frozen BC) and the critic's best-of-16 eval now use K = 20 sampler steps. |
+| Same as Experiment 12 | Exp 10 EqM-BC actor and frozen Exp 11 critic of the same seed; weights softmax_j(β Q) over the dataset action and 16 samples; renewal every 40k; 400k steps; Adam 1·10⁻⁴; EMA 0.005 evaluated. |
+| Arms | medium-diverse and umaze (the only datasets with usable Exp 11 critics) × β ∈ {3, 10, 0} × seeds 1–3: 18 runs, each with its Exp 12 twin. |
+| Eval | Unchanged: every 20k, 100 episodes, one sample per step at K = 10 (main) and K = 20; every 100k, the critic's best of 16 (now sampled at K = 20, Exp 12 at K = 10). |
+| Cost | Renewal ≈ 11 s (Exp 12: ≈ 6 s); runs 55–105 min, all 18 at once under `gpu_gate`, about 2 h in total. |
+| wandb | Project E, groups `Exp12b_FT_<dataset>_beta<β>`. Checkpoints (EMA and raw field) every 100k in `Trained_Models/checkpoints/Exp12b_FT_*`. |
+
+**The first support set (renewal 0, from the frozen BC) is narrower and closer to the data:**
+
+| At renewal 0 | K = 20 (12b) | K = 10 (Exp 12) |
+|---|---|---|
+| Sample spread per dimension | 0.20–0.21 | 0.35–0.36 |
+| Distance from the dataset action to the nearest sample (per √dim) | 0.20–0.21 | 0.25–0.26 |
+| Share of sample coordinates beyond ±0.99 | 0.16–0.17 | 0.09 |
+| Critic's best of 16 at step 0, medium-diverse / umaze | 64.7–72.3 / 92.3–95.3 | 76.7–81.7 / 97.7–99.0 |
+
+The BC actor alone at step 0 is the same (K = 10: 0 on medium-diverse, 73–75 on umaze). Only the candidates differ: less varied, so the critic's pick is a little worse.
+
+**Actor alone, one sample per step at K = 10** (success in %, single evals, mean over 3 seeds; Experiment 12 in brackets). 40k is the last eval before the first renewal, 60k the first after it.
+
+| Dataset | β | 40k | 60k | 100k | 200k | 400k | 400k per seed |
+|---|---|---|---|---|---|---|---|
+| medium-diverse | 3 | 24.7 (26.7) | **44.7** (1.7) | **46.7** (0.7) | **38.0** (0.7) | **48.7 ± 10.7** (0.3) | 35 / 50 / 61 |
+| medium-diverse | 10 | 51.3 (53.0) | **52.0** (7.0) | **42.7** (6.7) | **44.7** (4.3) | **42.0 ± 12.4** (5.7) | 47 / 54 / 25 |
+| medium-diverse | 0 | 0.0 (0.0) | 0.0 (0.0) | 0.3 (0.0) | 0.3 (0.0) | 0.0 (0.0) | 0 / 0 / 0 |
+| umaze | 3 | 96.3 (95.7) | 92.7 (93.3) | 91.7 (90.7) | **93.3** (78.7) | **87.3 ± 2.6** (16.7) | 91 / 86 / 85 |
+| umaze | 10 | 95.3 (94.3) | 93.0 (94.0) | 89.7 (91.0) | **89.0** (40.3) | **84.3 ± 3.8** (1.0) | 87 / 79 / 87 |
+| umaze | 0 | 70.3 (71.7) | 71.7 (54.3) | 68.0 (19.7) | **66.3** (0.0) | **72.7 ± 3.4** (0.0) | 76 / 74 / 68 |
+
+At 400k, also: K = 20 one sample, medium-diverse 39.7 / 36.3, umaze 77.7 / 82.0 (β = 3 / 10; Exp 12: 35.7 / 27.3 and 61.7 / 5.7). Critic's best of 16: medium-diverse 46.0 / 39.7, umaze 82.0 / 81.7 (Exp 12: 14.7 / 14.0 and 7.7 / 0.3). Best single K = 10 evals per seed: medium-diverse 42 / 69 / 71 (β = 3) and 47 / 73 / 69 (β = 10); umaze 95–99.
+
+References: Experiment 11 best of 16 (critic at test time) 78.8 / 94.6; CORL IQL 73.8 / 77.0; QIPO-OT (paper, best eval) 86.4 / 93.6 (medium-diverse / umaze).
+
+**The support set at the last renewal (400k)**, seed means (Experiment 12 in brackets):
+
+| | β = 0 | β = 3 | β = 10 |
+|---|---|---|---|
+| Distance from the dataset action to the nearest sample, medium / umaze (first renewal 0.21 / 0.20) | 0.28 (0.45) / 0.27 (0.45) | 0.40 (0.52) / 0.46 (0.56) | 0.49 (0.57) / 0.53 (0.61) |
+| Sample spread per dimension, medium / umaze (first renewal 0.21 / 0.20) | 0.14 (0.43) / 0.12 (0.43) | 0.15 (0.41) / 0.12 (0.39) | 0.16 (0.39) / 0.15 (0.37) |
+| Q at the samples − Q at the dataset action, medium / umaze | −0.02 (0.02) / −0.02 (−0.04) | 0.51 (0.39) / 1.05 (0.85) | 0.61 (0.50) / 1.23 (1.03) |
+| Share of sample coordinates beyond ±0.99 (first renewal 0.16–0.17) | 0.03 | 0.03–0.04 | 0.04–0.05 |
+
+1. **K = 20 support stops the drift.**
+   - The β = 0 control is the clean test. With uniform weights the actor trains on the data and its own samples, with no critic.
+   - At K = 10 (Exp 12), umaze fell from BC level (72 %) to 0 by 200k. At K = 20 it stays at BC level for all 400k steps: 66–73 %.
+   - The samples barely move: their distance to the dataset action goes from 0.20 to 0.27 (K = 10: 0.25 to 0.45). They get narrower instead of wider (spread 0.20 → 0.12; K = 10: 0.35 → 0.43).
+   - So the Exp 12 collapse came from training on unconverged K = 10 samples, not from the renewal itself.
+2. **The critic's gains now last, and on medium-diverse the renewals add to them.**
+   - medium-diverse, actor alone at 400k: 48.7 % (β = 3) and 42.0 % (β = 10). Exp 12: 0.3 and 5.7; BC alone: 0.
+   - At β = 3 the iteration helps, as QIPO intends (π_l ∝ μ · exp(l β Q)): 24.7 % before the first renewal, 45–49 % after it.
+   - At β = 10 the first round already reaches 51–52 %, and later rounds don't add to it (42–45 %).
+   - The seeds vary a lot (β = 3 at 400k: 35 / 50 / 61; β = 10: 47 / 54 / 25).
+   - umaze keeps the first round's gain: 87.3 % (β = 3) and 84.3 % (β = 10) at 400k, against 16.7 and 1.0 in Exp 12. That's above CORL's IQL (77.0) and below QIPO-OT's best eval (93.6).
+3. **A slower drift remains on umaze with the critic.**
+   - umaze K = 10 falls from 96 % at 40k to 87 % at 400k (β = 3), and from 95 to 84 (β = 10).
+   - With β > 0 the samples still move off the data (distance 0.20 → 0.46–0.53) and up the critic (Q 1.05–1.23 above Q at the dataset action, more than Exp 12's 0.85–1.03). They go where the critic was never trained.
+   - β = 0 shows almost no drift, so this remaining drift is the critic pulling, not the sampler.
+4. **The critic's pick no longer helps once the actor has moved.**
+   - At 400k, best of 16 is at or below one sample: medium-diverse 46.0 vs 48.7, umaze 82.0 vs 87.3 (β = 3).
+   - At step 0, the critic added 20–70 points over one BC sample.
+   - The fine-tuned actor's samples are off the data, so the critic's ranking of them is not reliable.
+5. **K = 10 stays the better eval setting.** At 400k, one sample at K = 20 scores below K = 10 on every arm with β > 0 (medium-diverse 39.7 vs 48.7, umaze 77.7 vs 87.3 at β = 3).
+6. **Still well below the references on medium-diverse.** The actor alone reaches 42–49 %, against the Exp 11 critic's best of 16 over BC samples (78.8), CORL IQL (73.8) and QIPO-OT (86.4). On umaze it is at IQL level or above.
+
+**What follows (not tested yet):**
+- The first candidate fix from Experiment 12: keep the support from the frozen BC (no renewal from the actor), now possibly at K = 20. It isolates whether the remaining umaze drift comes from the renewals.
+- Keep the actor near the data where the critic is reliable: a smaller β after the first round, fewer renewals, or a penalty on samples far from the dataset action.
+- Larger K (30) for the support, to see whether the samples move even less.
+
+- **Code:**
+  - Sweep `sweeps/exp12b_antmaze_finetune_K20.yaml`, run by `run_exp12b.sh`.
+  - `diagnostics/summarize_exp12.py` has new `--prefix` and `--title` options. `--prefix Exp12b_FT` summarizes these runs; the default (`Exp12_FT`) gives Experiment 12's summary as before.
 
 ## Later phases
 - **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.

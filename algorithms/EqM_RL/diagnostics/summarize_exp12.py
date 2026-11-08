@@ -11,6 +11,7 @@ wandb-metadata.json. Success rates in %; means over seeds (± population std).
 Windows: mean of the evals in the --window steps up to each step in --steps.
 
     python diagnostics/summarize_exp12.py > summary.md
+    python diagnostics/summarize_exp12.py --prefix Exp12b_FT --title "Experiment 12b: ... support_K = 20" > summary.md
 """
 
 import argparse
@@ -33,6 +34,9 @@ ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDe
 ap.add_argument("--steps", default="100000,200000,400000", help="score windows end here")
 ap.add_argument("--window", type=int, default=60000)
 ap.add_argument("--seeds", default="1,2,3")
+ap.add_argument("--prefix", default="Exp12_FT", help="wandb group prefix: Exp12_FT (Exp 12), Exp12b_FT (support_K = 20)")
+ap.add_argument("--title", default="Experiment 12: QIPO phase 3, EqM-BC fine-tuned with the frozen Experiment 11 "
+                                   "critics (3 seeds)")
 args = ap.parse_args()
 steps = [int(s) for s in args.steps.split(",")]
 seeds = [int(s) for s in args.seeds.split(",")]
@@ -80,13 +84,13 @@ runs = {}
 for d in sorted(glob.glob(f"{ROOT}/run-*")):   # sorted by date-time, so the newest wins
     a = run_args(d)
     g = a.get("group", "")
-    if g.startswith("Exp12_FT_") and a.get("seed", "").isdigit():
+    if g.startswith(f"{args.prefix}_") and a.get("seed", "").isdigit():
         runs[(g, int(a["seed"]))] = d
 data = {k: read(d) for k, d in runs.items()}
 
 
 def series(ds, beta, s, key):
-    return data.get((f"Exp12_FT_{ds}_beta{beta}", s), {}).get(key, np.zeros((0, 2)))
+    return data.get((f"{args.prefix}_{ds}_beta{beta}", s), {}).get(key, np.zeros((0, 2)))
 
 
 def window(e, lo, hi):
@@ -111,7 +115,7 @@ def ms(v, fmt="{:.1f}"):
 
 
 short = lambda d: d.replace("antmaze-", "").replace("-v2", "")  # noqa: E731
-print("# Experiment 12: QIPO phase 3, EqM-BC fine-tuned with the frozen Experiment 11 critics (3 seeds)\n")
+print(f"# {args.title}\n")
 print("Last eval step per run: " + "; ".join(
     f"{short(d)} β={b}: " + "/".join(f"{int(e[-1, 0]) // 1000}k" if len(e := series(d, b, s, MAIN)) else "–"
                                        for s in seeds) for d in DATASETS for b in BETAS) + "\n")

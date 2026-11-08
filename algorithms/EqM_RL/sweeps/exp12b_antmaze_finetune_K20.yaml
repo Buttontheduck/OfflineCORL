@@ -1,0 +1,53 @@
+# Experiment 12b: Experiment 12 (sweeps/exp12_antmaze_finetune.yaml) with the support samples drawn at K = 20
+# sampler steps instead of 10. Everything else is the same: the Exp 10 EqM-BC actor (checkpoint_500000.pt) is
+# fine-tuned with the frozen Exp 11 critic of the same seed (critic_1000000.pt) by Aware/finetune_actor.py,
+# weights softmax_j(beta * Q) over the dataset action and 16 samples of the current actor, support renewed every
+# 40k steps, 400k steps, Adam 1e-4, EMA 0.005 (evaluated).
+# Question: in Exp 12, each renewal from the actor's own K = 10 samples (not at the field's equilibria) widened
+# the policy and pulled it off the data, and K = 10 success collapsed after the first renewal (also at beta = 0).
+# Are K = 20 samples close enough to the equilibria that the renewals stop drifting?
+# Same two datasets (the only ones with usable Exp 11 critics), beta 3 / 10 / 0, seeds 1-3: 18 runs, so every run
+# has its Exp 12 twin. The first support set now also comes from the BC at K = 20 (narrower candidates).
+# Eval every 20k: 100 episodes, one sample per step at K = 10 (main) and K = 20; every 100k the critic's best of
+# 16, which now samples at K = 20 (support_K), unlike Exp 12 (K = 10).
+# wandb: project E, groups Exp12b_FT_<dataset>_beta<beta>. Started by run_exp12b.sh (the summary follows).
+#   python run_sweep.py sweeps/exp12b_antmaze_finetune_K20.yaml
+target: finetune_actor
+parallel: 18
+gpu_gate: {util_max: 97, min_free_mb: 3000, settle_s: 60, window_s: 30}
+untagged: [group]
+
+fixed:
+  name: Exp12b_FT
+  critic_prefix: Exp11_Critic
+  critic_checkpoint: critic_1000000.pt
+  support_num: 16
+  support_K: 20             # the only change from Experiment 12 (10)
+  renew_every: 40000
+  num_train_ops: 400001     # the extra 1 makes the last eval (and checkpoint) happen at step 400,000
+  learning_rate: 0.0001
+  eval_frequency: 20000
+  eval_K: "10,20"
+  eval_best_every: 100000
+  n_test_episodes: 100
+  checkpoint_every: 100000
+
+grid:
+  - {group: Exp12b_FT_antmaze-medium-diverse-v2_beta3, env_name: antmaze-medium-diverse-v2, beta: 3, seed: 1}
+  - {group: Exp12b_FT_antmaze-umaze-v2_beta3, env_name: antmaze-umaze-v2, beta: 3, seed: 1}
+  - {group: Exp12b_FT_antmaze-medium-diverse-v2_beta10, env_name: antmaze-medium-diverse-v2, beta: 10, seed: 1}
+  - {group: Exp12b_FT_antmaze-umaze-v2_beta10, env_name: antmaze-umaze-v2, beta: 10, seed: 1}
+  - {group: Exp12b_FT_antmaze-medium-diverse-v2_beta0, env_name: antmaze-medium-diverse-v2, beta: 0, seed: 1}
+  - {group: Exp12b_FT_antmaze-umaze-v2_beta0, env_name: antmaze-umaze-v2, beta: 0, seed: 1}
+  - {group: Exp12b_FT_antmaze-medium-diverse-v2_beta3, env_name: antmaze-medium-diverse-v2, beta: 3, seed: 2}
+  - {group: Exp12b_FT_antmaze-umaze-v2_beta3, env_name: antmaze-umaze-v2, beta: 3, seed: 2}
+  - {group: Exp12b_FT_antmaze-medium-diverse-v2_beta10, env_name: antmaze-medium-diverse-v2, beta: 10, seed: 2}
+  - {group: Exp12b_FT_antmaze-umaze-v2_beta10, env_name: antmaze-umaze-v2, beta: 10, seed: 2}
+  - {group: Exp12b_FT_antmaze-medium-diverse-v2_beta0, env_name: antmaze-medium-diverse-v2, beta: 0, seed: 2}
+  - {group: Exp12b_FT_antmaze-umaze-v2_beta0, env_name: antmaze-umaze-v2, beta: 0, seed: 2}
+  - {group: Exp12b_FT_antmaze-medium-diverse-v2_beta3, env_name: antmaze-medium-diverse-v2, beta: 3, seed: 3}
+  - {group: Exp12b_FT_antmaze-umaze-v2_beta3, env_name: antmaze-umaze-v2, beta: 3, seed: 3}
+  - {group: Exp12b_FT_antmaze-medium-diverse-v2_beta10, env_name: antmaze-medium-diverse-v2, beta: 10, seed: 3}
+  - {group: Exp12b_FT_antmaze-umaze-v2_beta10, env_name: antmaze-umaze-v2, beta: 10, seed: 3}
+  - {group: Exp12b_FT_antmaze-medium-diverse-v2_beta0, env_name: antmaze-medium-diverse-v2, beta: 0, seed: 3}
+  - {group: Exp12b_FT_antmaze-umaze-v2_beta0, env_name: antmaze-umaze-v2, beta: 0, seed: 3}
