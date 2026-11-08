@@ -1,14 +1,18 @@
 """D4RL data for the frozen-weights scripts (make_weights.py, fit_actor.py): the transitions in
 exactly the order of d4rl.qlearning_dataset (as Aware/main.py and CORL's iql.py load them), the
-same state normalization, and the episode of every transition, which qlearning_dataset drops."""
+same state normalization, and the episode of every transition, which qlearning_dataset drops.
 
-import d4rl  # noqa: F401  (registers the D4RL envs with gym)
-import gym
+d4rl and gym are imported inside load_d4rl, so data_filter also works in an env without them (the
+`ogbench` conda env, for fit_actor.py on OGBench data via ogbench_data.py)."""
+
 import numpy as np
 
 
 def load_d4rl(env_name: str):
     """-> env, dataset (qlearning_dataset), state mean, state std, episode id per transition."""
+    import d4rl  # noqa: F401  (registers the D4RL envs with gym)
+    import gym
+
     env = gym.make(env_name)
     data = d4rl.qlearning_dataset(env)
     obs = data["observations"]

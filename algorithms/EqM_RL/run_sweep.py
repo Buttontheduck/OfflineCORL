@@ -8,7 +8,7 @@ Usage (from algorithms/EqM_RL/):
 Any Python with PyYAML can start this file (the hawk, eagle or base env). Each training
 run is started with the Python of the conda env its target needs: `aware`, `awac_d4rl`,
 `iql_d4rl`, `fit_actor`, `train_critic` and `finetune_actor` (D4RL) run in hawk, `aware_minari` and `awac_minari` run in
-eagle. The sweep file format is described in sweeps/README.md.
+eagle, and `fit_actor_ogbench` (OGBench single-task data) runs in ogbench. The sweep file format is described in sweeps/README.md.
 
 Output: sweep_runs/<sweep name>_<date-time>/ with a copy of the sweep file, plan.txt
 (every command), runs.csv (status of every run) and one folder per run with its log.
@@ -52,6 +52,10 @@ TARGETS = {
     # Actor-only fits on frozen weights, Gaussian or EqM (Aware/fit_actor.py, pyrallis)
     "fit_actor": dict(script=HERE / "Aware" / "fit_actor.py", conda_env="hawk",
                       style="pyrallis", data="d4rl", name_prefix="Fit"),
+    # Actor-only fits on OGBench single-task data (same script, ogbench conda env; env_name like
+    # antmaze-large-navigate-singletask-v0; datasets in /workspace/ogbench_data)
+    "fit_actor_ogbench": dict(script=HERE / "Aware" / "fit_actor.py", conda_env="ogbench",
+                              style="pyrallis", data="ogbench", name_prefix="Fit"),
     # In-support softmax critics for frozen BC actors (Aware/train_critic.py, pyrallis)
     "train_critic": dict(script=HERE / "Aware" / "train_critic.py", conda_env="hawk",
                          style="pyrallis", data="d4rl", name_prefix="Critic"),
@@ -218,6 +222,9 @@ def prefetch_datasets(python: str, target: dict, env: dict, names: list) -> None
     try to download the same file at the same time."""
     if target["data"] == "d4rl":
         code = "import sys, gym, d4rl\ngym.make(sys.argv[1]).get_dataset()"
+    elif target["data"] == "ogbench":
+        code = ("import sys, ogbench_data\n"
+                "ogbench_data.load_ogbench(sys.argv[1])")      # downloads into ogbench_data.OGBENCH_DATA
     else:
         code = ("import sys, minari\n"
                 "if sys.argv[1] not in minari.list_local_datasets():\n"
