@@ -51,6 +51,7 @@ class Otter(nn.Module):
         iql_tau: float = 0.7,
         value: nn.Module = None,
         value_optimizer: torch.optim.Optimizer = None,
+        mc_samples: int = 0,
         **kwargs
 
     ):
@@ -101,8 +102,17 @@ class Otter(nn.Module):
         self._value = value
         self._value_optimizer = value_optimizer
 
+        # mc_samples > 0: the actor's weights come from _offline_weights_MC, where V(s) is the mean of
+        # min(Q1, Q2) over mc_samples actor samples per state. 0: _offline_weights with num_actions
+        # samples (as before). Only for the 'awac' critic: the 'iql' critic learns V(s) as a network.
+        if mc_samples < 0:
+            raise ValueError(f"mc_samples must be >= 0, got {mc_samples}")
+        if mc_samples > 0 and critic != "awac":
+            raise ValueError(f"mc_samples needs critic 'awac' (the 'iql' critic has its own V network), got {critic!r}")
+        self.mc_samples = mc_samples
 
-        
+
+
 
     def _expand_dims(self,low_dim_vector,reference):
         vector_matched_dim = expand_t_like_x(low_dim_vector,reference)
@@ -201,7 +211,10 @@ class Otter(nn.Module):
         pred_grad = self._model(noisy_action,states)
         
         if weights is None:
-            weights = self._offline_weights(states=states, actions= actions, num_actions=self.num_actions)
+            if self.mc_samples > 0:
+                weights = self._offline_weights_MC(states=states, actions=actions, num_samples=self.mc_samples)
+            else:
+                weights = self._offline_weights(states=states, actions= actions, num_actions=self.num_actions)
             if self.weighting == "bc":
                 weights = torch.ones_like(weights)
         # else: fixed weights (B, 1) given by the caller, e.g. Aware/fit_actor.py with frozen weights;
@@ -250,23 +263,64 @@ class Otter(nn.Module):
                 
 
                 weights = torch.clamp_max(input=torch.exp(adv/self._temperature), max=self._exp_adv_max)
-                # GPU tensors, no .item(): each .item() makes the CPU wait for the GPU. The logger
-                # turns them into numbers once per log_frequency steps (logger.py, dump).
-                gl.log("weighting/q_mean",            q.mean())
-                gl.log("weighting/v_mean",            v.mean())
-                gl.log("weighting/adv_mean",          adv.mean())
-                gl.log("weighting/adv_std",           adv.std(unbiased=False))
-                gl.log("weighting/weights_mean",      weights.mean())
-                gl.log("weighting/weights_max",       weights.max())
-                gl.log("weighting/weights_min",       weights.min())
-                gl.log("weighting/weights_var",       weights.var(unbiased=False))
-                gl.log("weighting/weights_median",    weights.median())
-                gl.log("weighting/weights_clip_frac", (weights >= self._exp_adv_max).float().mean())
-                
-                
-                
+                self._log_weighting(q, v, adv, weights)
+
             return weights
-    
+
+    def _offline_weights_MC(self, states, actions, num_samples):
+        """AWAC weights w = min(exp(A / T), exp_adv_max) with A = min(Q1, Q2)(s, a) - V(s), where V(s) is a
+        Monte Carlo estimate over num_samples actor samples per state:
+            V(s) = (1 / num_samples) * sum_k min(Q1, Q2)(s, a_k),   a_k ~ actor(s), k = 1 .. num_samples.
+        num_samples is the number of actions drawn per state, not the sampler's step count (actor.num_step).
+
+        Why more samples: with one sample, V(s) is noisy. The weight exp(-V / T) is convex in V, so this noise
+        makes the weights larger on average than with the exact V (Jensen's inequality). The noise variance,
+        and with it this upward bias, shrinks about as 1 / num_samples.
+
+        Shapes: states (B, S), actions (B, A) -> weights (B, 1). The actor draws all B * num_samples samples in
+        one batched sampler call, so the compiled sampler (compile: true) records one CUDA graph for this size.
+
+        Extra logs (besides the ones of _offline_weights):
+          weighting/v_sample_std           spread of min Q over a state's samples, averaged over the batch.
+                                           The noise of V(s) is this divided by sqrt(num_samples).
+          weighting/weights_mean_1sample   mean weight if V(s) came from the first sample only, as with
+                                           num_actions = 1. Its gap to weighting/weights_mean is the bias that
+                                           the extra samples remove.
+        """
+        with torch.no_grad():
+            pi_actions = self._actor(states, num_actions=num_samples)      # (N, B, A), clipped to the action box
+            N, B, A = pi_actions.shape
+            flat_states = states.unsqueeze(0).expand(N, B, states.shape[-1]).reshape(N * B, -1)
+            flat_pi_actions = pi_actions.reshape(N * B, A)
+            q_pi = torch.min(self._critic_1(flat_states, flat_pi_actions),
+                             self._critic_2(flat_states, flat_pi_actions)).reshape(N, B, 1)
+            v = q_pi.mean(dim=0)                                             # (B, 1)
+
+            q = torch.min(self._critic_1(states, actions), self._critic_2(states, actions))   # (B, 1)
+            adv = q - v
+            weights = torch.clamp_max(torch.exp(adv / self._temperature), self._exp_adv_max)
+
+            self._log_weighting(q, v, adv, weights)
+            if N > 1:
+                weights_1 = torch.clamp_max(torch.exp((q - q_pi[0]) / self._temperature), self._exp_adv_max)
+                gl.log("weighting/v_sample_std",         q_pi.std(dim=0, unbiased=True).mean())
+                gl.log("weighting/weights_mean_1sample", weights_1.mean())
+        return weights
+
+    def _log_weighting(self, q, v, adv, weights):
+        # GPU tensors, no .item(): each .item() makes the CPU wait for the GPU. The logger
+        # turns them into numbers once per log_frequency steps (logger.py, dump).
+        gl.log("weighting/q_mean",            q.mean())
+        gl.log("weighting/v_mean",            v.mean())
+        gl.log("weighting/adv_mean",          adv.mean())
+        gl.log("weighting/adv_std",           adv.std(unbiased=False))
+        gl.log("weighting/weights_mean",      weights.mean())
+        gl.log("weighting/weights_max",       weights.max())
+        gl.log("weighting/weights_min",       weights.min())
+        gl.log("weighting/weights_var",       weights.var(unbiased=False))
+        gl.log("weighting/weights_median",    weights.median())
+        gl.log("weighting/weights_clip_frac", (weights >= self._exp_adv_max).float().mean())
+
 
     def _critic_loss(self, states, actions, rewards, dones, next_states):
         with torch.no_grad():

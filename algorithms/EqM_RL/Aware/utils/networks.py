@@ -6,27 +6,33 @@ import math
 
 
 class MLP(Module):
-    def __init__(self, input_dim, output_dim,hidden_dim,num_hidden_layers):
+    def __init__(self, input_dim, output_dim,hidden_dim,num_hidden_layers, layer_norm=False):
+        """layer_norm: a LayerNorm after every hidden Linear, before the Mish (as FQL's critics). Off by
+        default; then the layers and the state-dict keys are the same as before the option existed."""
         super().__init__()
 
         assert num_hidden_layers >= 1, "For MLP, num_hidden_layers must be at least 1. This class does not support 0 hidden layers."
-        
+
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.hidden_dim = hidden_dim
         self.num_hidden_layers = num_hidden_layers
-        
+
         layers = []
-        
+
         first_layer = lin(self.input_dim,self.hidden_dim)
         layers.append(first_layer)
+        if layer_norm:
+            layers.append(nn.LayerNorm(self.hidden_dim))
         layers.append(nn.Mish())
-        
+
         for _ in range(0,self.num_hidden_layers-1):
             body = lin(self.hidden_dim,self.hidden_dim)
             layers.append(body)
+            if layer_norm:
+                layers.append(nn.LayerNorm(self.hidden_dim))
             layers.append(nn.Mish())
-        
+
         head = lin(self.hidden_dim,self.output_dim)
         layers.append(head)
         self.model = nn.Sequential(*layers)

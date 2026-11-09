@@ -72,7 +72,8 @@ class Policy:
             from critic_models import DeterministicCritic
             for key in ("critic_1", "critic_2"):
                 c = DeterministicCritic(self.state_dim, self.action_dim, self.cfg["hidden_dim"],
-                                        self.cfg["num_hidden_layers"]).to(device)
+                                        self.cfg["num_hidden_layers"],
+                                        self.cfg.get("critic_layer_norm", False)).to(device)
                 c.load_state_dict(state[key])
                 c.eval()
                 self.critics.append(c)

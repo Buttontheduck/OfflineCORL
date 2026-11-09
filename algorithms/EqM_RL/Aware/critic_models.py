@@ -55,7 +55,7 @@ class ValueNetwork(Module):
 
 
 class DeterministicCritic(Module):
-    def __init__(self,state_dim, action_dim, hidden_dim, num_hidden_layers):
+    def __init__(self,state_dim, action_dim, hidden_dim, num_hidden_layers, layer_norm=False):
         super().__init__()
 
         self.state_dim         = state_dim 
@@ -70,7 +70,8 @@ class DeterministicCritic(Module):
             input_dim         = self.input_dim, 
             output_dim        = self.output_dim, 
             hidden_dim        = self.hidden_dim,
-            num_hidden_layers = self.num_hidden_layers
+            num_hidden_layers = self.num_hidden_layers,
+            layer_norm        = layer_norm
             )
 
     def forward(self,state: torch.tensor , action: torch.tensor) -> torch.Tensor:

@@ -16,6 +16,7 @@ num_train_ops: 120001   # 120k updates; the extra 1 makes the last eval happen a
 # Network Architecture Hyperparameters
 hidden_dim: 256
 num_hidden_layers: 4
+critic_layer_norm: false    # true = LayerNorm after every hidden Linear of both Q networks (as FQL's critics)
 buffer_size: 2_000_000
 batch_size: 256
 
@@ -58,6 +59,7 @@ agent:
   weighting: 'awac'   # 'awac' = exp(A/T) weights; 'bc' = all weights 1 (behavior cloning ablation)
   critic: 'awac'      # 'awac' = Q on the actor's next action, V(s) from the actor's sample (Aware); 'iql' = IQL's in-sample critic (V by expectile regression, Q target r + gamma V(s'))
   iql_tau: 0.7        # IQL expectile for V(s); only used with critic: 'iql' (CORL: 0.7 locomotion, 0.9 AntMaze)
+  mc_samples: 0       # > 0: weights from Otter._offline_weights_MC, V(s) = mean of min Q over this many actor samples per state (critic 'awac' only); 0: Otter._offline_weights with num_actions samples
 
 
 actor: 

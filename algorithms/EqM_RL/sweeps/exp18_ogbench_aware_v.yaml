@@ -1,0 +1,35 @@
+# Experiment 18: Aware (EqM actor + its own AWAC twin critic) on humanoidmaze-medium task1, as Experiment 13's
+# AWAC arm (sweeps/exp13_ogbench_aware.yaml), with four changes:
+#   agent.mc_samples 16      V(s) = mean of min(Q1, Q2) over 16 actor samples per state (Otter._offline_weights_MC);
+#                            Experiment 13 used 1 sample (agent.num_actions 1)
+#   gamma 0.999              FFM's shared setting for HumanoidMaze (Experiment 13: 0.995, FQL's)
+#   hidden_dim 512           actor field and both critics 4 x 512 (FFM's width for 1M-transition datasets; Exp 13: 256)
+#   critic_layer_norm true   LayerNorm after every hidden Linear of both Q networks (FQL's and FFM's critics)
+# Unchanged from Experiment 13: T = 1/3 (FQL's FAWAC alpha = 3), the sampler (K = 20, NAG), min(Q1, Q2), no target
+# clipping, 1M steps, eval every 100k with 50 episodes of task1, score = mean of the evals at 800k, 900k and 1M.
+# Experiment 13's AWAC critic on humanoidmaze diverged below Q = -200 by 200k and was stopped there.
+# FQL default-task references (BC / IQL / FAWAC / FQL / IFQL): 1 / 32 / 6 / 19 / 69.
+#   python run_sweep.py sweeps/exp18_ogbench_aware_v.yaml   (started by run_exp18.sh)
+target: aware_ogbench
+parallel: 3
+gpu_gate: {util_max: 97, min_free_mb: 3000, settle_s: 90, window_s: 30}
+untagged: [group]
+
+fixed:
+  name: Exp18_Aware
+  compile: true
+  num_train_ops: 1000001    # the extra 1 makes the last eval (and checkpoint) happen at step 1,000,000
+  eval_frequency: 100000
+  n_test_episodes: 50
+  eval_tasks: own
+  gamma: 0.999
+  temperature: 0.3333333333
+  hidden_dim: 512
+  critic_layer_norm: true
+  agent.critic: awac
+  agent.mc_samples: 16
+
+grid:
+  - {group: Exp18_aware_humanoidmaze-medium, env_name: humanoidmaze-medium-navigate-singletask-v0, seed: 1}
+  - {group: Exp18_aware_humanoidmaze-medium, env_name: humanoidmaze-medium-navigate-singletask-v0, seed: 2}
+  - {group: Exp18_aware_humanoidmaze-medium, env_name: humanoidmaze-medium-navigate-singletask-v0, seed: 3}

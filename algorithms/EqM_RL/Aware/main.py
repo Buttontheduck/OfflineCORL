@@ -187,7 +187,8 @@ def train(cfg: DictConfig):
         "state_dim" :        state_dim,
         "action_dim":        action_dim,
         "hidden_dim":        cfg.hidden_dim,
-        "num_hidden_layers": cfg.num_hidden_layers
+        "num_hidden_layers": cfg.num_hidden_layers,
+        "layer_norm":        cfg.get("critic_layer_norm", False),
     }
 
     model = ConditionalMLP(**model_kwargs)
