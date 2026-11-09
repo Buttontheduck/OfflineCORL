@@ -1,0 +1,26 @@
+# Experiment 17: Gaussian BC on humanoidmaze-medium, the comparison actor for the two-group check
+# (EqM_RL.md, "OGBench check" and "AntMaze check"). Same settings as the Experiment 14 EqM-BC runs
+# (sweeps/exp14_ogbench_bc.yaml), only the actor differs: a Gaussian of the same depth and width (4 x 256)
+# with a state-independent std (as CORL's AWAC actor and Experiment 10's Gaussian BC), trained by maximum
+# likelihood with every weight 1, evaluated with its mean. 500k steps, 50 episodes of the default task
+# (task1) every 50k, checkpoints every 100k (checkpoint_500000.pt is what the two-group check loads). 3 runs.
+#   python run_sweep.py sweeps/exp17_ogbench_gauss_bc.yaml   (started by run_exp17.sh)
+target: fit_actor_ogbench
+parallel: 3
+gpu_gate: {util_max: 97, min_free_mb: 3000, settle_s: 30, window_s: 30}
+untagged: [group]
+
+fixed:
+  name: Exp17_BC
+  weights: ones
+  data_filter: all
+  num_train_ops: 500001     # the extra 1 makes the last eval (and checkpoint) happen at step 500,000
+  eval_frequency: 50000
+  n_test_episodes: 50       # per task (OGBench's protocol)
+  eval_tasks: own
+  checkpoint_every: 100000
+
+grid:
+  - {group: Exp17_GaussBC_humanoidmaze-medium, env_name: humanoidmaze-medium-navigate-singletask-v0, actor: gaussian, seed: 1}
+  - {group: Exp17_GaussBC_humanoidmaze-medium, env_name: humanoidmaze-medium-navigate-singletask-v0, actor: gaussian, seed: 2}
+  - {group: Exp17_GaussBC_humanoidmaze-medium, env_name: humanoidmaze-medium-navigate-singletask-v0, actor: gaussian, seed: 3}

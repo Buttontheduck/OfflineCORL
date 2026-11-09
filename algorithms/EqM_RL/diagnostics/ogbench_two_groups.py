@@ -70,7 +70,16 @@ def args():
     p.add_argument("--seeds", default="1,2,3")
     p.add_argument("--kinds", default=None, help="eqm,gaussian (default: eqm on OGBench, both on D4RL)")
     p.add_argument("--bc_prefix", default=None, help="default: Exp14_BC on OGBench, Exp10_BC on D4RL")
+    p.add_argument("--gauss_prefix", default=None, help="run-name prefix of the Gaussian actors (default: bc_prefix;"
+                   " humanoidmaze: Exp17_BC)")
     p.add_argument("--checkpoint", default="checkpoint_500000.pt")
+    p.add_argument("--eqm_runs", default=None, help="run-folder pattern of the EqM actors, with {env} and {seed}"
+                   " (default: <bc_prefix>_env_name{env}_actoreqm_seed{seed}-{env}-*); e.g. Exp3's Aware runs:"
+                   " Aware_env_name{env}_seed{seed}-{env}-*")
+    p.add_argument("--gauss_runs", default=None, help="the same for the Gaussian actors; e.g. CORL's AWAC runs:"
+                   " AWAC_env_name{env}_seed{seed}-{env}-*")
+    p.add_argument("--eqm_checkpoint", default=None, help="default: --checkpoint")
+    p.add_argument("--gauss_checkpoint", default=None, help="default: --checkpoint")
     p.add_argument("--n_states", type=int, default=256)
     p.add_argument("--n_samples", type=int, default=256)
     p.add_argument("--n_nn", type=int, default=128)
@@ -82,16 +91,25 @@ def args():
     ogb = ogbench_data.is_ogbench(a.env)
     a.kinds = a.kinds or ("eqm" if ogb else "eqm,gaussian")
     a.bc_prefix = a.bc_prefix or ("Exp14_BC" if ogb else "Exp10_BC")
+    a.gauss_prefix = a.gauss_prefix or a.bc_prefix
+    a.eqm_runs = a.eqm_runs or a.bc_prefix + "_env_name{env}_actoreqm_seed{seed}-{env}-*"
+    a.gauss_runs = a.gauss_runs or a.gauss_prefix + "_env_name{env}_actorgaussian_seed{seed}-{env}-*"
+    a.eqm_checkpoint = a.eqm_checkpoint or a.checkpoint
+    a.gauss_checkpoint = a.gauss_checkpoint or a.checkpoint
     return a
 
 
 def find_actor(a, kind, seed):
-    pat = os.path.join(CKPT_ROOT, f"{a.bc_prefix}_env_name{a.env}_actor{kind}_seed{seed}-{a.env}-*")
-    dirs = [d for d in sorted(glob.glob(pat)) if os.path.exists(os.path.join(d, a.checkpoint))]
-    assert len(dirs) == 1, f"expected one run with {a.checkpoint} for {pat}, found {dirs}"
+    """-> (run folder, config, checkpoint file name). fit_actor.py runs name the actor kind in config.yaml; Aware
+    (main.py) runs are EqM and CORL awac.py runs are Gaussian without saying so."""
+    pattern, ckpt = (a.gauss_runs, a.gauss_checkpoint) if kind == "gaussian" else (a.eqm_runs, a.eqm_checkpoint)
+    pat = os.path.join(CKPT_ROOT, pattern.format(env=a.env, seed=seed))
+    dirs = [d for d in sorted(glob.glob(pat)) if os.path.exists(os.path.join(d, ckpt))]
+    assert len(dirs) == 1, f"expected one run with {ckpt} for {pat}, found {dirs}"
     cfg = yaml.safe_load(open(os.path.join(dirs[0], "config.yaml")))
-    assert cfg["env_name"] == a.env and cfg["seed"] == seed and cfg["actor"]["kind"] == kind, dirs[0]
-    return dirs[0], cfg
+    saved_kind = (cfg.get("actor") or {}).get("kind")
+    assert cfg["env_name"] == a.env and cfg["seed"] == seed and saved_kind in (None, kind), dirs[0]
+    return dirs[0], cfg, ckpt
 
 
 @torch.no_grad()
@@ -194,15 +212,15 @@ def measure(Xc, half_b, groups_vis, groups_plain, rng, low, high):
 
 @torch.no_grad()
 def run_eqm(a, seed, s, half_b, groups_vis, groups_plain, subs, low, high, dev, out):
-    run, cfg = find_actor(a, "eqm", seed)
+    run, cfg, ckpt = find_actor(a, "eqm", seed)
     n, m, action_dim = len(s), a.n_samples, half_b.shape[-1]
     model = ConditionalMLP(s.shape[1] + action_dim, action_dim, cfg["hidden_dim"], cfg["num_hidden_layers"]).to(dev)
-    model.load_state_dict(torch.load(os.path.join(run, a.checkpoint), map_location=dev)["model"])
+    model.load_state_dict(torch.load(os.path.join(run, ckpt), map_location=dev)["model"])
     model.eval().requires_grad_(False)
     act = cfg["actor"]
     assert act["opt_type"] == "nag", act
     eta, mu = float(act["step_size"]), float(act["moment"])
-    print(f"eqm seed {seed}: {run}/{a.checkpoint} (trained K = {act['num_step']}, eta {eta}, momentum {mu})", flush=True)
+    print(f"eqm seed {seed}: {run}/{ckpt} (trained K = {act['num_step']}, eta {eta}, momentum {mu})", flush=True)
     st = s.repeat_interleave(m, 0)
     torch.manual_seed(0)                                          # the same starting noise for every actor
     x = torch.randn(n * m, action_dim, device=dev)
@@ -232,17 +250,18 @@ def run_eqm(a, seed, s, half_b, groups_vis, groups_plain, subs, low, high, dev, 
 
 @torch.no_grad()
 def run_gaussian(a, seed, s, half_b, groups_vis, groups_plain, low, high, dev, out):
-    run, cfg = find_actor(a, "gaussian", seed)
+    run, cfg, ckpt = find_actor(a, "gaussian", seed)
+    lo_std, hi_std = cfg.get("min_log_std", -20.0), cfg.get("max_log_std", 2.0)   # CORL awac.py's defaults
     n, m, action_dim = len(s), a.n_samples, half_b.shape[-1]
-    model = GaussianActor(s.shape[1], action_dim, cfg["hidden_dim"], cfg["num_hidden_layers"],
-                          cfg["min_log_std"], cfg["max_log_std"]).to(dev)
-    model.load_state_dict(torch.load(os.path.join(run, a.checkpoint), map_location=dev)["actor"])
+    model = GaussianActor(s.shape[1], action_dim, cfg["hidden_dim"], cfg.get("num_hidden_layers", 3),  # awac.py: 3
+                          lo_std, hi_std).to(dev)
+    model.load_state_dict(torch.load(os.path.join(run, ckpt), map_location=dev)["actor"])
     model.eval().requires_grad_(False)
-    std = model._log_std.clamp(cfg["min_log_std"], cfg["max_log_std"]).exp()
+    std = model._log_std.clamp(lo_std, hi_std).exp()
     mean_a = model._mlp(s)                                         # (n, d): the action it executes (clipped)
     torch.manual_seed(0)
     X = mean_a[:, None] + std * torch.randn(n, m, action_dim, device=dev)
-    print(f"gaussian seed {seed}: {run}/{a.checkpoint} (std per action number {np.round(std.tolist(), 3).tolist()})",
+    print(f"gaussian seed {seed}: {run}/{ckpt} (std per action number {np.round(std.tolist(), 3).tolist()})",
           flush=True)
     rng = np.random.default_rng(seed)
     res = dict(kind="gaussian", seed=seed, run=run, std=std.tolist(),
@@ -281,7 +300,14 @@ def counts(vals):
 
 def summary(a, info, R):
     n_g = info["_n_two_group"]
-    L = [f"# Two-group check: `{a.env}` ({a.bc_prefix} actors, seeds {a.seeds})", "",
+    kinds = a.kinds.split(",")
+    if a.eqm_runs.startswith(a.bc_prefix + "_") and a.gauss_runs.startswith(a.gauss_prefix + "_"):
+        runs = a.bc_prefix if a.gauss_prefix == a.bc_prefix else f"EqM: {a.bc_prefix}, Gaussian: {a.gauss_prefix}"
+    else:
+        runs = ", ".join(f"{k}: `{r}` ({c})" for k, r, c in [("EqM", a.eqm_runs, a.eqm_checkpoint),
+                                                               ("Gaussian", a.gauss_runs, a.gauss_checkpoint)]
+                         if ("eqm" if k == "EqM" else "gaussian") in kinds)
+    L = [f"# Two-group check: `{a.env}` ({runs} actors, seeds {a.seeds})", "",
          "Evaluation only. Script and word definitions: `diagnostics/ogbench_two_groups.py` and EqM_RL.md. "
          f"{a.n_states} dataset states (numpy seed 0), {a.n_samples} samples per state. Values: average over the seeds "
          "± standard deviation between them. Counts: per seed.", "", "## The data", ""]
