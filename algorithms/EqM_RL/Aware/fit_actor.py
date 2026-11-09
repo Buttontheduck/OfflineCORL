@@ -24,7 +24,7 @@ Two benchmarks, chosen by env_name (run each in its conda env):
   OGBench (ogbench) a single-task name, e.g. antmaze-large-navigate-singletask-v0 (ogbench_data.py).
                     Data from ogbench_dir. Every eval runs n_test_episodes episodes for each task in
                     eval_tasks (OGBench: 50). eval/normalized_score = success rate in %, the mean over the
-                    tasks (OGBench's score); eval/score = mean return (-1 per step until the goal),
+                    tasks (OGBench's score); eval/score = mean return (mazes: -1 per step until the goal),
                     eval/episode_length. Per task, in the wandb section eval_tasks/: success_task<k> (%),
                     return_task<k>, length_task<k>.
   Both: eval/normalized_score_K<k> for the extra EqM sampler step counts in eval_num_steps, and the

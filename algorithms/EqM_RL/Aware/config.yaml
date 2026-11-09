@@ -30,6 +30,9 @@ normalize_reward: false
 eval_frequency: 1000
 log_frequency: 1000       # train/* and weighting/* go to wandb every this many steps, averaged over them
 n_test_episodes: 10       # eval episodes, run side by side (batched sampler), so 10 cost about as much as 1
+                          # (OGBench: episodes per task, OGBench's protocol uses 50)
+eval_tasks: own           # OGBench only: 'own' (the task whose rewards Aware trains on), 'all' (1-5) or e.g. "1,3"
+ogbench_dir: /workspace/ogbench_data   # OGBench only: where the datasets are stored
 num_actions_inference: 1
 diag_states: 256          # dataset states for the sampler/* logs at each eval (0 = off)
 diag_samples: 8           # samples per state for those logs

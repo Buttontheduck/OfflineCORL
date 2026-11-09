@@ -8,7 +8,8 @@ Usage (from algorithms/EqM_RL/):
 Any Python with PyYAML can start this file (the hawk, eagle or base env). Each training
 run is started with the Python of the conda env its target needs: `aware`, `awac_d4rl`,
 `iql_d4rl`, `fit_actor`, `train_critic` and `finetune_actor` (D4RL) run in hawk, `aware_minari` and `awac_minari` run in
-eagle, and `fit_actor_ogbench` (OGBench single-task data) runs in ogbench. The sweep file format is described in sweeps/README.md.
+eagle, and the OGBench targets `aware_ogbench`, `fit_actor_ogbench`, `train_critic_ogbench` and
+`finetune_actor_ogbench` run in ogbench. The sweep file format is described in sweeps/README.md.
 
 Output: sweep_runs/<sweep name>_<date-time>/ with a copy of the sweep file, plan.txt
 (every command), runs.csv (status of every run) and one folder per run with its log.
@@ -52,6 +53,18 @@ TARGETS = {
     # Actor-only fits on frozen weights, Gaussian or EqM (Aware/fit_actor.py, pyrallis)
     "fit_actor": dict(script=HERE / "Aware" / "fit_actor.py", conda_env="hawk",
                       style="pyrallis", data="d4rl", name_prefix="Fit"),
+    # Aware on OGBench single-task data (same main.py, ogbench conda env; env_name like
+    # humanoidmaze-medium-navigate-singletask-v0; datasets in /workspace/ogbench_data)
+    "aware_ogbench": dict(script=HERE / "Aware" / "main.py", conda_env="ogbench",
+                          style="hydra", data="ogbench", name_prefix="Aware"),
+    # QIPO phases 2 and 3 on OGBench single-task data (same scripts as train_critic / finetune_actor, ogbench env)
+    "train_critic_ogbench": dict(script=HERE / "Aware" / "train_critic.py", conda_env="ogbench",
+                                 style="pyrallis", data="ogbench", name_prefix="Critic"),
+    "finetune_actor_ogbench": dict(script=HERE / "Aware" / "finetune_actor.py", conda_env="ogbench",
+                                   style="pyrallis", data="ogbench", name_prefix="FT"),
+    # Eval-only best-of-N: frozen EqM-BC actor + frozen critic on OGBench (Aware/eval_best_of_n.py, no training, no wandb)
+    "eval_best_of_n_ogbench": dict(script=HERE / "Aware" / "eval_best_of_n.py", conda_env="ogbench",
+                                   style="pyrallis", data="ogbench", name_prefix="BestN"),
     # Actor-only fits on OGBench single-task data (same script, ogbench conda env; env_name like
     # antmaze-large-navigate-singletask-v0; datasets in /workspace/ogbench_data)
     "fit_actor_ogbench": dict(script=HERE / "Aware" / "fit_actor.py", conda_env="ogbench",

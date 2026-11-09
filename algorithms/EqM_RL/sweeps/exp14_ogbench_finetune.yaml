@@ -1,0 +1,60 @@
+# Experiment 14 (QIPO pipeline on OGBench, as Experiments 10 -> 11 -> 12b on D4RL AntMaze), default tasks of
+# humanoidmaze-medium (task1), antsoccer-arena (task4) and cube-double (task2), EqM actor only, seeds 1-3.
+# Phase 3: QIPO fine-tuning of the BC field with the frozen phase-2 critic of the same seed (Aware/finetune_actor.py),
+# as Experiment 12b: weights softmax_j(beta Q) over the dataset action and 16 samples of the current actor at K = 20
+# (12b's fix for Experiment 12's drift), support renewed every 40k, 400k steps, Adam 1e-4, EMA 0.005 (evaluated).
+# beta 3 / 10 / 0 (0 = uniform weights, the no-critic control). Eval every 40k: one sample per step at K = 10 (main)
+# and K = 20, 50 episodes; every 100k the critic's best of 16 (K = 20). 27 runs.
+# FQL default-task references (BC / IQL / FAWAC / FQL): humanoidmaze-medium task1 1 / 32 / 6 / 19, antsoccer-arena
+# task4 1 / 3 / 12 / 39, cube-double task2 0 / 1 / 2 / 36 (success %, Park et al. 2025, Table 3).
+#   python run_sweep.py sweeps/exp14_ogbench_finetune.yaml   (started by run_exp14.sh after phase 2)
+target: finetune_actor_ogbench
+parallel: 27
+gpu_gate: {util_max: 97, min_free_mb: 3000, settle_s: 60, window_s: 30}
+untagged: [group]
+
+fixed:
+  name: Exp14_FT
+  critic_prefix: Exp14_Critic
+  critic_checkpoint: critic_1000000.pt
+  min_free_mb: 4000
+  support_num: 16
+  support_K: 20
+  renew_every: 40000
+  num_train_ops: 400001     # the extra 1 makes the last eval (and checkpoint) happen at step 400,000
+  learning_rate: 0.0001
+  eval_frequency: 40000
+  eval_K: "10,20"
+  eval_best_every: 100000
+  n_test_episodes: 50
+  eval_tasks: own
+  checkpoint_every: 100000
+
+grid:
+  - {group: Exp14_FT_humanoidmaze-medium_beta3, env_name: humanoidmaze-medium-navigate-singletask-v0, beta: 3, seed: 1}
+  - {group: Exp14_FT_antsoccer-arena_beta3, env_name: antsoccer-arena-navigate-singletask-v0, beta: 3, seed: 1}
+  - {group: Exp14_FT_cube-double_beta3, env_name: cube-double-play-singletask-v0, beta: 3, seed: 1}
+  - {group: Exp14_FT_humanoidmaze-medium_beta10, env_name: humanoidmaze-medium-navigate-singletask-v0, beta: 10, seed: 1}
+  - {group: Exp14_FT_antsoccer-arena_beta10, env_name: antsoccer-arena-navigate-singletask-v0, beta: 10, seed: 1}
+  - {group: Exp14_FT_cube-double_beta10, env_name: cube-double-play-singletask-v0, beta: 10, seed: 1}
+  - {group: Exp14_FT_humanoidmaze-medium_beta0, env_name: humanoidmaze-medium-navigate-singletask-v0, beta: 0, seed: 1}
+  - {group: Exp14_FT_antsoccer-arena_beta0, env_name: antsoccer-arena-navigate-singletask-v0, beta: 0, seed: 1}
+  - {group: Exp14_FT_cube-double_beta0, env_name: cube-double-play-singletask-v0, beta: 0, seed: 1}
+  - {group: Exp14_FT_humanoidmaze-medium_beta3, env_name: humanoidmaze-medium-navigate-singletask-v0, beta: 3, seed: 2}
+  - {group: Exp14_FT_antsoccer-arena_beta3, env_name: antsoccer-arena-navigate-singletask-v0, beta: 3, seed: 2}
+  - {group: Exp14_FT_cube-double_beta3, env_name: cube-double-play-singletask-v0, beta: 3, seed: 2}
+  - {group: Exp14_FT_humanoidmaze-medium_beta10, env_name: humanoidmaze-medium-navigate-singletask-v0, beta: 10, seed: 2}
+  - {group: Exp14_FT_antsoccer-arena_beta10, env_name: antsoccer-arena-navigate-singletask-v0, beta: 10, seed: 2}
+  - {group: Exp14_FT_cube-double_beta10, env_name: cube-double-play-singletask-v0, beta: 10, seed: 2}
+  - {group: Exp14_FT_humanoidmaze-medium_beta0, env_name: humanoidmaze-medium-navigate-singletask-v0, beta: 0, seed: 2}
+  - {group: Exp14_FT_antsoccer-arena_beta0, env_name: antsoccer-arena-navigate-singletask-v0, beta: 0, seed: 2}
+  - {group: Exp14_FT_cube-double_beta0, env_name: cube-double-play-singletask-v0, beta: 0, seed: 2}
+  - {group: Exp14_FT_humanoidmaze-medium_beta3, env_name: humanoidmaze-medium-navigate-singletask-v0, beta: 3, seed: 3}
+  - {group: Exp14_FT_antsoccer-arena_beta3, env_name: antsoccer-arena-navigate-singletask-v0, beta: 3, seed: 3}
+  - {group: Exp14_FT_cube-double_beta3, env_name: cube-double-play-singletask-v0, beta: 3, seed: 3}
+  - {group: Exp14_FT_humanoidmaze-medium_beta10, env_name: humanoidmaze-medium-navigate-singletask-v0, beta: 10, seed: 3}
+  - {group: Exp14_FT_antsoccer-arena_beta10, env_name: antsoccer-arena-navigate-singletask-v0, beta: 10, seed: 3}
+  - {group: Exp14_FT_cube-double_beta10, env_name: cube-double-play-singletask-v0, beta: 10, seed: 3}
+  - {group: Exp14_FT_humanoidmaze-medium_beta0, env_name: humanoidmaze-medium-navigate-singletask-v0, beta: 0, seed: 3}
+  - {group: Exp14_FT_antsoccer-arena_beta0, env_name: antsoccer-arena-navigate-singletask-v0, beta: 0, seed: 3}
+  - {group: Exp14_FT_cube-double_beta0, env_name: cube-double-play-singletask-v0, beta: 0, seed: 3}

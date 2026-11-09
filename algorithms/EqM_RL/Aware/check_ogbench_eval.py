@@ -25,7 +25,7 @@ import numpy as np
 import ogbench_data
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--env", default="pointmaze-medium-navigate-singletask-v0")
+ap.add_argument("--env", default="pointmaze-medium-navigate-singletask-v0")   # the policies need a point maze
 ap.add_argument("--episodes", type=int, default=4, help="per task")
 ap.add_argument("--seed", type=int, default=69)
 args = ap.parse_args()
@@ -34,7 +34,7 @@ failed = []
 # ---------------------------------------------------------------- data conversion
 env, data, mean, std, ep, info = ogbench_data.load_ogbench(args.env)
 print(f"data: {info}")
-ok = (set(np.unique(data["rewards"])) <= {-1.0, 0.0} and np.array_equal(data["terminals"] == 1, data["rewards"] == 0)
+ok = (data["rewards"].max() <= 0 and np.array_equal(data["terminals"] == 1, data["rewards"] == 0)
       and ep[-1] == info["episodes"] - 1 and np.all(np.diff(ep) >= 0))
 failed += [] if ok else ["data conversion"]
 print(f"data conversion (terminals = 1 - masks, rewards, episode ids): {'ok' if ok else 'FAIL'}\n")

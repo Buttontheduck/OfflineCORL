@@ -6,8 +6,10 @@ returned dict has the keys of offline_data.load_d4rl (observations, actions, rew
 terminals), plus the same state normalization and the episode of every transition. OGBench's own fields differ:
   terminals  OGBench: 1 at the last step of each collected trajectory (an episode boundary, NOT the end of the
              task). Used here for the episode ids only.
-  masks      0 where the task is solved (reward 0), else 1 (reward -1). The task terminal is 1 - masks, which is
-             what D4RL calls terminals, so data["terminals"] = 1 - masks.
+  masks      0 where the task is solved (reward 0), else 1. The task terminal is 1 - masks, which is what D4RL
+             calls terminals, so data["terminals"] = 1 - masks.
+  rewards    mazes (navigate): -1 per step, 0 at the goal. Manipulation (cube, scene, puzzle): -(number of
+             unsolved subtasks), e.g. cube-double -2 / -1 / 0. Reward 0 <=> masks 0 in both.
 Behavior cloning uses only the observations and actions; the rewards are those of the dataset's own task.
 
 Evaluation, as OGBench's reference implementations (FQL's utils/evaluation.py, 50 episodes per task):
@@ -104,7 +106,8 @@ def evaluate(envs: list, act, mean: np.ndarray, std: np.ndarray, seed: int, low:
     logs the *_task<k> ones under eval_tasks/ and the others under eval/):
       normalized_score       success rate in %, mean over the tasks (OGBench's score)
       success_task<k>        success rate in % of task k
-      score, score_std, score_min, return_task<k>   undiscounted return (single-task: -1 per step until the goal)
+      score, score_std, score_min, return_task<k>   undiscounted return (mazes: -1 per step until the goal;
+                                                    manipulation: -(unsolved subtasks) per step)
       episode_length, length_task<k>                steps until the goal or the time limit
     """
     n = len(envs)

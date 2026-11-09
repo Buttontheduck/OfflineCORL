@@ -1,0 +1,33 @@
+# Experiment 15: eval-only best-of-N with the frozen Experiment 14 models, no training (Aware/eval_best_of_n.py).
+# Experiment 14's best number was not the fine-tuned actor but its step-0 eval: the EqM-BC actor's 16 samples at
+# K = 20, the critic picks the best (humanoidmaze-medium 30 / 34 / 56 %), while the critic's own eval at K = 10 gave 0.
+# Here: phase-2 critics (critic_1000000.pt) x their BC actors (checkpoint_500000.pt), same seed, K = 20 / 30 sampler
+# steps x N = 16 / 32 / 64 candidates. 100 episodes of the default task per cell (Experiment 14: 50; the first 50
+# start states are the same ones). 3 envs x 3 seeds = 9 runs, each loops over the 6 (K, N) cells.
+# FQL default-task references (BC / IQL / FAWAC / FQL): humanoidmaze-medium task1 1 / 32 / 6 / 19, antsoccer-arena
+# task4 1 / 3 / 12 / 39, cube-double task2 0 / 1 / 2 / 36 (success %, Park et al. 2025, Table 3).
+#   python run_sweep.py sweeps/exp15_ogbench_bestofn.yaml
+#   python diagnostics/summarize_exp15.py > sweep_runs/exp15_ogbench_bestofn_<date-time>/summary.md
+target: eval_best_of_n_ogbench
+parallel: 9
+untagged: [group]
+
+fixed:
+  name: Exp15_BestN
+  critic_prefix: Exp14_Critic
+  critic_checkpoint: critic_1000000.pt
+  Ks: "20,30"
+  Ns: "16,32,64"
+  n_test_episodes: 100
+  eval_tasks: own
+
+grid:
+  - {group: Exp15_BestN, env_name: humanoidmaze-medium-navigate-singletask-v0, seed: 1}
+  - {group: Exp15_BestN, env_name: antsoccer-arena-navigate-singletask-v0, seed: 1}
+  - {group: Exp15_BestN, env_name: cube-double-play-singletask-v0, seed: 1}
+  - {group: Exp15_BestN, env_name: humanoidmaze-medium-navigate-singletask-v0, seed: 2}
+  - {group: Exp15_BestN, env_name: antsoccer-arena-navigate-singletask-v0, seed: 2}
+  - {group: Exp15_BestN, env_name: cube-double-play-singletask-v0, seed: 2}
+  - {group: Exp15_BestN, env_name: humanoidmaze-medium-navigate-singletask-v0, seed: 3}
+  - {group: Exp15_BestN, env_name: antsoccer-arena-navigate-singletask-v0, seed: 3}
+  - {group: Exp15_BestN, env_name: cube-double-play-singletask-v0, seed: 3}

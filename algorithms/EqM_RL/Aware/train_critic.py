@@ -27,6 +27,16 @@ The BC run is found by name in bc_root (fit_actor.py's run folder, e.g.
 Exp10_BC_env_nameantmaze-umaze-v2_actoreqm_seed1-antmaze-umaze-v2-<id>). If its bc_checkpoint
 isn't there yet (the BC run is still training), the script waits for it before touching the GPU.
 
+OGBench single-task (env_name like humanoidmaze-medium-navigate-singletask-v0; run with the ogbench conda env):
+data from ogbench_data.load_ogbench, rewards used as given (mazes -1 per step, manipulation -(unsolved
+subtasks), 0 at the goal), d = the task terminal (1 - masks); the eval runs n_test_episodes episodes of each task
+in eval_tasks ('own' = the dataset's task) with ogbench_data.evaluate, eval/normalized_score = success in %.
+Options for both benchmarks, off by default (Experiment 11 ran without them):
+  layer_norm   LayerNorm after every hidden Linear of both Q networks (as FQL's value networks).
+  target_clip  clip the TD target to the range Q can take, [r_min / (1 - gamma), r_max / (1 - gamma)] (with
+               rewards <= 0: [r_min / (1 - gamma), 0]); against the soft maximum's runaway overestimation
+               that diverged every umaze-diverse critic in Experiment 11.
+
     python train_critic.py --env_name=antmaze-umaze-v2 --bc_actor=eqm --seed=1
 """
 
@@ -41,7 +51,6 @@ from copy import deepcopy
 from dataclasses import asdict, dataclass
 from typing import Optional
 
-import gym
 import numpy as np
 import pyrallis
 import torch
@@ -50,6 +59,7 @@ import torch.nn.functional as F
 import wandb
 import yaml
 
+import ogbench_data
 from actor_models import Actor
 from gaussian_actor import GaussianActor
 from offline_data import load_d4rl
@@ -78,6 +88,8 @@ class TrainConfig:
     # critic and optimisation
     hidden_dim: int = 256
     n_hidden: int = 2                     # IQL's / QGPO's TwinQ: 2 hidden layers
+    layer_norm: bool = False              # LayerNorm after every hidden Linear (FQL's critics)
+    target_clip: bool = False             # clip the TD target to [r_min, r_max] / (1 - gamma) (see the docstring)
     learning_rate: float = 3e-4
     batch_size: int = 256
     gamma: float = 0.99
@@ -87,8 +99,10 @@ class TrainConfig:
     stats_every: int = 10                 # the train/ and support/ logs average every this many steps' batches
     # evaluation and saving
     eval_frequency: int = 100000          # no eval at step 0 (an untrained critic)
-    n_test_episodes: int = 100
+    n_test_episodes: int = 100            # D4RL: episodes per eval; OGBench: episodes per task (OGBench: 50)
     eval_candidates: int = 16             # N candidates per step, the highest-Q one is taken
+    eval_tasks: str = "own"               # OGBench only: 'own' (the dataset's task), 'all' or e.g. "1,3"
+    ogbench_dir: str = ogbench_data.OGBENCH_DATA
     test_seed: int = 69
     checkpoints_path: Optional[str] = "/workspace/Trained_Models/checkpoints/"
     checkpoint_every: int = 100000
@@ -100,13 +114,13 @@ class TrainConfig:
 
 
 class TwinQ(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_dim, n_hidden):
+    def __init__(self, state_dim, action_dim, hidden_dim, n_hidden, layer_norm=False):
         super().__init__()
 
         def mlp():
             layers, d = [], state_dim + action_dim
             for _ in range(n_hidden):
-                layers += [nn.Linear(d, hidden_dim), nn.ReLU()]
+                layers += [nn.Linear(d, hidden_dim)] + ([nn.LayerNorm(hidden_dim)] if layer_norm else []) + [nn.ReLU()]
                 d = hidden_dim
             return nn.Sequential(*layers, nn.Linear(d, 1))
 
@@ -120,7 +134,7 @@ class TwinQ(nn.Module):
         return torch.min(*self.both(s, a))
 
 
-def set_seed(seed: int, env: Optional[gym.Env] = None):
+def set_seed(seed: int, env=None):   # env: a gym (D4RL) or gymnasium (OGBench) environment
     if env is not None:
         env.action_space.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
@@ -174,16 +188,25 @@ def train(cfg: TrainConfig):
     assert bc["env_name"] == cfg.env_name and bc["actor"]["kind"] == cfg.bc_actor and bc["seed"] == cfg.seed, bc_dir
     print(f"BC run {bc_dir} ({cfg.bc_checkpoint})", flush=True)
     dev = cfg.device
-    env, data, mean, std, ep = load_d4rl(cfg.env_name)
+    ogb = ogbench_data.is_ogbench(cfg.env_name)
+    if ogb:
+        env, data, mean, std, ep, data_info = ogbench_data.load_ogbench(cfg.env_name, cfg.ogbench_dir)
+    else:
+        env, data, mean, std, ep = load_d4rl(cfg.env_name)
+        data_info = dict(benchmark="d4rl", transitions=len(data["observations"]))
     set_seed(cfg.seed, env)
     n, state_dim, action_dim = len(data["observations"]), data["observations"].shape[1], data["actions"].shape[1]
     low, high = float(env.action_space.low[0]), float(env.action_space.high[0])
 
-    # ------------------------------------------------------------ dataset (normalized states, r - 1)
+    # ------------------------------------------------------------ dataset (normalized states; D4RL AntMaze r - 1)
     norm = lambda x: torch.tensor((x - mean) / std, dtype=torch.float32, device=dev)  # noqa: E731
     S, S2 = norm(data["observations"]), norm(data["next_observations"])
     A = torch.tensor(data["actions"], dtype=torch.float32, device=dev)
-    R = torch.tensor(data["rewards"] - 1.0, dtype=torch.float32, device=dev)
+    R = torch.tensor(data["rewards"] - (0.0 if ogb else 1.0), dtype=torch.float32, device=dev)
+    r_min, r_max = float(R.min()), float(R.max())
+    q_lo = r_min / (1 - cfg.gamma) if r_min < 0 else r_min          # the range Q can take (target_clip)
+    q_hi = r_max / (1 - cfg.gamma) if r_max > 0 else r_max
+    data_info.update(reward_min=r_min, reward_max=r_max, q_range=[q_lo, q_hi])
     D = torch.tensor(data["terminals"], dtype=torch.float32, device=dev)
     # the dataset's next action: the next row, if it belongs to the same episode and starts at s'
     has_next = np.zeros(n, bool)
@@ -252,7 +275,7 @@ def train(cfg: TrainConfig):
           + ", ".join(f"{k.split('/')[1]} {v:.3f}" for k, v in sup_stats.items()), flush=True)
 
     # ------------------------------------------------------------ critic
-    critic = TwinQ(state_dim, action_dim, cfg.hidden_dim, cfg.n_hidden).to(dev)
+    critic = TwinQ(state_dim, action_dim, cfg.hidden_dim, cfg.n_hidden, cfg.layer_norm).to(dev)
     target = deepcopy(critic).requires_grad_(False)
     opt = torch.optim.Adam(critic.parameters(), lr=cfg.learning_rate)
     M1 = cfg.support_num + 1
@@ -269,6 +292,8 @@ def train(cfg: TrainConfig):
             w = torch.softmax((cfg.beta * q_next).masked_fill(~valid, float("-inf")), 1)
             v_next = (w * q_next).sum(1)
             y = r + cfg.gamma * (1.0 - d) * v_next
+            if cfg.target_clip:
+                y = y.clamp(q_lo, q_hi)
         q1, q2 = critic.both(s, a)
         loss = 0.5 * (F.mse_loss(q1, y) + F.mse_loss(q2, y))
         opt.zero_grad()
@@ -291,10 +316,38 @@ def train(cfg: TrainConfig):
         return stats
 
     # ------------------------------------------------------------ evaluation: best of N BC candidates
-    eval_envs = [env] + [gym.make(cfg.env_name) for _ in range(cfg.n_test_episodes - 1)]
+    if ogb:
+        tasks = ogbench_data.parse_tasks(cfg.eval_tasks, env)
+        eval_envs = ogbench_data.make_eval_envs(cfg.env_name, tasks, cfg.n_test_episodes)
+        data_info.update(eval_tasks=tasks, eval_episodes_per_task=cfg.n_test_episodes,
+                         score="success rate in %, mean over eval_tasks (OGBench)")
+    else:
+        import gym
+
+        eval_envs = [env] + [gym.make(cfg.env_name) for _ in range(cfg.n_test_episodes - 1)]
 
     @torch.no_grad()
-    def evaluate():
+    def best_of(s: torch.Tensor):
+        """Normalized states (B, S) -> the highest-min(Q1, Q2) of eval_candidates BC candidates, and its Q."""
+        cand = propose(s, cfg.eval_candidates)
+        q = critic(s[:, None].expand(-1, cfg.eval_candidates, -1), cand)
+        return cand[torch.arange(len(s), device=dev), q.argmax(1)], q.max(1).values
+
+    @torch.no_grad()
+    def evaluate() -> dict:
+        """The log entries of one eval: eval/ (score, normalized_score, q_start) and on OGBench eval_tasks/."""
+        if ogb:
+            first = {}
+
+            def act(s_np):
+                a, q = best_of(torch.tensor(s_np, device=dev))
+                first.setdefault("q", q.mean().item())          # at the start states
+                return a.cpu().numpy()
+
+            ev = ogbench_data.evaluate(eval_envs, act, mean, std, cfg.test_seed, low, high)
+            out = {("eval_tasks/" if "_task" in k else "eval/") + k: v for k, v in ev.items()}
+            out["eval/q_start"] = first["q"]
+            return out
         obs = []
         for i, e in enumerate(eval_envs):
             e.seed(cfg.test_seed + i)  # old gym API (D4RL): seed before reset
@@ -304,20 +357,19 @@ def train(cfg: TrainConfig):
         while not done.all():
             active = np.flatnonzero(~done)
             s = torch.tensor((obs[active] - mean) / std, dtype=torch.float32, device=dev)
-            cand = propose(s, cfg.eval_candidates)
-            q = critic(s[:, None].expand(-1, cfg.eval_candidates, -1), cand)
-            best = q.argmax(1)
-            a = cand[torch.arange(len(s), device=dev), best].cpu().numpy()
+            a, qb = best_of(s)
+            a = a.cpu().numpy()
             if q_start is None:
-                q_start = q.max(1).values.mean().item()
+                q_start = qb.mean().item()
             for k, i in enumerate(active):
                 obs[i], r, done[i], _ = eval_envs[i].step(a[k])
                 ret[i] += r
-        return ret, q_start
+        return {"eval/score": ret.mean(), "eval/normalized_score": env.get_normalized_score(ret.mean()) * 100.0,
+                "eval/q_start": q_start}
 
     # ------------------------------------------------------------ run
     run_dir = os.path.join(cfg.checkpoints_path, cfg.name) if cfg.checkpoints_path else None
-    full = dict(asdict(cfg), bc_run=bc_dir, bc_config=bc, support_stats=sup_stats)
+    full = dict(asdict(cfg), bc_run=bc_dir, bc_config=bc, support_stats=sup_stats, data_info=data_info)
     if run_dir:
         os.makedirs(run_dir, exist_ok=True)
         with open(os.path.join(run_dir, "config.yaml"), "w") as f:
@@ -343,10 +395,9 @@ def train(cfg: TrainConfig):
                 acc = {}
                 if do_eval:
                     te = time.time()
-                    ret, q_start = evaluate()
-                    log.update({"eval/score": ret.mean(), "eval/normalized_score": env.get_normalized_score(ret.mean()) * 100.0,
-                                "eval/q_start": q_start, "eval/seconds": time.time() - te})
-                    print(f"{t:>8}  success {log['eval/normalized_score']:5.1f}  q_start {q_start:7.2f}  "
+                    log.update(evaluate())
+                    log["eval/seconds"] = time.time() - te
+                    print(f"{t:>8}  success {log['eval/normalized_score']:5.1f}  q_start {log['eval/q_start']:7.2f}  "
                           f"q_data {log['train/q_data']:7.2f}  loss {log['train/q_loss']:.4f}  "
                           f"w_data {log.get('support/w_data', float('nan')):.2f}  eff_n {log['support/eff_n']:.1f}  "
                           f"lift {log.get('support/lift', float('nan')):.2f}  ({log['eval/seconds']:.0f}s eval, "

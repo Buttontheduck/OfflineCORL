@@ -1,14 +1,13 @@
 import os
 import random
 import uuid
-from typing import Optional, Tuple, Union
+from typing import Tuple, Union
 
-import d4rl
-import gym
 import hydra
 import numpy as np
 import torch
 import torch.nn.functional
+import ogbench_data
 from buffer import ReplayBuffer
 from actor_models import Actor
 from critic_models import DeterministicCritic, ValueNetwork
@@ -20,8 +19,13 @@ from logger import global_logger as gl
 import wandb
 
 
+# Two benchmarks, chosen by env_name: D4RL (run in the hawk conda env; d4rl and gym are imported only then) and
+# OGBench single-task, e.g. humanoidmaze-medium-navigate-singletask-v0 (run in the ogbench conda env; data and
+# evaluation from ogbench_data.py: eval/normalized_score = success rate in %, per task under eval_tasks/).
+
+
 def set_seed(
-    seed: int, env: Optional[gym.Env] = None, deterministic_torch: bool = False
+    seed: int, env=None, deterministic_torch: bool = False
 ):
     if env is not None:
         env.action_space.seed(seed)
@@ -43,10 +47,13 @@ def normalize_states(states: np.ndarray, mean: np.ndarray, std: np.ndarray):
 
 
 def wrap_env(
-    env: gym.Env,
+    env,
     state_mean: Union[np.ndarray, float] = 0.0,
     state_std: Union[np.ndarray, float] = 1.0,
-) -> gym.Env:
+):
+    """D4RL only (old gym API). OGBench envs stay unwrapped: ogbench_data.evaluate normalizes the states."""
+    import gym
+
     def normalize_state(state):
         # Ensure the state matches the 32-bit float dtype standard in RL
         return ((state - state_mean) / state_std).astype(np.float32)
@@ -109,8 +116,21 @@ def train(cfg: DictConfig):
 
     OmegaConf.set_struct(cfg, True)
 
-    env = gym.make(cfg.env_name)
-    dataset = d4rl.qlearning_dataset(env)
+    ogb = ogbench_data.is_ogbench(cfg.env_name)
+    if ogb:
+        # OGBench single-task data: rewards -1 per step (mazes) or -(unsolved subtasks) (manipulation), 0 where the
+        # task is solved; dataset["terminals"]
+        # is the task terminal (1 - OGBench's masks), so the critic doesn't bootstrap past the goal.
+        assert not cfg.normalize_reward, "OGBench: the rewards are used as given (normalize_reward: false)"
+        env, dataset, _, _, _, data_info = ogbench_data.load_ogbench(cfg.env_name, cfg.ogbench_dir)
+    else:
+        import d4rl  # noqa: F401  (registers the D4RL envs with gym)
+        import gym
+
+        env = gym.make(cfg.env_name)
+        dataset = d4rl.qlearning_dataset(env)
+        data_info = dict(benchmark="d4rl", transitions=len(dataset["observations"]))
+    print(f"data: {data_info}", flush=True)
     set_seed(cfg.seed, env, deterministic_torch=cfg.deterministic_torch)
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
@@ -125,12 +145,20 @@ def train(cfg: DictConfig):
     dataset["next_observations"] = normalize_states(
         dataset["next_observations"], state_mean, state_std
     )
-    env = wrap_env(env, state_mean=state_mean, state_std=state_std)
     # One env per eval episode, so the episodes run side by side (see eval_actor)
-    eval_envs = [env] + [
-        wrap_env(gym.make(cfg.env_name), state_mean=state_mean, state_std=state_std)
-        for _ in range(cfg.n_test_episodes - 1)
-    ]
+    if ogb:
+        # n_test_episodes episodes for each task in eval_tasks ('own' = the task whose rewards Aware trains on)
+        tasks = ogbench_data.parse_tasks(cfg.eval_tasks, env)
+        eval_envs = ogbench_data.make_eval_envs(cfg.env_name, tasks, cfg.n_test_episodes)
+        data_info.update(eval_tasks=tasks, eval_episodes_per_task=cfg.n_test_episodes,
+                         score="success rate in %, mean over eval_tasks (OGBench)")
+    else:
+        env = wrap_env(env, state_mean=state_mean, state_std=state_std)
+        eval_envs = [env] + [
+            wrap_env(gym.make(cfg.env_name), state_mean=state_mean, state_std=state_std)
+            for _ in range(cfg.n_test_episodes - 1)
+        ]
+        data_info.update(eval_episodes=cfg.n_test_episodes, score="D4RL normalized score of the mean return")
 
     # Fixed dataset states for the sampler/* logs at each eval
     diag_idx = np.random.default_rng(0).choice(
@@ -143,7 +171,7 @@ def train(cfg: DictConfig):
     replay_buffer = ReplayBuffer(
         state_dim,
         action_dim,
-        cfg.buffer_size,
+        max(cfg.buffer_size, len(dataset["observations"])),   # some OGBench datasets have more than 2M
         cfg.device,
     )
     replay_buffer.load_d4rl_dataset(dataset)
@@ -232,9 +260,32 @@ def train(cfg: DictConfig):
 
         actor.train()
         return episode_rewards
-    
 
-    wandb_init(OmegaConf.to_container(cfg, resolve=True))
+    low, high = float(env.action_space.low[0]), float(env.action_space.high[0])
+
+    def ogbench_act(s: np.ndarray) -> np.ndarray:
+        """Normalized states -> actions for ogbench_data.evaluate. The batch shrinks as episodes end; it is padded
+        to the number of eval envs, so the compiled sampler (compile: true) keeps one shape (one CUDA graph)."""
+        m, n = len(s), len(eval_envs)
+        if m < n:
+            s = np.concatenate([s, np.repeat(s[-1:], n - m, axis=0)])
+        return actor.sample(s)[:m]
+
+    def evaluate() -> dict:
+        """The log entries of one evaluation: eval/ (headline) and, on OGBench, eval_tasks/ (per task)."""
+        if ogb:
+            actor.eval()
+            try:
+                ev = ogbench_data.evaluate(eval_envs, ogbench_act, state_mean, state_std, cfg.test_seed, low, high)
+            finally:
+                actor.train()
+            return {("eval_tasks/" if "_task" in k else "eval/") + k: v for k, v in ev.items()}
+        eval_scores = eval_actor(eval_envs, cfg.test_seed)
+        return {"eval/score": eval_scores.mean(), "eval/score_std": eval_scores.std(),
+                "eval/score_min": eval_scores.min(),
+                "eval/normalized_score": env.get_normalized_score(eval_scores.mean()) * 100.0}
+
+    wandb_init({**OmegaConf.to_container(cfg, resolve=True), "data_info": data_info})
 
     if getattr(cfg, "actual_checkpoints_path", None) is not None:
         print(f"Checkpoints path: {cfg.actual_checkpoints_path}")
@@ -253,13 +304,11 @@ def train(cfg: DictConfig):
             if t % cfg.log_frequency == 0:
                 gl.dump(step=t)
             if (t) % cfg.eval_frequency == 0:
-                eval_scores = eval_actor(eval_envs, cfg.test_seed)
-
-                gl.log("eval/score", eval_scores.mean())
-                gl.log("eval/score_std", eval_scores.std())
-                gl.log("eval/score_min", eval_scores.min())
-                normalized_eval_scores = env.get_normalized_score(eval_scores.mean()) * 100.0
-                gl.log("eval/normalized_score", normalized_eval_scores)
+                ev = evaluate()
+                for key, val in ev.items():
+                    gl.log(key, val)
+                print(f"\n{t:>8}  normalized_score {ev['eval/normalized_score']:6.1f}  score {ev['eval/score']:9.2f}",
+                      flush=True)
                 if cfg.diag_states > 0:
                     sampler_stats = actor.diagnostics(
                         diag_states, diag_actions, n_samples=cfg.diag_samples, generator=diag_generator
