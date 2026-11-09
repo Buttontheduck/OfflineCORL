@@ -1853,6 +1853,231 @@ References: Experiment 11 best of 16 (critic at test time) 78.8 / 94.6; CORL IQL
 - **Second candidate fix:** generate the support with converged samples (larger K).
 - **Not tested yet.**
 
+### OGBench check: do the actor's samples reach both kinds of actions in the data, and where do the samples go after K = 20? (3 seeds, 2026-11-08)
+> **What we tested.** Evaluation only: no training, no episodes, no wandb. Two questions about the EqM-BC actor:
+> 1. At some states, the dataset contains two different kinds of actions. At K = 20 (20 sampler steps), does the actor produce both kinds, or only one?
+> 2. After K = 20 the samples keep moving. In which direction do they move?
+>
+> The same test was done on Maze2D before (Experiment 9 follow-up), where an action has 2 numbers. Here an action has 21 numbers (one per motor of the humanoid) and a state has 69 numbers.
+> - **Actors:** the three EqM-BC actors of Experiment 14 on `humanoidmaze-medium-navigate-singletask-v0` (500k training steps, trained and evaluated at K = 20). Experiments 13–16 are not written up in this file yet; their results are in `sweep_runs/exp13_*`, `exp14_*`, `exp15_*` and `exp16_*` (`summary.md`).
+> - **Code:** `diagnostics/ogbench_two_groups.py`, run with the `ogbench` env's python. It takes 23 s for all three actors. Results: `diagnostics/out/ogbench_two_groups/humanoidmaze-medium-navigate-singletask-v0/` (`summary.md`, `results.json`, and all samples).
+
+**Words used below**
+
+| Word | Exact meaning |
+|---|---|
+| sample | One action from the actor: start from random noise and run the EqM sampler for K steps. |
+| K | The number of sampler steps. |
+| similar states | For a chosen dataset state, the 128 dataset states closest to it (distance between the normalized 69 state numbers). They are taken only from other episodes, at most 4 from each episode. Without this rule, most of the 128 would be the previous and next steps of the same episode. |
+| data actions | The 128 actions that were taken in those 128 similar states. |
+| group A, group B | The 128 data actions split into two sets with 2-means: each action belongs to the closer of two centre points, and each centre is the average of its actions. "Centre A" is the average action of group A. |
+| two-group state | A state where this split is real: (1) the smaller group has at least 20 % of the 128 actions, and (2) the distance between centre A and centre B is more than 4 times the spread of the actions inside the groups, measured along the line from centre A to centre B. 22 of the 256 states pass. |
+| sample is in group A | The sample is closer to centre A than to centre B. |
+| both groups reached | At least 10 % of the state's 256 samples are in group A, and at least 10 % are in group B. |
+| random points | A baseline that ignores the data. For each state: 256 points drawn from a round normal distribution whose centre is the average of the actor's 256 samples and whose width is their average standard deviation. A wide set of points can reach both groups just because it is wide. If the actor reaches both groups more often than random points with the same centre and width, its samples are pointed at the groups, not only spread out. |
+| wrong split | \|share of samples in group B − share of data actions in group B\|, averaged over the two-group states. Example: the data is 35 % in B and the samples are 3 % in B → 0.32. |
+| in the middle | Put each sample on the line from centre A (position 0) to centre B (position 1). "In the middle" = position between 1/3 and 2/3, where the data has few actions. The number is the share of samples there. |
+| width | The standard deviation of a state's 256 samples, averaged over the 21 numbers. |
+| distance to data | For each sample: distance to the closest data action (from one half of the 128, split by alternate rank), divided by √21. Averaged. For comparison, the data actions of one half are on average **0.322** from the closest data action of the other half. |
+| data missed | For each data action (same half): distance to the closest sample, divided by √21. Averaged. Large = some data actions have no sample near them. |
+| ‖f‖ | The length of the vector the EqM model outputs at the sample. Each sampler step moves the sample by step size × f, so ‖f‖ = 0 means the sample no longer moves. |
+| at ±0.99 | The share of the 21 action numbers that are above 0.99 or below −0.99 (the action limit is ±1). |
+| main data directions | For each state: the directions (out of 21) in which the 128 data actions differ the most from each other, found with principal component analysis. We keep the top directions that hold 90 % of the differences; that is 13 of the 21 directions on average. |
+| share along the main data directions | How a sample moved between two K values, and what part of that movement (squared length) lies in the main data directions. If samples moved in random directions, the share would be 13 / 21 = 0.63. |
+
+**How the test works**
+1. Pick 256 states from the dataset (the same 256 for all three actors).
+2. At each state, draw 256 samples. Save each sample after K = 5, 10, 15, 20, 25, 30, 50, 100 and 1000 steps. All K values come from the same sampler run, so the K = 100 value shows where a K = 20 sample goes if the sampler keeps running.
+3. For each state, find the similar states, the data actions, and groups A and B. Decide if it is a two-group state.
+4. Compute the numbers defined above at every K.
+
+**Why the two-group rule differs from Maze2D.** On Maze2D, the distance between the centres was compared with the spread averaged over all action numbers, and the threshold was 3. With 21 numbers, that rule calls almost any single set of actions "two groups". In a simulation with 128 points from one normal distribution, it did so 100 % of the time.
+- **The new rule** measures the spread only along the line from centre A to centre B, and uses 4 instead of 3.
+- **In the simulation:** it never called points from one normal distribution "two groups", and it found 88–100 % of real two-group cases (two normal distributions 4 to 6 standard deviations apart).
+- **On the real data:** we replaced each state's 128 data actions with 128 points from one normal distribution with the same average and covariance. None of these 256 replacements passed.
+
+**The data**
+- **22 of the 256 states are two-group states.** The other 234 states do not have two clearly separate kinds of actions. With Maze2D's way of choosing similar states (own episode allowed), it is 24.
+- **In those 22 states,** the smaller group has 35 % of the data actions on average, and 10 % of the data actions are "in the middle".
+- **The similar states are not very close.** The 128th closest state is at a median distance of 4.8; two random dataset states are at a median distance of 11.7.
+
+**Results at each K.** The first four number columns use only the 22 two-group states; the rest use all 256 states. Each value is the average over the three actors; ± is the standard deviation between them.
+
+| K | both groups reached: actor (%) | both groups reached: random points (%) | wrong split | in the middle | width | distance to data | data missed | ‖f‖ | at ±0.99 (%) |
+|---|---|---|---|---|---|---|---|---|---|
+| 5 | 89 ± 2 | 82 ± 4 | 0.28 | 0.37 | 0.542 | 0.574 | 0.486 | 38.1 | 13.3 |
+| 10 | 58 ± 4 | 53 ± 6 | 0.29 | 0.30 | 0.330 | 0.371 | **0.388** | 23.9 | 6.1 |
+| 15 | 47 ± 2 | 35 ± 9 | 0.31 | 0.26 | 0.217 | 0.305 | **0.385** | 11.5 | 6.3 |
+| **20** | **41 ± 6** | **24 ± 2** | 0.32 | 0.24 | 0.165 | **0.296** | 0.410 | 6.7 | 9.4 |
+| 25 | 33 ± 8 | 17 ± 8 | 0.34 | 0.23 | 0.133 | 0.299 | 0.434 | 4.6 | 13.0 |
+| 30 | 30 ± 6 | 14 ± 4 | 0.35 | 0.23 | 0.112 | 0.303 | 0.453 | 3.5 | 15.7 |
+| 50 | 26 ± 6 | 11 ± 9 | 0.36 | 0.20 | 0.070 | 0.316 | 0.498 | 1.6 | 19.3 |
+| 100 | 14 ± 4 | 5 ± 0 | 0.39 | 0.18 | 0.037 | 0.329 | 0.541 | 0.5 | 20.1 |
+| 1000 | 9 ± 0 | 5 ± 0 | 0.40 | 0.17 | 0.011 | 0.340 | 0.580 | 0.0 | 20.0 |
+| the data | – | – | – | 0.10 | 0.383 | 0.322 | – | – | – |
+
+- Standard deviation between the three actors: at most 0.06 for "in the middle", 0.03 for "wrong split", and 0.012 for width, distance to data and data missed.
+- In counts of states, at K = 20: the actor reaches both groups in 7, 10 and 10 of the 22 states (actors 1, 2, 3); random points do so in 5, 6 and 5.
+- With Maze2D's way of choosing similar states, K = 20 gives 37 % (actor) against 21 % (random points).
+
+**Direction of movement** (all 256 states, average over the three actors; the shares differ by at most 0.01 between actors). The last two columns repeat the measurement with main data directions taken from the 64 closest states instead of 128 (12 directions on average, random share 0.58), to check that the result does not depend on this choice.
+
+| from K → to K | distance moved (per action number) | share along the main data directions | share if random | same, 64 states | if random, 64 states |
+|---|---|---|---|---|---|
+| 5 → 10 | 0.357 | 0.62 | 0.63 | 0.56 | 0.58 |
+| 10 → 20 | 0.291 | 0.66 | 0.63 | 0.60 | 0.58 |
+| 20 → 30 | 0.107 | **0.77** | 0.63 | **0.70** | 0.58 |
+| 30 → 50 | 0.106 | **0.82** | 0.63 | **0.76** | 0.58 |
+| 50 → 100 | 0.111 | **0.86** | 0.63 | **0.80** | 0.58 |
+| 100 → 1000 | 0.133 | **0.87** | 0.63 | **0.82** | 0.58 |
+
+Measured directly from K = 20 to K = 1000: the samples end 0.30, 0.38 and 0.34 (per action number) from their K = 20 position (actors 1, 2, 3), and 84–85 % of that movement is along the main data directions. From K = 10 to K = 20: 0.29, with 65–66 % along them.
+
+**What the numbers show**
+1. **After K = 20, the samples move mostly along the main data directions, and all samples of a state end at almost the same action.**
+   - From K = 5 to K = 20, 62–66 % of the movement is along the main data directions. Random directions would give 63 %, so in this phase the direction of movement is not related to the data.
+   - From K = 20 on, the share is 77 %, then 82 %, 86 % and 87 %. The check with 64 states gives the same pattern (70 % → 82 %, against 58 % for random directions).
+   - The samples still move a lot after K = 20: 0.30–0.38 from K = 20 to K = 1000, about the same as from K = 10 to K = 20 (0.29).
+   - At K = 1000, the 256 samples of a state are almost the same action: their width is 0.011 (0.165 at K = 20).
+   - That final action is a little farther from the data actions than the data actions are from each other: distance to data 0.340, against 0.322 for the data and 0.296 for the samples at K = 20.
+   - At the same time, data missed grows from 0.410 to 0.580, and the share of action numbers at the limit grows from 9 % to 20 %.
+   - This matches the "tangential drift" of point 3 of the low-dimensional caveat at the top of this file: after the samples reach the data, the sampler keeps moving them along the data (in the directions where the data actions differ), toward one action per state.
+2. **At K = 20, the actor reaches both groups more often than random points do, by the same margin as on Maze2D. But in most two-group states, it still produces mostly one kind of action.**
+   - At K = 20, the actor reaches both groups in 41 % of the 22 two-group states (about 9 states). Random points with the same centre and width reach both groups in 24 % (about 5 states). The difference is 17 percentage points, about 4 states.
+   - On Maze2D (Experiment 9 actors, T = 4 and T = 1, 99 two-group states), the actor reached both groups in 76–81 % of the states and random points in 63–64 %: a difference of 13–18 points. **So the margin over random points is about the same on both tasks.** (An earlier version of this section said the humanoidmaze result was "much weaker" than Maze2D. That compared 41 % with 76–81 % without the baseline, which was wrong.)
+   - What differs is the level. On humanoidmaze, even random points reach both groups in only 24 % of the states, against 63–64 % on Maze2D. The reason is that at K = 20 the samples are narrow compared with the distance between the two groups, so a set of points that narrow rarely touches both.
+   - As a result, in about 13 of the 22 two-group states, fewer than 10 % of the actor's K = 20 samples are in one of the two groups. The wrong split is 0.32: for example, data 35 % in group B, samples 3 % in group B.
+   - 24 % of the samples are in the middle between the two groups, against 10 % of the data actions. So the actor puts more samples between the two kinds of actions than the data has there.
+   - The actor's margin over random points is largest at K = 15–30 (12–17 points). At K = 10 it is only 5 points (58 % against 53 %): at K = 10, ‖f‖ is still 24 and the samples are still mostly spread-out noise, so both the actor and the random points reach both groups often.
+3. **Which K is best depends on what the samples are used for.**
+   - Data missed is lowest at K = 10–15 (0.385–0.388): the samples are near the most data actions.
+   - Distance to data is lowest at K = 20 (0.296): the samples are closest to data actions.
+   - The margin over random points is largest at K = 15–30.
+   - Experiment 15 agrees: the critic choosing the best of N samples scored higher at K = 20 than at K = 30 for every N.
+   - It also explains the collapse during fine-tuning (Experiments 14 and 16). At K = 20, ‖f‖ is 6.7, so the samples are still moving; they have not reached the point where the sampler stops (‖f‖ = 0). Fine-tuning trains the model to treat these K = 20 samples as final actions. Then the next K = 20 samples are closer to the end point, which has a width of almost 0.
+4. **Limits of this test.**
+   - **The similar states are not very similar** (4.8 apart, against 11.7 for random states). So some two-group states may really be two different states with one kind of action each, not one state with two kinds of actions. For the same reason, the width of the data actions (0.383) is larger than the true width of the actions at one exact state.
+   - **Only 22 two-group states.** One state changes "both groups reached" by 4.5 percentage points. The three actors differ by up to 8 points.
+   - **The main data directions are 13 of the 21 directions,** a large part of all directions. We measured the direction of the movement, not whether it makes the policy worse. Section 3 of the 2026-11-04 plan (changing the sampler to block this movement and checking the return) is still not done.
+   - **Only humanoidmaze was tested on OGBench.** antsoccer and cube-double were not. The same test on D4RL AntMaze, with a Gaussian actor for comparison, is in the next section.
+
+### AntMaze check: does EqM-BC reach both kinds of actions more often than a Gaussian BC actor trained on the same data? (3 seeds each, 2026-11-08)
+> **What we tested.** Evaluation only: no training, no episodes, no wandb. The same test as in the OGBench section above, on the four D4RL AntMaze datasets, with one addition: a Gaussian actor trained on the same data is tested in exactly the same way. Three questions:
+> 1. At K = 20, does the EqM actor produce both kinds of actions more often than the Gaussian actor?
+> 2. What happens at K smaller and larger than 20?
+> 3. Does the movement after K = 20 go along the data, as on humanoidmaze?
+>
+> Here an action has 8 numbers (one per motor of the ant) and a state has 29 numbers.
+> - **Actors:** the Experiment 10 BC actors (`checkpoint_500000.pt`, seeds 1–3, 4 datasets). EqM-BC: 4 × 256, trained at K = 20. Gaussian BC: the same size, trained by maximum likelihood on the same data. Its std is one number per action number, the same at every state (as in CORL's AWAC actor). That std is 0.29–0.38.
+> - **Code:** `diagnostics/ogbench_two_groups.py`, now also for D4RL data and Gaussian actors. Run it with the `hawk` env's python and `LD_LIBRARY_PATH=$HOME/.mujoco/mujoco210/bin`. Results: `diagnostics/out/two_groups/<dataset>/` (`summary.md`, `results.json`, all samples; 99 MB for the four datasets).
+
+**Words used below.** The same as in the OGBench section above, with these changes and additions:
+
+| Word | Exact meaning |
+|---|---|
+| Gaussian samples | 256 draws per state from the Gaussian actor: its mean action plus its std times random normal noise. The Gaussian has no K. |
+| Gaussian mean action | The Gaussian's mean action, one per state. This is the action the Gaussian executes in Experiment 10. |
+| random points | As above, built separately for each actor from that actor's own 256 samples: same centre, same width. So EqM is compared with random points of EqM's width, and the Gaussian with random points of the Gaussian's width. |
+| margin over random points | (% of two-group states where the actor reaches both groups) − (% where its random points do). It shows how much of "both groups reached" comes from where the samples are put, and not only from how wide they are. |
+| distance to data, data missed | As above, divided by √8 instead of √21. |
+| main data directions | As above. Here 5.0–5.2 of the 8 directions on average, so movement in random directions would give a share of 0.63–0.65. |
+
+**The data** (256 states per dataset, chosen with numpy seed 0)
+
+| dataset | episodes | two-group states (of 256) | similar states: median distance of the 128th | two random states: median distance | width of the data actions | data actions: half vs half distance |
+|---|---|---|---|---|---|---|
+| umaze | 10154 | 103 | 2.75 | 7.58 | 0.438 | 0.211 |
+| umaze-diverse | 1035 | 82 | 2.94 | 7.52 | 0.445 | 0.214 |
+| medium-diverse | 2958 | 107 | 3.29 | 7.57 | 0.485 | 0.228 |
+| large-diverse | 7188 | 102 | 3.19 | 7.54 | 0.475 | 0.225 |
+
+- **82–107 of the 256 states are two-group states,** against 22 on humanoidmaze.
+- **In those states,** the smaller group has 35–36 % of the data actions, and 9 % of the data actions are in the middle (all four datasets).
+- **Check of the two-group rule:** each state's 128 data actions were replaced with 128 points from one normal distribution with the same average and covariance. 0 of 256 replacements passed, on every dataset.
+- **32–33 % of the data's action numbers are at ±0.99,** against 14.6 % on humanoidmaze.
+- **The similar states are not much closer than on humanoidmaze.** The 128th similar state is at 36–43 % of the distance between two random states (humanoidmaze: 4.8 / 11.7 = 41 %).
+
+**Result 1: both groups reached at K = 20** (two-group states only; % = average over the 3 seeds; counts in brackets = number of states for seeds 1, 2, 3)
+
+| dataset | EqM | random points, EqM width | EqM margin | Gaussian samples | random points, Gaussian width | Gaussian margin |
+|---|---|---|---|---|---|---|
+| umaze (103 states) | **49 %** (49, 50, 52) | 21 % (22, 23, 20) | **28** | 35 % (34, 38, 36) | 29 % (29, 32, 30) | 6 |
+| umaze-diverse (82) | **43 %** (35, 38, 34) | 17 % (16, 15, 11) | **26** | 29 % (23, 24, 24) | 20 % (15, 16, 18) | 9 |
+| medium-diverse (107) | **44 %** (41, 47, 52) | 20 % (20, 20, 23) | **24** | 35 % (36, 38, 39) | 30 % (29, 36, 31) | 5 |
+| large-diverse (102) | **41 %** (43, 39, 44) | 18 % (23, 18, 15) | **23** | 33 % (39, 29, 32) | 23 % (28, 20, 23) | 10 |
+
+With Maze2D's way of choosing similar states (own episode allowed; 77–91 two-group states), the picture is the same: at K = 20, EqM 51–56 % against 22–24 % for its random points; Gaussian 36–39 % against 30–34 %.
+
+**Result 2: where the samples land at K = 20.** "In the middle" uses the two-group states; the other columns use all 256 states. Average over the 3 seeds; the standard deviation between seeds is at most 0.01 for every number here except "at ±0.99" (at most 1.7 points).
+
+| dataset | in the middle: EqM / Gaussian samples / data | Gaussian mean action in the middle (% of two-group states; per seed) | width: EqM / Gaussian | distance to data: EqM / Gaussian samples / Gaussian mean action / data | data missed: EqM / Gaussian | at ±0.99 (%): EqM / Gaussian |
+|---|---|---|---|---|---|---|
+| umaze | 0.11 / 0.25 / 0.09 | 24 % (23, 26, 26) | 0.214 / 0.259 | 0.177 / 0.249 / 0.185 / 0.211 | 0.336 / 0.359 | 17.2 / 25.2 |
+| umaze-diverse | 0.10 / 0.21 / 0.09 | 14 % (11, 11, 13) | 0.216 / 0.261 | 0.179 / 0.252 / 0.189 / 0.214 | 0.340 / 0.359 | 17.7 / 24.4 |
+| medium-diverse | 0.13 / 0.25 / 0.09 | 22 % (20, 30, 22) | 0.223 / 0.272 | 0.180 / 0.260 / 0.189 / 0.228 | 0.370 / 0.387 | 16.3 / 25.2 |
+| large-diverse | 0.10 / 0.21 / 0.09 | 16 % (20, 16, 14) | 0.239 / 0.281 | 0.180 / 0.261 / 0.190 / 0.225 | 0.347 / 0.372 | 16.5 / 26.2 |
+
+**Result 3: EqM at every K** (both groups reached, % of two-group states; EqM / its random points). The Gaussian has no K; its row is repeated at the bottom.
+
+| K | umaze | umaze-diverse | medium-diverse | large-diverse | EqM in the middle (all 4) | EqM width (all 4) |
+|---|---|---|---|---|---|---|
+| 5 | 99 / 98 | 99 / 98 | 99 / 98 | 99 / 99 | 0.31–0.33 | 0.546–0.551 |
+| 10 | 71 / 59 | 71 / 53 | 65 / 58 | 66 / 49 | 0.23–0.25 | 0.360–0.374 |
+| 15 | 54 / 28 | 49 / 23 | 47 / 31 | 46 / 25 | 0.13–0.17 | 0.255–0.276 |
+| **20** | **49 / 21** | **43 / 17** | **44 / 20** | **41 / 18** | 0.10–0.13 | 0.214–0.239 |
+| 25 | 47 / 20 | 42 / 15 | 41 / 16 | 40 / 16 | 0.09–0.11 | 0.194–0.224 |
+| 30 | 45 / 17 | 39 / 16 | 39 / 13 | 38 / 15 | 0.08–0.10 | 0.183–0.217 |
+| 50 | 41 / 15 | 35 / 15 | 37 / 13 | 36 / 13 | 0.06–0.08 | 0.162–0.207 |
+| 100 | 38 / 14 | 29 / 13 | 32 / 11 | 34 / 12 | 0.05–0.07 | 0.142–0.199 |
+| 1000 | 33 / 12 | 25 / 12 | 28 / 10 | 33 / 12 | 0.04–0.06 | 0.116–0.187 |
+| Gaussian samples | 35 / 29 | 29 / 20 | 35 / 30 | 33 / 23 | 0.21–0.25 | 0.259–0.281 |
+
+- **K = 5:** almost all samples reach both groups, and so do random points. At K = 5 the samples are still close to the starting noise (width 0.55).
+- **K = 10:** EqM reaches both groups in 65–71 % of the states, but its margin over random points is only 7–18 points. Its samples are wider than the Gaussian's (0.36–0.37 against 0.26–0.28) and put as many samples in the middle as the Gaussian samples do (0.23–0.25 against 0.21–0.25).
+- **K = 15–30:** EqM is above the Gaussian on every dataset. Its margin over random points is 16–28 points, against 5–10 for the Gaussian.
+- **K = 50 and above:** EqM's level drops to about the Gaussian's level (25–41 % against 29–35 %). It stays above its own random points (margin 13–26 points), because its random points shrink with it.
+
+**Result 4: direction of EqM's movement** (all 256 states, average over the 3 seeds; share along the main data directions)
+
+| from K → to K | umaze | umaze-diverse | medium-diverse | large-diverse | share if random |
+|---|---|---|---|---|---|
+| 5 → 10 | 0.59 | 0.61 | 0.63 | 0.62 | 0.63–0.65 |
+| 10 → 20 | 0.63 | 0.65 | 0.67 | 0.67 | 0.63–0.65 |
+| 20 → 30 | **0.81** | **0.83** | **0.83** | **0.84** | 0.63–0.65 |
+| 30 → 50 | **0.89** | **0.90** | **0.90** | **0.90** | 0.63–0.65 |
+| 50 → 100 | **0.91** | **0.92** | **0.91** | **0.91** | 0.63–0.65 |
+| 100 → 1000 | **0.92** | **0.91** | **0.91** | **0.91** | 0.63–0.65 |
+
+With main data directions from the 64 closest states instead of 128, the shares are 0.78–0.81 for 20 → 30 and 0.88–0.90 for 100 → 1000, against 0.59–0.62 for random directions.
+
+**Where EqM's samples end (K = 1000, ‖f‖ = 0.00 on every dataset)**
+- **Width: 0.116 (umaze), 0.135 (umaze-diverse), 0.149 (medium-diverse), 0.187 (large-diverse).** On humanoidmaze it was 0.011. So on AntMaze the 256 samples of a state do not end at one action.
+- **Distance to data: 0.169–0.178,** still below the data's own 0.211–0.228. (On humanoidmaze the end point was above the data's value: 0.340 against 0.322.)
+- **But 38–44 % of the action numbers end at ±0.99,** against 16–18 % at K = 20 and 32–33 % in the data. So part of the remaining width comes from samples pushed to the action limit, not from samples that stop at separate points inside the action range.
+- **Data missed grows from 0.336–0.370 (K = 20) to 0.522–0.564 (K = 1000).**
+
+**What the numbers show**
+1. **At K = 15–30, EqM produces both kinds of actions more often than the Gaussian, on all four datasets, and not because it is wider.**
+   - At K = 20, EqM reaches both groups in 41–49 % of the two-group states, the Gaussian samples in 29–35 %.
+   - EqM's samples are narrower than the Gaussian's (0.21–0.24 against 0.26–0.28). Still, EqM beats random points of its own width by 23–28 points. The Gaussian beats random points of its own width by only 5–10 points. So the Gaussian reaches both groups mostly because it is wide, and EqM because its samples are placed at the groups.
+   - The margin of 23–28 points is larger than on humanoidmaze (17) and on Maze2D (13–18).
+2. **The Gaussian fills the gap between the two groups; EqM at K ≥ 15 does not.**
+   - At K = 20, 0.21–0.25 of the Gaussian samples are in the middle. That is more than twice the data's share (0.09). EqM: 0.10–0.13.
+   - The Gaussian mean action, the action it executes, lies in the middle in 14–24 % of the two-group states.
+   - Over all 256 states, though, the Gaussian mean action is about as close to the data as EqM's K = 20 samples (0.185–0.190 against 0.177–0.180). The mean action is a problem in the two-group states, not on average.
+3. **The movement after K = 20 goes along the main data directions, more clearly than on humanoidmaze.** Up to K = 20, the share is 0.59–0.67, about the same as random directions (0.63–0.65). From K = 20 on, it is 0.81–0.92 (humanoidmaze: 0.77–0.87). The pattern is the same on all four datasets.
+4. **This test does not predict the return.** Compare with Experiment 10 (success rate on umaze / umaze-diverse):
+   - At K = 20, where this test favours EqM most clearly, EqM-BC scores the same as the Gaussian's mean action: 55.3 against 54.6, and 55.5 against 51.8.
+   - At K = 10, EqM-BC scores best (73.3 and 73.9). But at K = 10 this test favours EqM much less. Its margin over random points is 12 and 18 points (umaze, umaze-diverse). Its samples are wider than the Gaussian's, farther from the data (0.299–0.307 against 0.249–0.261), and put as many samples in the middle as the Gaussian samples.
+   - So "reaching both groups" and "not putting samples in the middle", as measured at K = 20, are not what made EqM-BC beat the Gaussian on return.
+   - One measured number is best at K = 10: data missed is lowest there (0.300–0.325, against 0.336–0.370 at K = 20 and 0.359–0.387 for the Gaussian samples). At K = 10 there is a sample near more of the data actions. This matches the higher return, but the test does not show that one causes the other.
+   - On medium-diverse and large-diverse, both actors score about 0, so the return cannot separate them there.
+5. **Limits of this test.**
+   - **The similar states are still far apart** (36–43 % of the distance between random states, the same as humanoidmaze). Some two-group states may be two different states with one kind of action each.
+   - **The Gaussian's std is the same at every state.** A Gaussian whose std depends on the state could be narrower where the data actions are close together. Its margin over random points might then change. It would still be one bump per state.
+   - **About 100 two-group states per dataset.** One state changes "both groups reached" by about 1 percentage point. The 3 seeds differ by up to ±4 points at K = 20.
+   - **Only the BC actors were tested,** not actors fine-tuned with a critic.
+
 ## Later phases
 - **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.
 - **Phase 3 — Offline-to-online:** continue EqM-AWAC online. Consider FINO (wider action support for exploration) and FFM (behavior-tilted fine-tuning).
