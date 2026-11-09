@@ -1,8 +1,8 @@
 # IFQL: how it trains, how its critic works, and how the critic is used
 
-Written 2026-11-09. IFQL ("implicit flow Q-learning") is one of the baselines in the FQL paper (Park, Li, Levine 2025). It is the
-best-performing method in that paper on our main task, `humanoidmaze-medium-navigate-singletask-v0` (69 % success on task 1),
-which is why it is written up here.
+Written 2026-11-09, and corrected the same day after a second check against the sources below. IFQL ("implicit flow
+Q-learning") is one of the baselines in the FQL paper (Park, Li, Levine 2025). It is the best-performing method in that paper on
+our main task, `humanoidmaze-medium-navigate-singletask-v0` (69 % success on task 1), which is why it is written up here.
 
 **Sources** (everything below was checked against these; anything that could not be checked is marked as such):
 - FQL paper: `papers/FQL.pdf` (arXiv 2502.02538v2). Main text Section 4.1 (rejection sampling, Equation 11) and Section 5.1;
@@ -12,14 +12,18 @@ which is why it is written up here.
   `utils/networks.py`, `utils/flax_utils.py`, `utils/datasets.py`, `envs/env_utils.py`, `utils/evaluation.py`, `main.py`, and the
   exact IFQL command for humanoidmaze in `README.md`.
 - IDQL paper (Hansen-Estruch et al. 2023, arXiv 2304.10573), Sections 4.1, 4.2 and 6.3. IFQL is "the flow counterpart of IDQL"
-  (FQL paper, Section 5.1); the IDQL paper defines the critic-based weights described in Section 8.
+  (FQL paper, Section 5.1); the IDQL paper defines the critic-based weights described in Section 9.3.
+- OGBench 1.2.2 (in the `ogbench` conda env): `ogbench/utils.py`, `ogbench/relabel_utils.py`, `ogbench/locomaze/maze.py`, and
+  the humanoidmaze-medium dataset itself. Used for how the dataset's rewards and masks are set (Section 2).
+- Our own runs (Sections 9.4 and 11): `sweeps/exp13_ogbench_aware.yaml`, `sweeps/exp14_ogbench_*.yaml`,
+  `sweeps/exp15_ogbench_bestofn.yaml`, `sweeps/exp18_ogbench_aware_v.yaml`, the summaries in `sweep_runs/`, and `Aware/agents.py`.
 
 ## 1. Summary
 
 1. IFQL trains three things **separately**, all from the first step, on the same batches of dataset rows:
    a value network V, a critic Q (two copies), and a flow network that copies the dataset's actions (behaviour cloning).
-2. The critic is IQL's critic, unchanged. It is trained only at the dataset's own actions: it never scores an action that a
-   policy invented.
+2. The critic is IQL's critic, unchanged. It is trained only at the dataset's own actions: during training, it never scores
+   an action that a policy invented. It scores the flow network's proposals only when an action is chosen (point 4).
 3. The flow network never sees Q or V. Every dataset row has weight 1.
 4. The critic and the flow network are combined only when an action is chosen: the flow network proposes 32 actions,
    and the critic picks the one with the highest score.
@@ -32,9 +36,9 @@ which is why it is written up here.
 |---|---|
 | state s | the numbers describing the situation at one time step; in humanoidmaze, 69 numbers (robot body and position) |
 | action a | the command sent to the robot at one step; in humanoidmaze, 21 numbers (one per motor), each between −1 and 1 |
-| reward r | −1 on every step before the goal is reached, 0 on the step that reaches it (FQL appendix E.1: "rewards are always −1 or 0") |
+| reward r | always −1 or 0 (FQL appendix E.1: "rewards are always −1 or 0"). **In the dataset:** 0 on the rows whose state s is already inside the goal circle, −1 on all other rows, including the row whose next state s′ first enters the goal circle. **In the evaluation environment:** 0 on the step that reaches the goal, −1 on every step before it. See the note below this table |
 | next state s′ | the state one step after s |
-| mask | 0 on the step where the goal is reached (the episode ends there, appendix E.1), 1 on every other step |
+| mask | **in the dataset:** 0 on the rows whose state s is inside the goal circle (the same rows that have reward 0), 1 on all other rows. It stands in for the end of the episode: in the evaluation environment, the episode ends on the step that reaches the goal (appendix E.1) |
 | dataset | 2,000,000 rows (s, a, r, s′, mask) recorded in advance (`humanoidmaze-medium-navigate-v0`, the training split). IFQL collects no new data in offline training |
 | batch | 256 rows drawn uniformly at random from the dataset (with replacement) |
 | discount γ | how much a later reward counts: a reward k steps later counts γᵏ times as much. Humanoidmaze: γ = 0.995 |
@@ -43,7 +47,7 @@ which is why it is written up here.
 | Q(s, a), the critic | a network that takes a state and an action and outputs an estimate of the return after taking that action |
 | Q1, Q2 | two critic networks with the same shape and different random starting weights; "min Q" = the smaller of their outputs |
 | V(s), the value network | a network that takes only a state and outputs one number: how good that state is (defined exactly in Section 4, step 2) |
-| target copy | a second set of weights that follows the trained weights slowly (Section 4, step 6); training targets are computed with it so that they do not jump around |
+| target copy | a second set of weights that follows the trained weights slowly (Section 4, step 6). In IFQL, only Q1 and Q2 have one, and only V's training target is computed with it, so that this target does not jump around. Q's own target uses V, which has no copy |
 | flow network v(s, x, t) | a network that takes a state s, a point x in action space (21 numbers) and a time t between 0 and 1, and outputs a direction (21 numbers) saying how to move x |
 | behaviour cloning (BC) | training a network to reproduce the dataset's actions, with no notion of good or bad |
 | expectile loss with τ = 0.9 | a squared error that counts with weight 0.9 when the prediction is too low and 0.1 when it is too high |
@@ -51,6 +55,17 @@ which is why it is written up here.
 | LayerNorm | rescales the 512 numbers of a layer to mean 0 and spread 1, then applies a learned scale and shift |
 | IQL | Implicit Q-Learning (Kostrikov et al. 2022), the method IFQL takes its V and Q training from |
 | IDQL | Implicit Diffusion Q-Learning (Hansen-Estruch et al. 2023): IQL's critic plus a diffusion BC model; IFQL is the same idea with a flow BC model |
+
+**Note on the goal and the reward timing.** The goal circle is the set of x-y positions within 0.5 of the task's goal position
+(task 1: (20, 20)). The dataset and the evaluation environment give reward 0 one step apart:
+- OGBench sets the dataset's rewards and masks from the position in each row's state s, not in s′ (`relabel_dataset` in
+  `ogbench/relabel_utils.py` reads `qpos`, and `ogbench/utils.py` aligns `qpos` with s).
+- The evaluation environment checks for the goal after each step.
+- Checked on the task 1 data: all 3,921 of the 2,000,000 rows with reward 0 have s inside the goal circle. All 209 rows that
+  enter the circle (s outside, s′ inside) have reward −1 and mask 1.
+- Effect: for every state s outside the goal circle, Q with the dataset's rewards = γ · (Q with the evaluation rewards) − 1.
+  So the values learned from the data are lower by between 0 and 1: by 1 right before the goal, by almost 0 far from it.
+  Both rank actions the same way.
 
 ## 3. The networks
 
@@ -79,9 +94,13 @@ there is no separate pre-training phase.
 - d = q − V(s).
 - Loss = 0.9 · d² if d ≥ 0 (V is too low), and 0.1 · d² if d < 0 (V is too high). Averaged over the batch.
 - Effect: a prediction that is too low costs 9 times more than one that is too high, so V(s) does not settle at the average
-  Q of the actions taken at similar states. It settles between that average and the highest of them, closer to the highest.
-- Example: if the dataset's actions at similar states have Q = −120, −100 and −80, a plain squared loss puts V at −100 (the
-  average); the 0.9 expectile puts V at about −85.5 (solve 0.9 · (−80 − V) = 0.1 · ((V + 120) + (V + 100))).
+  Q of the actions taken at similar states. It settles between that average and the highest of them. Where exactly depends on
+  how the Q values are spread, as the two examples show.
+- Example 1: if the dataset's actions at similar states have Q = −120, −100 and −80, a plain squared loss puts V at −100 (the
+  average); the 0.9 expectile puts V at about −85.5 (solve 0.9 · (−80 − V) = 0.1 · ((V + 120) + (V + 100))). Here V is
+  closer to the highest Q.
+- Example 2: if 99 actions have Q = 0 and 1 action has Q = 100, the average is 1 and the 0.9 expectile is about 8.3 (solve
+  0.9 · (100 − V) = 0.1 · 99 · V). Here V is much closer to the average than to the highest Q.
 - In plain words: V(s) is "how good s is if you act like the better actions in the data".
 
 **Step 3. Train Q1 and Q2.**
@@ -203,18 +222,20 @@ one-hot" (Section 4.2). That is why IFQL takes the maximum.
 
 ### 9.4 For comparison: methods that train the actor with weights from a critic
 
-Results on humanoidmaze-medium task 1 (FQL paper Table 3, 8 seeds; our runs 3 seeds).
+Results on humanoidmaze-medium task 1 (FQL paper Table 3, 8 seeds; our runs 3 seeds, except 2 for Exp 13's IQL critic).
 
 | method | weight of each dataset row during actor training | success |
 |---|---|---|
 | IQL (Gaussian actor; same code base, same critic as IFQL) | min(exp(10 · (min(Q1, Q2)(s, a) − V(s))), 100); α = 10 (Table 6); uses the trained Q, not the target copies | 32 ± 7 % |
 | FAWAC (flow actor with AWR weights) | exp(α · (Q(s, a) − V(s))) with α = 3 (Equation 10, Table 6). Its code is not public, so its V and any cap could not be checked | 6 ± 2 % |
 | **IFQL** | **none (weight 1 for every row); best of 32 at decision time** | **69 ± 19 %** |
-| our Aware (Experiments 13 and 18) | min(exp((Q − V)/T), 100) with T = 1/3, the same form as α = 3; V = mean min Q over the actor's own samples (1 sample in Exp 13, 16 in Exp 18), not an expectile network | 0–2 % (both stopped early: Exp 13 at 100–200k, Exp 18 at 300k) |
+| our Aware with its AWAC critic (Experiment 13, AWAC runs; Experiment 18) | min(exp((Q − V)/T), 100) with T = 1/3, the same form as α = 3; Q = min(Q1, Q2)(s, a) from the trained critic; V = mean min Q over the actor's own samples (1 sample in Exp 13, 16 in Exp 18), not an expectile network | 0–2 % (stopped early; last eval at 100–200k in Exp 13, 300k in Exp 18) |
+| our Aware with an IQL critic (Experiment 13, IQL runs) | the same formula with T = 1/3, but Q = min(Q1, Q2)(s, a) from the target copies, and V from a value network trained with the 0.9 expectile loss, as in IFQL | 0–2 % (2 seeds, the third run was never started; stopped early, last eval at 200k) |
 
 ## 10. Results on humanoidmaze-medium (FQL paper)
 
 Success in %, 8 seeds, mean of the evals at 800k, 900k and 1M (Table 3; Table 2 for the average over the five tasks).
+Exception: IDQL was trained for 3M steps, and its score is the mean of the evals at 2.5M, 2.75M and 3M (appendix E.2).
 
 | task | BC | IQL | IDQL | CAC | FAWAC | FBRAC | **IFQL** | FQL |
 |---|---|---|---|---|---|---|---|---|
@@ -226,8 +247,10 @@ Success in %, 8 seeds, mean of the evals at 800k, 900k and 1M (Table 3; Table 2 
 | average of the 5 tasks | 2 ± 1 | 33 ± 2 | 1 ± 0 | 53 ± 8 | 19 ± 1 | 38 ± 5 | **60 ± 14** | 58 ± 5 |
 
 - **Offline-to-online** (Table 4, task 1, success at 1M offline steps → after 1M more online steps): IFQL 56 ± 35 → 82 ± 20;
-  FQL 12 ± 7 → 22 ± 12; IQL 21 ± 13 → 16 ± 8. The offline number (56) differs from Table 3 (69) because Table 4 reports the 1M eval
-  only. IFQL used N = 32 here as well (Table 7).
+  FQL 12 ± 7 → 22 ± 12; IQL 21 ± 13 → 16 ± 8. The offline number (56) differs from Table 3 (69). One reason: Table 4 reports
+  only the eval at 1M (appendix B), while Table 3 reports the mean of the evals at 800k, 900k and 1M. The paper does not say
+  whether Table 4 uses the same runs as Table 3. For FQL it cannot: FQL used α = 30 in Table 6 and α = 100 in Table 7. IFQL
+  used N = 32 in both tables.
 - **The same idea with a different implementation scored 1 %:** IDQL (the official diffusion code, run by the FQL authors,
   appendix E.2) uses the same kind of critic (IQL, expectile loss) and also chooses among N = 32 samples (Table 6), but scored
   1 ± 1 % on task 1. The differences the appendix lists: value networks of 2 × 512 (4 layers were "unstable" in that code base), expectile 0.7 for locomotion
@@ -236,20 +259,24 @@ Success in %, 8 seeds, mean of the evals at 800k, 900k and 1M (Table 3; Table 2 
 
 ## 11. Comparison with our experiments on the same task
 
-| | IFQL | our Experiment 15 (best of N) | our Experiments 13 and 18 (Aware) |
-|---|---|---|---|
-| actor proposing actions | flow BC, 10 Euler steps, 1M steps, never sees the critic | EqM-BC (Exp 14), K = 20 sampler steps, 500k steps, frozen | EqM actor trained with AWAC weights from the critic |
-| critic target | r + γ · V(s′); V by expectile 0.9 at dataset actions | QIPO softmax: average of Q over the dataset's next action and 16 EqM-BC samples at K = 10, weighted by softmax(3 · Q) | min Q at one next action from the current EqM actor |
-| critic sees policy-made actions in training | no | yes (the 16 EqM-BC samples) | yes (the actor's next action) |
-| critic network | 4 × 512, LayerNorm, γ = 0.995, no target clipping | 4 × 512, LayerNorm, γ = 0.995, target clipped to [−200, 0] | Exp 13: 4 × 256, γ = 0.995; Exp 18: 4 × 512, LayerNorm, γ = 0.999 |
-| how the critic is used | best of 32 at decision time | best of 16 / 32 / 64 at decision time | weights in actor training |
-| seeds | 8 | 3 | 3 |
-| success, task 1 | 69 ± 19 % | 33 / 39 / 42 % (N = 16 / 32 / 64) | 0–2 % |
+| | IFQL | our Experiment 15 (best of N) | our Aware with its AWAC critic (Exp 13 AWAC runs, Exp 18) | our Aware with an IQL critic (Exp 13 IQL runs) |
+|---|---|---|---|---|
+| actor proposing actions | flow BC, 10 Euler steps, 1M steps, never sees the critic | EqM-BC (Exp 14), K = 20 sampler steps, 500k steps, frozen | EqM actor trained with AWAC weights from the critic | EqM actor trained with AWAC weights from the critic |
+| critic target | r + γ · V(s′); V by expectile 0.9 at dataset actions | QIPO softmax: average of Q over the dataset's next action and 16 EqM-BC samples at K = 10, weighted by softmax(3 · Q) | min Q at one next action from the current EqM actor | r + γ · V(s′); V by expectile 0.9 at dataset actions, as in IFQL |
+| critic sees policy-made actions in training | no | yes (the 16 EqM-BC samples) | yes (the actor's next action) | no |
+| critic network | 4 × 512, LayerNorm, γ = 0.995, no target clipping | 4 × 512, LayerNorm, γ = 0.995, target clipped to [−200, 0] | Exp 13: 4 × 256, γ = 0.995; Exp 18: 4 × 512, LayerNorm, γ = 0.999 | Q and V: 4 × 256, no LayerNorm, γ = 0.995 |
+| how the critic is used | best of 32 at decision time | best of 16 / 32 / 64 at decision time | weights in actor training | weights in actor training |
+| seeds | 8 | 3 | 3 | 2 (the third run was never started) |
+| success, task 1 | 69 ± 19 % | 33 / 39 / 42 % (N = 16 / 32 / 64) | 0–2 % (stopped early; last eval at 100k–300k) | 0–2 % (stopped early; last eval at 200k) |
 
-Experiment 15 and IFQL use the critic in the same way (choose one of N samples from a frozen BC actor). They differ in how the
-critic is trained (IQL expectile V on dataset actions vs QIPO's softmax target over BC samples), in the actor (EqM at K = 20 vs
-flow), in BC training length (500k vs 1M steps), and in the number of seeds.
+Experiment 15 and IFQL use the critic in the same way (choose one of N samples from a BC actor that the critic never changes).
+They differ in how the critic is trained (IQL expectile V on dataset actions vs QIPO's softmax target over BC samples), in the
+actor (EqM at K = 20 vs flow), in the actor's width (EqM-BC 4 × 256 vs flow 4 × 512), in BC training length (500k vs 1M
+steps), in the evaluation (Exp 15: 100 episodes at the final checkpoints; FQL: the mean of 3 evals of 50 episodes each, at
+800k, 900k and 1M), and in the number of seeds.
 
 **Not tested yet (possible next experiment):** the IFQL recipe with our actor, i.e. train an IQL critic exactly as in Sections 4
 and 7 (expectile 0.9, 4 × 512 with LayerNorm, γ = 0.995, 1M steps) and choose the best of 32 EqM-BC samples at K = 20. This would
-separate the effect of the critic training from the effect of the actor type.
+separate the effect of the critic training from the effect of the actor type. Experiment 13 already trained an IQL critic
+(expectile 0.9), but a different one, used differently: smaller networks (4 × 256, no LayerNorm), used only for the actor's
+training weights and never to choose among samples, and stopped early (last eval at 200k, 0–2 %).
