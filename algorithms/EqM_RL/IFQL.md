@@ -396,6 +396,60 @@ What these numbers show:
    FQL paper's own Table 4 gives IFQL at the 1M eval alone as 56 ± 35 (Section 10), so single seeds failing at single
    evals also happens there.
 
-Not known: why seed 1's critic drifted upward after 700k. Its checkpoints at every 100k steps are saved
-(`/workspace/Trained_Models/checkpoints/Exp19_IEQM_…_seed1-…/checkpoint_700000.pt` and `checkpoint_800000.pt`), so the
-critic before and after the fall can be compared without new training.
+Why seed 1 fell is answered in Section 12.7.
+
+### 12.7 Why seed 1 fell: the critic grew a false peak of V at maze cell (4,2)
+
+Checked on 2026-11-10 with `diagnostics/exp19_critic_drift.py` (output: `diagnostics/out/exp19_critic_drift/summary.md`).
+It reads the saved checkpoints (one per 100k steps and seed) and trains nothing.
+
+The maze is a grid of cells of 4 × 4 length units. A cell is named (row, column); `####` is a wall:
+
+```
+  start   (1,2)    ####    ####   (1,5)   (1,6)
+  (2,1)   (2,2)    ####   (2,4)   (2,5)   (2,6)
+   ####   (3,2)   (3,3)   (3,4)    ####    ####
+  (4,1)   (4,2)    ####   (4,4)   (4,5)   (4,6)
+  (5,1)    ####   (5,3)   (5,4)    ####   (5,6)
+  (6,1)   (6,2)   (6,3)    ####   (6,5)    goal
+```
+
+The route to the goal is start → (2,1) → (2,2) → (3,2) → (3,3) → (3,4) → (4,4) → (4,5) → (4,6) → (5,6) → goal.
+Cell (4,2) lies below (3,2), off this route. It is the entrance of a side corridor: (4,2) → (4,1) → (5,1) → (6,1).
+
+"V of a cell" below is V averaged over the dataset states whose x-y position is in that cell (300,000 sampled states).
+
+1. **V changed in one region only.** Seed 1, from 700k to 800k: V rose by 25.7 at (4,2), by 24.2 at (4,1) and by 15.1 at
+   (5,1). From 700k to 900k: by 44.3, 49.1 and 50.7. In the 13 cells on the goal side (columns 4 to 6), V changed by less
+   than 5. In seed 2, between 700k and 900k, no cell changed by more than 2.2.
+2. **This makes (4,2) a false peak.** Test: start in the start cell and always step to the neighbouring cell with the
+   highest V, until no neighbour is higher. In seed 2 this walk ends in the goal cell at all 10 checkpoints. In seed 1 it
+   ends at (4,2) at 800k, 900k and 1M. In seed 3 it ends at (4,2) at 1M. (Seed 1 also stopped once early, at (5,4) at 200k.)
+3. **The policy walks to the false peak.** Rollouts of 50 episodes with the seed's frozen actor and the critic of one
+   checkpoint, best of 32 as in the run:
+
+   | seed | critic of | success | where the failed episodes spent their last 500 steps (share of those steps) |
+   |---|---|---|---|
+   | 1 | 700k | 70 % | (6,6) 41 %, (4,2) 13 %, (5,4) 10 %, (5,6) 10 % |
+   | 1 | 800k | 8 % | (4,2) 34 %, (5,1) 28 %, (5,4) 18 %, (4,1) 11 % |
+   | 1 | 900k | 0 % | (5,1) 71 %, (4,2) 19 %, (4,1) 7 %, (6,1) 2 % |
+   | 3 | 900k | 92 % | (6,6) 89 %, (5,6) 11 % |
+   | 3 | 1M | 38 % | (4,2) 64 %, (6,6) 7 %, (5,4) 6 %, (5,1) 6 % |
+   | 2 | 1M | 62 % | (6,6) 29 %, (5,4) 26 %, (4,5) 9 %, (2,2) 6 % |
+
+   These successes differ by up to 16 points from the run's own evals of the same checkpoints (70 vs 76, 92 vs 78,
+   62 vs 78). The start states are the same; only the random candidates differ. So one eval of 50 episodes is this noisy.
+4. **Seed 3's fall at the last eval (Section 12.6, point 3) is the same failure starting**, at the same cell: its V at
+   (4,2) rose by 13.2 between 900k and 1M.
+5. **An early sign, one checkpoint before the success fell.** The spread (standard deviation over the cell's dataset rows)
+   of Q(s, a) − V(s) at (4,2): seed 1: 0.65 at 500k, 0.70 at 600k, then 1.58 at 700k, when success was still 76 %. Seed 3:
+   0.71 at 800k, then 1.08 at 900k, when success was still 78 %. Seed 2: 0.59 at 700k and 0.70 at 900k. This is 3 seeds,
+   so it is an observation, not a proven rule.
+6. **The training losses did not show the failure.** In seed 1 the Q loss rose only from 2.7 to 3.2, and Q stayed between
+   −187 and −4.
+7. **The level of V is far more optimistic than the real returns, also in the good checkpoints.** V at the start cell is
+   about −155, which is the return of reaching the goal in about 300 steps. Successful episodes need about 1,300 steps. So
+   the policy is steered by which cell has the higher V, not by the level of V, and a local error of the shape is enough to
+   break it.
+
+Not known: why the peak starts, and why at (4,2) in both seeds.
