@@ -36,6 +36,7 @@ ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDe
 ap.add_argument("--env_name", default="humanoidmaze-medium-navigate-singletask-v0")
 ap.add_argument("--root", default="/workspace/Trained_Models/checkpoints")
 ap.add_argument("--prefix", default="Exp19_IEQM")
+ap.add_argument("--tag", default="", help="the part of the run name between the env name and _seed, e.g. _expectile0.7")
 ap.add_argument("--seeds", default="1,2,3")
 ap.add_argument("--steps", default=",".join(str(s) for s in range(100000, 1000001, 100000)))
 ap.add_argument("--sample", type=int, default=300000, help="dataset states used for the cell means")
@@ -67,7 +68,7 @@ def cells_of(xy: np.ndarray) -> np.ndarray:
 
 
 def run_dir(seed: int) -> str:
-    d = glob.glob(f"{args.root}/{args.prefix}_env_name{args.env_name}_seed{seed}-{args.env_name}-*")
+    d = glob.glob(f"{args.root}/{args.prefix}_env_name{args.env_name}{args.tag}_seed{seed}-{args.env_name}-*")
     assert len(d) == 1, f"expected one run for seed {seed}, found {d}"
     return d[0]
 
@@ -120,7 +121,7 @@ def grid(vals: dict, fmt="{:7.1f}") -> str:
 VC = {(sd, st): cell_means(sd, st) for sd in seeds for st in steps}
 
 print("# Experiment 19: the critic per maze cell, and where the policy goes\n")
-print(f"`{args.env_name}`, runs `{args.prefix}`, seeds {seeds}. The maze is a grid of cells of 4 × 4 length units. "
+print(f"`{args.env_name}`, runs `{args.prefix}{args.tag}`, seeds {seeds}. The maze is a grid of cells of 4 × 4 length units. "
       f"A cell is named (row, column). Start cell {start_cell}, goal cell {goal_cell}. `####` = wall.\n")
 layout = {c: (" start" if c == start_cell else "  goal" if c == goal_cell else f" ({c[0]},{c[1]})") for c in free}
 print("Cell names:\n\n" + grid(layout, "{:>7}") + "\n")

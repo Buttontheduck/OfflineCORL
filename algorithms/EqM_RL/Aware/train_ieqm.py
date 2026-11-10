@@ -1,5 +1,5 @@
-"""IEQM: IFQL (IFQL.md) with our EqM actor in place of IFQL's flow network. OGBench single-task data only
-(run with the ogbench conda env). Experiment 19.
+"""IEQM: IFQL (IFQL.md) with our EqM actor in place of IFQL's flow network.
+OGBench single-task data runs in the ogbench conda env; D4RL data runs in hawk (Experiment 23).
 
 What is IFQL's, unchanged (IFQL.md, Sections 3, 4, 5 and 7; FQL's agents/ifql.py):
   networks   V(s), Q1(s, a), Q2(s, a): n_hidden x (Linear -> GELU -> LayerNorm), then Linear -> 1. Glorot-uniform
@@ -29,8 +29,9 @@ Optional second actor, evaluated with the same critic (frozen_bc_prefix, e.g. Ex
 of fit_actor.py with this seed, <bc_root>/<frozen_bc_prefix>_env_name<env>_actoreqm_seed<seed>-*/<bc_checkpoint>.
 It is not trained here. Its eval is the critic comparison with Experiment 15 (same actor, QIPO critic).
 
-Eval every eval_frequency steps: n_test_episodes episodes per task in eval_tasks (ogbench_data.evaluate, seeded
-starts). Logged under eval/ (trained actor) and eval_frozen/ (frozen actor): normalized_score = success in %,
+Eval every eval_frequency steps: OGBench uses n_test_episodes episodes per task in eval_tasks; D4RL uses
+n_test_episodes seeded episodes and D4RL's normalized return (not success). Logged under eval/ (trained actor)
+and eval_frozen/ (frozen actor): normalized_score = success in % for OGBench, D4RL normalized return otherwise,
 score = return, episode_length, q_start = Q of the chosen action at the start states, q_gain = mean over all steps of
 Q(chosen) - mean Q(candidates). One line 'RESULT {json}' per eval and actor, and at the end one 'FINAL {json}' per
 actor: the mean success of the last final_evals evals (FQL's score: the evals at 800k, 900k and 1M).
@@ -61,6 +62,7 @@ import yaml
 import ogbench_data
 from actor_models import Actor
 from agents import Otter
+from offline_data import load_d4rl
 from train_critic import set_seed
 from utils.networks import ConditionalMLP
 
@@ -100,10 +102,11 @@ class TrainConfig:
     # evaluation and saving
     eval_candidates: int = 32             # N (IFQL on humanoidmaze: 32)
     eval_frequency: int = 100000
-    n_test_episodes: int = 50             # per task (OGBench: 50)
+    n_test_episodes: int = 50             # per task for OGBench; total episodes for D4RL
     eval_tasks: str = "own"               # 'own' (the dataset's task, whose rewards the critic learned), 'all' or "1,3"
     final_evals: int = 3                  # the score is the mean success of this many last evals
     test_seed: int = 69                   # as fit_actor.py, train_critic.py and eval_best_of_n.py
+    flip_angle: float = 2.0              # HalfCheetah diagnostic: |body angle| exceeds this in an episode
     ogbench_dir: str = ogbench_data.OGBENCH_DATA
     log_frequency: int = 5000
     stats_every: int = 10                 # the train/ logs average every this many steps' batches
@@ -176,11 +179,48 @@ def find_frozen_bc(cfg: TrainConfig) -> str:
     return dirs[0]
 
 
+def evaluate_d4rl(envs, act, seed, low, high, track_flips=False, flip_angle=2.0):
+    """Old-gym episodes side by side, as fit_actor.py. act takes raw states.
+
+    Time limits end evaluation episodes; training bootstraps according to dataset terminals only.
+    """
+    obs = []
+    for i, env in enumerate(envs):
+        env.seed(seed + i)
+        obs.append(env.reset())
+    obs = np.stack(obs).astype(np.float64)
+    returns = np.zeros(len(envs))
+    lengths = np.zeros(len(envs), dtype=int)
+    done = np.zeros(len(envs), dtype=bool)
+    flipped = np.zeros(len(envs), dtype=bool)
+    while not done.all():
+        active = np.flatnonzero(~done)
+        actions = np.clip(act(obs[active].astype(np.float32)), low, high)
+        for k, i in enumerate(active):
+            obs[i], reward, done[i], _ = envs[i].step(actions[k])
+            returns[i] += reward
+            lengths[i] += 1
+            if track_flips:
+                flipped[i] |= abs(obs[i][1]) > flip_angle
+    out = dict(score=float(returns.mean()), score_std=float(returns.std()), score_min=float(returns.min()),
+               normalized_score=float(envs[0].get_normalized_score(returns.mean()) * 100.0),
+               episode_length=float(lengths.mean()))
+    if track_flips:
+        out["flip_rate"] = float(flipped.mean())
+    return out
+
+
 @pyrallis.wrap()
 def train(cfg: TrainConfig):
-    assert ogbench_data.is_ogbench(cfg.env_name), "train_ieqm.py supports OGBench single-task data only"
     dev = cfg.device
-    env, data, mean, std, _, data_info = ogbench_data.load_ogbench(cfg.env_name, cfg.ogbench_dir)
+    ogb = ogbench_data.is_ogbench(cfg.env_name)
+    if ogb:
+        env, data, mean, std, _, data_info = ogbench_data.load_ogbench(cfg.env_name, cfg.ogbench_dir)
+    else:
+        env, data, mean, std, ep = load_d4rl(cfg.env_name)
+        data_info = dict(benchmark="d4rl", transitions=len(data["observations"]), episodes=int(ep.max()) + 1,
+                         state_dim=int(data["observations"].shape[1]), action_dim=int(data["actions"].shape[1]),
+                         max_episode_steps=int(env.spec.max_episode_steps))
     set_seed(cfg.seed, env)
     n, state_dim, action_dim = len(data["observations"]), data["observations"].shape[1], data["actions"].shape[1]
     low, high = float(env.action_space.low[0]), float(env.action_space.high[0])
@@ -191,7 +231,7 @@ def train(cfg: TrainConfig):
     A = torch.tensor(np.clip(data["actions"], low + cfg.action_clip_eps, high - cfg.action_clip_eps),
                      dtype=torch.float32, device=dev)
     R = torch.tensor(data["rewards"], dtype=torch.float32, device=dev)
-    D = torch.tensor(data["terminals"], dtype=torch.float32, device=dev)      # task terminal = 1 - masks
+    D = torch.tensor(data["terminals"], dtype=torch.float32, device=dev)      # OGBench task terminal / D4RL terminal
     mean_t = torch.tensor(mean, dtype=torch.float32, device=dev)              # the actors take (s - mean) / std
     std_t = torch.tensor(std, dtype=torch.float32, device=dev)
     r_min = float(R.min())
@@ -262,10 +302,16 @@ def train(cfg: TrainConfig):
                     "train/adv_std": out["diff"].std(), "train/adv_pos_share": (out["diff"] >= 0).float().mean()}
 
     # ------------------------------------------------------------ evaluation: best of N candidates of an actor
-    tasks = ogbench_data.parse_tasks(cfg.eval_tasks, env)
-    eval_envs = ogbench_data.make_eval_envs(cfg.env_name, tasks, cfg.n_test_episodes)
-    data_info.update(eval_tasks=tasks, eval_episodes_per_task=cfg.n_test_episodes,
-                     score="success rate in %, mean over eval_tasks (OGBench)")
+    if ogb:
+        tasks = ogbench_data.parse_tasks(cfg.eval_tasks, env)
+        eval_envs = ogbench_data.make_eval_envs(cfg.env_name, tasks, cfg.n_test_episodes)
+        data_info.update(eval_tasks=tasks, eval_episodes_per_task=cfg.n_test_episodes,
+                         score="success rate in %, mean over eval_tasks (OGBench)")
+    else:
+        import gym
+        tasks = []
+        eval_envs = [env] + [gym.make(cfg.env_name) for _ in range(cfg.n_test_episodes - 1)]
+        data_info.update(eval_episodes=cfg.n_test_episodes, score="D4RL normalized score of the mean return")
     eval_gen = torch.Generator(device=dev).manual_seed(cfg.seed + 2000)   # its own stream: evals don't change training
     N = cfg.eval_candidates
 
@@ -287,7 +333,11 @@ def train(cfg: TrainConfig):
             st["n"] += len(s)
             return cand[torch.arange(len(s), device=dev), best].cpu().numpy()
 
-        ev = ogbench_data.evaluate(eval_envs, act, 0.0, 1.0, cfg.test_seed, low, high)
+        if ogb:
+            ev = ogbench_data.evaluate(eval_envs, act, 0.0, 1.0, cfg.test_seed, low, high)
+        else:
+            ev = evaluate_d4rl(eval_envs, act, cfg.test_seed, low, high,
+                               "halfcheetah" in cfg.env_name, cfg.flip_angle)
         ev.update(q_start=st["q_start"], q_gain=st["gain"] / max(st["n"], 1))
         return ev
 
@@ -328,8 +378,13 @@ def train(cfg: TrainConfig):
                         log.update({(f"{prefix[kind]}_tasks/" if "_task" in k else f"{prefix[kind]}/") + k: v
                                     for k, v in ev.items()})
                         print("RESULT " + json.dumps(dict(
-                            env_name=cfg.env_name, seed=cfg.seed, step=t, actor=kind, K=cfg.num_step, N=N,
-                            episodes=cfg.n_test_episodes * len(tasks), success=ev["normalized_score"],
+                            env_name=cfg.env_name, seed=cfg.seed, expectile=cfg.expectile, gamma=cfg.gamma,
+                            benchmark=data_info["benchmark"], step=t, actor=kind,
+                            K=cfg.num_step, N=N,
+                            episodes=cfg.n_test_episodes * (len(tasks) if ogb else 1),
+                            normalized_score=ev["normalized_score"],
+                            **({"success": ev["normalized_score"]} if ogb else
+                               {"flip_rate": ev.get("flip_rate")}),
                             score=ev["score"], episode_length=ev["episode_length"], q_start=ev["q_start"],
                             q_gain=ev["q_gain"], seconds=ev["seconds"], v_data=log["train/v_data"],
                             q_data=log["train/q_data"], q_loss=log["train/q_loss"], v_loss=log["train/v_loss"],
@@ -344,10 +399,14 @@ def train(cfg: TrainConfig):
             if steps:
                 final = float(np.mean([h[s] for s in steps]))
                 wandb.run.summary[f"final/{prefix[kind]}_score"] = final
-                print("FINAL " + json.dumps(dict(env_name=cfg.env_name, seed=cfg.seed, actor=kind, steps=steps,
-                                                 success=final)), flush=True)
+                print("FINAL " + json.dumps(dict(env_name=cfg.env_name, seed=cfg.seed, expectile=cfg.expectile,
+                                                 gamma=cfg.gamma, actor=kind, steps=steps, normalized_score=final,
+                                                 **({"success": final} if ogb else {}))), flush=True)
     finally:
         wandb.finish()
+        if not ogb:
+            for eval_env in eval_envs:
+                eval_env.close()
 
 
 if __name__ == "__main__":

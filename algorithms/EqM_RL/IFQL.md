@@ -453,3 +453,35 @@ Cell (4,2) lies below (3,2), off this route. It is the entrance of a side corrid
    break it.
 
 Not known: why the peak starts, and why at (4,2) in both seeds.
+
+### 12.8 An OOD score of the EqM actor does not help against the false peak
+
+Checked on 2026-11-10 with `diagnostics/exp19_ood_check.py` (output: `diagnostics/out/exp19_ood_check/summary.md`), at
+the user's request. Two scores of the EqM field f, as in the earlier OOD check. The sampler makes a candidate in K = 20
+steps, x₁ … x₂₀:
+- **last+1:** |f(x₂₀ | s)|, the norm of the field one evaluation after the last step (GeCO's score).
+- **accumulated:** |f(x₁ | s)| + … + |f(x₂₀ | s)|, the sum of the norms over the 20 steps.
+
+A state's score is the average over its 32 candidates. Rollouts of 50 episodes with the seed's frozen actor and the
+critic of one checkpoint, as in Section 12.7.
+
+| seed | critic of | success, no filter | success, only the 16 candidates with the lowest last+1 | success, only the 16 with the lowest accumulated |
+|---|---|---|---|---|
+| 1 | 700k (good) | 70 % | 64 % | 78 % |
+| 1 | 800k (false peak) | 8 % | 2 % | 8 % |
+| 1 | 900k (false peak) | 0 % | 0 % | 0 % |
+| 3 | 900k (good) | 92 % | 72 % | 72 % |
+| 3 | 1M (false peak) | 38 % | 46 % | 40 % |
+
+1. **Filtering the candidates by either score does not rescue the bad critics** (8 → 2 and 8, 0 → 0 and 0, 38 → 46 and
+   40; one eval of 50 episodes is noisy by about ±10 points). With the good critic of seed 3 it cost 20 points.
+2. **The states in the corridor are not flagged.** Share of visited corridor states with a score above the 95th percentile
+   of 5,000 held-out dataset states (5 % would be "like the data"): 5 to 9 % for last+1, 4 to 6 % for accumulated, 5 to
+   10 % for the distance to the nearest dataset state.
+3. **The critic does not pick candidates with unusual scores.** Position of the chosen candidate's score among the 32
+   (0 = lowest, 1 = highest, 0.5 = no relation): 0.54 to 0.59 for last+1 and 0.47 to 0.51 for accumulated, the same for
+   good and bad critics.
+
+Reason: nothing in this failure is out of distribution. The wrong V is at dataset states (the corridor is in the
+data), and the candidates are the actor's own samples. An OOD score measures distance from the data, so it cannot see a
+critic that is wrong inside the data.

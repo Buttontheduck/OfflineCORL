@@ -22,7 +22,7 @@ Background on every paper used here is in [`EqM_literature.md`](EqM_literature.m
 - **Expressive:** it can represent multimodal action distributions, like diffusion and flow policies.
 - **Time-free sampling:** step size and number of steps are free choices; it supports adaptive early stopping (stop when `‖f‖` is small) and warm starts.
 - **One model, one energy landscape:** zeros of the field ≈ dataset actions for the given state (EqM, Statements 1–2).
-- **Hypothesis (to test later):** the field norm `‖f(a|s)‖`, or the EqM energy, is a built-in **OOD signal**. It could keep the policy inside the data support, or filter candidate actions, without an extra density model or ensemble. GeCO and EqC report this kind of signal for robot control; it has not yet been tested in offline RL. See the low-dimensional caveat below.
+- **Hypothesis:** the field norm `‖f(a|s)‖`, or the EqM energy, could provide an **OOD signal** for keeping the policy inside the data support or filtering candidate actions, without an extra density model or ensemble. GeCO and EqC report such signals for robot control. The offline diagnostics below now test field-based scores: they detect some synthetic shifts, depend strongly on sampler K, and do not rescue Experiment 19's critic failure. See the low-dimensional caveat and the OOD checks below.
 
 ## Caveat: low-dimensional actions (one action, no chunking)
 EqM's guarantees (EqM paper, Appendix C) are **high-dimensional** arguments. Our actor generates **one action** $a \in \mathbb R^{d_a}$ per step, with no chunking, and $d_a$ is small (HalfCheetah: $d_a = 6$). This is exactly where those arguments are weakest.
@@ -144,6 +144,7 @@ clip a to the action bounds
 
 ### Current implementation
 - **Code:** `Aware_Minari/` (Minari data) and `Aware/` (D4RL data), same algorithm; see *Code structure* below.
+- **Later variant, IEQM (Experiments 19–23):** [Aware/train_ieqm.py](Aware/train_ieqm.py) trains an EqM actor by BC and an independent IQL critic on OGBench or D4RL data. Q ranks candidate actions during evaluation; it does not weight the actor's training loss. The Aware defaults below describe the earlier AWAC variant.
 - **Data:** Minari datasets, currently `mujoco/halfcheetah/simple-v0`; D4RL `halfcheetah-medium-v2` for server runs.
 - **Gaussian AWAC reference:** `Awac_Minari.py` and `Offline Awac/`.
 - **Defaults at time of writing:**
@@ -1851,7 +1852,373 @@ References: Experiment 11 best of 16 (critic at test time) 78.8 / 94.6; CORL IQL
 **What follows:**
 - **First candidate fix:** no renewal from the actor. Keep the support from the frozen BC (sampled once, or redrawn from the BC), which is exactly what the successful first 40k steps used, and train longer to see whether the peak holds.
 - **Second candidate fix:** generate the support with converged samples (larger K).
-- **Not tested yet.**
+- **Follow-up:** Experiment 12b tested K = 20 instead of 10 for the support samples. It did not establish that those samples had converged. Keeping the support fixed to the original BC actor was not tested in that experiment.
+
+### How to read Experiments 12b–23
+
+The write-ups for Experiments 12b–18 were added on 2026-11-10 after checking all 358 runs then in [W&B project E](https://wandb.ai/duck13/E). Experiments 19–22 and the additional diagnostics below were checked against their local configurations, logs and saved summaries on the same date. Run counts include each training seed separately. A stopped or unfinished run is reported at the evaluations it actually reached.
+
+**Terms used below.** A *state* is the observation given to the policy. An *action* is the vector of commands sent to the environment. The *actor* produces actions. *Behavior cloning*, abbreviated **BC**, trains the actor to reproduce dataset actions without using rewards. A *critic* predicts the discounted return: future rewards with rewards farther in the future multiplied by a smaller factor. The factor is **γ**, the discount. We train two action-value networks, Q1 and Q2, and use their smaller prediction, written **Q**, when ranking actions. **V(s)** is a separate prediction for a state without specifying an action. A *target network* is a slowly updated copy used to calculate the numbers that the critic learns to match.
+
+| Term | Meaning in these experiments |
+|---|---|
+| K | Number of sampler steps used to make **one** EqM action from Gaussian noise. K is not the number of candidate actions. |
+| Best of N | Draw N actions at the same state, score each with Q, and execute the one with the highest Q. The critic is needed during evaluation. |
+| Support set | A stored list of actions used as training examples or critic targets. Here it usually contains one dataset action and 16 generated actions per state. It does not guarantee that the generated actions lie in the data distribution. |
+| β | Controls how strongly Q changes the weights within a support set. Each weight is exp(βQ) divided by the sum over that state's candidates. This normalization is called softmax. At β = 0, all candidates have equal weight. |
+| Renewal | Replace the stored generated actions with new samples, then recalculate their weights. |
+| Frozen | The network's parameters are held fixed. Its predictions can still differ between states and actions. |
+| Seed | A separate training run with a different random initialization and sequence of random samples. |
+| 4 × 256 | Four hidden network layers, each with 256 units. |
+
+**Scores.** A training step is one parameter update, not an environment step. `100k` means 100,000 training steps. An evaluation runs complete episodes without updating the model. For AntMaze and the OGBench tasks below, the score is the percentage of episodes that reach the goal. Unless stated otherwise, ± is the population standard deviation across training seeds, after averaging the stated evaluations within each seed. It is not an uncertainty interval. A best evaluation, selected after seeing the curve, is labeled as such.
+
+**Two uses of the critic must be kept separate.** Aware uses Q to weight the actor's training examples. Best-of-N uses Q to choose an action during evaluation. Experiments 19–23 use BC during actor training and best-of-32 during evaluation; they do not train the actor with Q weights.
+
+<a id="experiment-12b"></a>
+
+### Experiment 12b: make the fine-tuning support with K = 20 instead of 10 (3 seeds, 2026-11-08)
+
+**Objective.** In Experiment 12, repeatedly training on the actor's own K = 10 samples moved those samples away from the data. Test whether taking more sampler steps before storing a training action prevents the loss of success after renewal.
+
+**Design and implementation.** Use the same Experiment 10 BC actors, frozen Experiment 11 critics, AntMaze umaze and medium-diverse datasets, and β = 0, 3, 10. Change `support_K` from 10 to 20 in [Aware/finetune_actor.py](Aware/finetune_actor.py). All 18 runs reached 400k steps. The field has 4 × 256 units; its EqM loss uses scale 8 and decay threshold 0.8. The sampler uses step size 0.01 and Nesterov momentum 0.3. Adam uses learning rate 0.0001 and batches of 256 states.
+
+The evaluation also checks the critic's best of 16 at `support_K`. Therefore this evaluation uses K = 20 in 12b and K = 10 in Experiment 12. Their best-of-16 numbers change both the trained actor and its evaluation sampler. The one-action evaluations at K = 10 and K = 20 keep their respective samplers fixed across the two experiments.
+
+**Algorithm, step by step.**
+
+1. Load the BC field and critic of the same seed. Freeze the critic; continue training the field.
+2. At every dataset state, draw 16 actions using K = 20. Add the dataset action as candidate 17.
+3. Score these actions with the frozen Q. Calculate the softmax weights defined above. Store the actions and weights.
+4. Draw a batch of states. Train the field on all 17 actions at each state, multiplying each action's EqM loss by its stored weight. The weights sum to one per state.
+5. Every 40k updates, regenerate the 16 samples from the current field and repeat step 3. The critic remains fixed.
+6. Maintain an averaged copy of the field: after every update, move it 0.5% toward the current field. Evaluate this copy every 20k steps with 100 episodes at K = 10 and K = 20. Every 100k, also evaluate best-of-16 at K = 20.
+
+**Results.** Success in %. These are the evaluations at the named checkpoints, averaged over three seeds; the final columns are at 400k. Full results: [12b summary](sweep_runs/exp12b_20261108-002139/summary.md). W&B groups start with `Exp12b_FT_`.
+
+| Dataset | β | K = 10 at 40k | K = 10 at 60k | K = 10 at 400k | K = 20 at 400k | Best of 16 at 400k |
+|---|---|---|---|---|---|---|
+| medium-diverse | 3 | 24.7 ± 4.2 | 44.7 ± 18.9 | **48.7 ± 10.7** | 39.7 ± 7.1 | 46.0 ± 4.9 |
+| medium-diverse | 10 | 51.3 ± 10.9 | 52.0 ± 14.4 | **42.0 ± 12.4** | 36.3 ± 14.1 | 39.7 ± 13.2 |
+| medium-diverse | 0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.7 ± 0.5 | 64.3 ± 7.4 |
+| umaze | 3 | 96.3 ± 0.9 | 92.7 ± 1.2 | **87.3 ± 2.6** | 77.7 ± 2.9 | 82.0 ± 3.7 |
+| umaze | 10 | 95.3 ± 1.7 | 93.0 ± 5.7 | **84.3 ± 3.8** | 82.0 ± 5.1 | 81.7 ± 7.3 |
+| umaze | 0 | 70.3 ± 1.7 | 71.7 ± 6.2 | **72.7 ± 3.4** | 49.3 ± 4.7 | 92.3 ± 3.3 |
+
+**Interpretation.** The larger support sampler prevents the severe decay seen at K = 10. At 400k, the actor's K = 10 evaluation on umaze is 87.3 and 84.3 for β = 3 and 10, against 17 and 1 in Experiment 12. On medium-diverse it is 48.7 and 42.0, against 0 and 6. The β = 0 control now retains 72.7 on umaze instead of falling to zero. Thus part of Experiment 12's failure depended on how its training samples were generated, even without Q weighting.
+
+This does not eliminate movement away from the dataset actions. Define *distance to data* here as the distance from each dataset action to its nearest support sample, divided by the square root of the action dimension. At β = 10 it grows from 0.21 to 0.49 on medium-diverse and from 0.20 to 0.53 on umaze. Meanwhile the samples get narrower. Higher return therefore does not mean that repeated self-training preserves the original action distribution. K = 20 is a tested improvement; convergence of those samples was not established here.
+
+<a id="experiment-13"></a>
+
+### Experiment 13: Aware with two critic choices on OGBench (stopped early, 2026-11-08)
+
+**Objective.** Test Aware beyond D4RL, and check whether replacing its AWAC critic with an IQL critic is enough to learn the new tasks.
+
+**Data and evaluation.** OGBench supplies the offline transitions and task-specific rewards. We use the default task of each dataset below. These are single-task results, not averages over all OGBench tasks.
+
+| Short name | Dataset | Evaluated task | Discount γ | Actor temperature T |
+|---|---|---|---|---|
+| humanoidmaze-medium | `humanoidmaze-medium-navigate-singletask-v0` | 1 | 0.995 | 1/3 |
+| antsoccer-arena | `antsoccer-arena-navigate-singletask-v0` | 4 | 0.995 | 0.1 |
+| cube-double | `cube-double-play-singletask-v0` | 2 | 0.99 | 10/3 |
+
+The temperature T divides the advantage before exponentiation: a smaller T gives more weight to actions the critic prefers. The *advantage* is Q at the dataset action minus the state's baseline V. This is a different parameter from the support-set β used in fine-tuning.
+
+**Implementation choices.** [Aware/ogbench_data.py](Aware/ogbench_data.py) keeps the supplied rewards: −1 until success for navigation, and minus the number of unsolved subtasks for cube-double. It uses `1 - masks` as the task-terminal flag. OGBench's separate `terminals` field marks collection boundaries and is not used to declare the task solved. States are normalized using dataset means and standard deviations. Evaluation uses the task's own start and goal, with fixed seeds for the start states.
+
+The two variants share 4 × 256 networks, the same temperature within a task, and the EqM sampler K = 20, step size 0.01, momentum 0.3. The field loss uses scale 8 and decay threshold 0.8. Neither variant has critic LayerNorm or target clipping. LayerNorm, introduced in later experiments, rescales each hidden layer's activations before passing them onward. The runs use compiled training code checked in the implementation checks below. Configuration: [exp13 sweep](sweeps/exp13_ogbench_aware.yaml); training: [Aware/agents.py](Aware/agents.py).
+
+**Algorithm, step by step.**
+
+1. Draw a batch of dataset transitions: state s, action a, reward r, next state s′, and task-terminal flag d.
+2. In the **AWAC variant**, sample a next action from the current actor. Train Q1 and Q2 toward `r + γ(1 − d) × min(target Q1, target Q2)(s′, sampled action)`.
+3. In the **IQL variant**, first train a separate V network on the dataset actions. Let the error be `min(target Q1, target Q2)(s, a) − V(s)`. Multiply its square by 0.9 when the error is positive and by 0.1 when negative. This asymmetric fit is called **expectile regression**, with expectile 0.9. Then train Q1 and Q2 toward `r + γ(1 − d) × V(s′)`. No actor-generated action enters these critic updates.
+4. Calculate the advantage. AWAC's baseline is Q at one sampled actor action; IQL's baseline is the learned V. Use weight `min(exp(advantage / T), 100)` on the dataset action's EqM training loss.
+5. Update the actor and slowly update the target critics. Evaluate one actor action per environment step every 100k training steps, using 50 episodes. No critic selects the evaluation action.
+
+**Results and stopping.** The plan was 18 runs to 1M steps. Fifteen started: all nine AWAC runs, and IQL seeds 1–2 for each task. IQL seed 3 never started. All 15 were stopped at roughly 179k–285k training steps; their last evaluations are at 100k or 200k. None reached the planned score window at 800k, 900k and 1M. W&B marks these runs `killed`, under groups `Exp13_Aware-awacQ_*` and `Exp13_Aware-iqlQ_*`.
+
+| Task | Critic | Best observed success per seed (1 / 2 / 3), % | Last mean Q at dataset actions |
+|---|---|---|---|
+| humanoidmaze-medium | AWAC | 2 / 0 / 2 | −277 ± 25.5 |
+| humanoidmaze-medium | IQL | 0 / 2 / not started | −54 ± 77.3 |
+| antsoccer-arena | AWAC | 0 / 0 / 0 | 1.13 billion ± 1.59 billion |
+| antsoccer-arena | IQL | 0 / 0 / not started | −98.5 ± 0.2 |
+| cube-double | AWAC | 0 / 0 / 0 | −219 ± 0.8 |
+| cube-double | IQL | 0 / 0 / not started | −74.6 ± 15.3 |
+
+Source: [13 summary](sweep_runs/exp13_20261108-043259/summary.md). Q diagnostics are taken at each run's last log, which is not the same training step across runs. The best observed successes are not final benchmark scores.
+
+**Interpretation.** There was no useful policy at the observed checkpoints. AWAC also produced invalid value estimates: with the rewards and discounts above, the discounted return cannot fall below −200 or exceed zero. Its mean Q was below −200 on humanoidmaze and cube-double, and extremely positive on antsoccer. The IQL replacement avoided those particular mean-Q failures on antsoccer and cube-double, but did not produce successful policies during the available training period. This early stop cannot establish what either method would score at 1M. It motivated separating actor training from critic training in Experiment 14.
+
+<a id="experiment-14"></a>
+
+### Experiment 14: BC, a separate critic, then actor fine-tuning on OGBench (3 seeds, 2026-11-08)
+
+**Objective.** Find which part of the system can improve behavior: the actor's action proposals, the critic's choice among proposals, or training the actor to favor high-Q proposals. Train these parts in stages so a changing actor does not also change the critic's training samples.
+
+**Design changes.** Use the three tasks and reward handling from Experiment 13. There are 45 finished runs: nine BC actors, nine critics, and 27 actor fine-tunes. The BC field stays at 4 × 256. The critic grows to 4 × 512, with ReLU activations and LayerNorm after each hidden linear layer. Its training target is clipped to the return range [−200, 0] on these tasks. This limits the target, not the network's predictions. The discount remains 0.995 for humanoidmaze and antsoccer, and 0.99 for cube-double.
+
+Code: [fit_actor.py](Aware/fit_actor.py), [train_critic.py](Aware/train_critic.py), and [finetune_actor.py](Aware/finetune_actor.py). Configurations: [BC](sweeps/exp14_ogbench_bc.yaml), [critic](sweeps/exp14_ogbench_critic.yaml), and [fine-tuning](sweeps/exp14_ogbench_finetune.yaml). Results: [14 summary](sweep_runs/exp14_20261108-061059/summary.md). W&B groups start with `Exp14_BC_`, `Exp14_Critic_`, and `Exp14_FT_`.
+
+**Algorithm, step by step.**
+
+1. **Train BC for 500k steps.** Draw dataset state-action pairs. Mix each action with Gaussian noise and train the EqM field to predict the scaled noise-minus-action vector, as in the actor loss defined earlier. Give every pair weight one. No reward or critic enters this loss. Use batch 256 and Adam learning rate 0.0003.
+2. **Freeze BC and prepare critic candidates.** At every next state, store 16 BC samples made with K = 10. Add the dataset's next action when the next row belongs to the same episode; otherwise mark that candidate invalid. Keep these samples fixed during critic training.
+3. **Train the critic for 1M steps.** At each sampled transition, score the valid next-state candidates with the smaller target-Q prediction. Weight them by softmax with β = 3. Form `y = r + γ(1 − d) × weighted mean of next Q`, clip y to [−200, 0], and fit both critics to y. Use batch 256, Adam learning rate 0.0003, and target update rate 0.005. Every 100k, evaluate best-of-16 BC actions at K = 10.
+4. **Freeze the critic and fine-tune the actor for 400k steps.** Start from its paired BC checkpoint. Use Experiment 12b's procedure: the dataset action plus 16 current-actor samples at K = 20, softmax weights with β = 0, 3, or 10, and renewal every 40k. Use learning rate 0.0001 and an averaged field updated at rate 0.005.
+5. **Evaluate the fine-tuned actor.** Every 40k, execute one action per step at K = 10 and K = 20. Every 100k, also test best-of-16 at K = 20. Each evaluation uses 50 episodes. The critic is used during evaluation only in the best-of-16 test.
+
+**Results of BC and critic training.** BC columns average 400k, 450k and 500k. The critic column averages 800k, 900k and 1M. The last column uses the same frozen BC actor and final critic, but K = 20 at the start of fine-tuning; it is one evaluation per seed.
+
+| Task | BC, K = 10 | BC, K = 20 | BC, K = 30 | Critic's best of 16, K = 10 | Same final models, best of 16, K = 20 |
+|---|---|---|---|---|---|
+| humanoidmaze-medium | 0.0 ± 0.0 | 0.4 ± 0.6 | 0.7 ± 0.5 | 0.0 ± 0.0 | **40.0 ± 11.4** |
+| antsoccer-arena | 0.0 ± 0.0 | 0.2 ± 0.3 | 0.4 ± 0.6 | 0.4 ± 0.3 | **6.7 ± 3.8** |
+| cube-double | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 |
+
+**Results of actor fine-tuning.** One-action scores average 320k, 360k and 400k. Best-of-16 is the single 400k evaluation, averaged across seeds. All numbers are success percentages.
+
+| Task | β | One action, K = 10 | One action, K = 20 | Best of 16, K = 20, at 400k |
+|---|---|---|---|---|
+| humanoidmaze-medium | 3 | 2.0 ± 0.5 | 6.9 ± 2.2 | 22.0 ± 8.6 |
+| humanoidmaze-medium | 10 | 2.2 ± 2.2 | 14.7 ± 2.7 | 33.3 ± 7.4 |
+| humanoidmaze-medium | 0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.7 ± 0.9 |
+| antsoccer-arena | 3 | 5.3 ± 3.0 | 2.7 ± 0.5 | 2.7 ± 0.9 |
+| antsoccer-arena | 10 | 1.3 ± 1.1 | 0.0 ± 0.0 | 0.0 ± 0.0 |
+| antsoccer-arena | 0 | 0.2 ± 0.3 | 0.0 ± 0.0 | 0.0 ± 0.0 |
+| cube-double | 3 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 |
+| cube-double | 10 | 0.0 ± 0.0 | 0.2 ± 0.3 | 0.7 ± 0.9 |
+| cube-double | 0 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 |
+
+**Interpretation.** On humanoidmaze, BC rarely succeeds alone, but its K = 20 candidates give the critic useful choices. The 40% result would have been missed if we had only evaluated the critic with K = 10. Experiment 15 repeats this comparison with more episodes and different candidate counts.
+
+Fine-tuning does not preserve that initial best-of-16 result through 400k. To measure the change in the proposals, define *sample spread* as the standard deviation of the 16 actions at each state, averaged over action coordinates and states. On humanoidmaze it falls from 0.16 to 0.02–0.03 at β = 3 or 10, and to 0.01 at β = 0. On antsoccer it falls from 0.14 to 0.01–0.02. The actor increasingly proposes similar actions, including in the control that does not use Q weights. Narrower proposals leave fewer different actions for the critic to choose from; the measurements support this explanation but do not isolate it from changes in where the actions are placed.
+
+Antsoccer briefly reaches 14.7 ± 5.2% with one K = 10 action at 40k and β = 10, then declines. That early result is not the final score. Cube-double stays near zero throughout. The later dataset-loss control in Experiment 16 tests whether keeping direct training on the original actions prevents the decay.
+
+<a id="experiment-15"></a>
+
+### Experiment 15: vary sampler steps and candidate count with frozen models (3 seeds, 2026-11-08)
+
+**Objective.** Experiment 14's humanoidmaze result changed from near zero to 40% when best-of-16 used K = 20 instead of 10. Test whether more sampler steps or more candidate actions improve the critic's choices, without changing either trained network.
+
+**Design and implementation.** Load each Experiment 14 BC actor at 500k and its paired critic at 1M. Hold both fixed. Test K = 20 or 30 and N = 16, 32, or 64. This separates the number of steps spent making each action from the number of actions the critic can compare. Use 100 episodes per combination, rather than Experiment 14's 50. There are 3 tasks × 3 seeds × 6 combinations = 54 evaluations. All 54 completed. This is a local evaluation, with no new W&B training run.
+
+**Algorithm, step by step.**
+
+1. Load the frozen actor and critic of one task and seed.
+2. At each environment state, draw N independent Gaussian starting points.
+3. Run the EqM sampler for K steps on each point, then clip actions to the environment bounds.
+4. Evaluate Q for all N actions and execute the highest-Q action. Repeat until the goal or episode limit.
+5. Repeat for 100 episodes and all six (K, N) combinations. Average the success percentages across seeds.
+
+Implementation: [eval_best_of_n.py](Aware/eval_best_of_n.py) and [15 sweep](sweeps/exp15_ogbench_bestofn.yaml). Results: [15 summary](sweep_runs/exp15_ogbench_bestofn_20261108-123600/summary.md).
+
+| Task | K = 20, N = 16 | K = 20, N = 32 | K = 20, N = 64 | K = 30, N = 16 | K = 30, N = 32 | K = 30, N = 64 |
+|---|---|---|---|---|---|---|
+| humanoidmaze-medium | 32.7 ± 15.2 | 39.0 ± 20.0 | **42.3 ± 16.8** | 25.7 ± 10.2 | 28.3 ± 13.9 | 32.0 ± 16.3 |
+| antsoccer-arena | 5.7 ± 3.3 | 6.0 ± 1.4 | 4.3 ± 0.5 | 6.0 ± 1.4 | 5.3 ± 1.7 | 4.7 ± 2.4 |
+| cube-double | 2.3 ± 2.1 | 0.7 ± 0.5 | 1.0 ± 1.4 | 0.0 ± 0.0 | 0.0 ± 0.0 | 0.0 ± 0.0 |
+
+**Interpretation.** On humanoidmaze, K = 20 scores higher than K = 30 at every candidate count. More refinement of each action does not improve this policy. At K = 20, increasing N from 16 to 64 raises the mean from 32.7 to 42.3%, but variation across the three seeds remains large. It also requires four times as many candidate trajectories through the sampler, so the gain has an evaluation cost.
+
+The experiment confirms that the unchanged BC actor and critic can solve some humanoidmaze episodes together. It does not show that the actor alone learned to choose the right action. Antsoccer and cube-double remain low for all six settings. The best-of-16 humanoidmaze result is 32.7% here versus 40.0% in Experiment 14: these use different episode counts and random candidate draws, so the difference is not a training change.
+
+<a id="experiment-16"></a>
+
+### Experiment 16: keep fine-tuning tied to the dataset actions (3 seeds, 2026-11-08)
+
+**Objective.** In Experiment 14, the generated actions became much narrower during fine-tuning, and best-of-16 success declined. Test two ways of retaining a stronger training signal from the original dataset actions.
+
+**Design.** Use humanoidmaze-medium and antsoccer-arena, the same frozen Experiment 14 critics and BC starting checkpoints, and β = 10. Compare three variants, with three seeds each: 18 runs, all finished at 400k. Cube-double is left out because the preceding evaluations rarely succeeded there. The field, sampler, optimizer, and renewal schedule are those of Experiment 14.
+
+| Variant | Exact training change | Reason for testing it |
+|---|---|---|
+| Plain | One dataset action plus 16 generated actions; the usual Q-based weights | Repeat the original method under the same evaluation schedule as the new variants. |
+| Data ×16 | Multiply exp(βQ) for the dataset action by 16 before normalizing all 17 weights | Give the original action more weight while still letting Q affect its share. If every Q is equal, it gets half the total weight. |
+| + BC loss | Keep the plain support weights. Add an ordinary EqM loss on a separate batch of dataset actions, with coefficient one | Keep direct training on the data even when the critic gives dataset actions little weight. |
+
+**Algorithm, step by step.**
+
+1. Load the paired BC actor and frozen critic. Generate 16 K = 20 actions at every dataset state and add the dataset action.
+2. Calculate β = 10 softmax weights. For Data ×16 only, multiply the dataset action's unnormalized weight by 16.
+3. Draw 256 states and calculate the weighted EqM loss over their 17 candidates.
+4. For + BC loss only, draw a separate batch of 256 dataset pairs, calculate their unweighted EqM loss, and add it to the loss in step 3. Update the field with Adam at learning rate 0.0001.
+5. Renew generated actions and weights every 40k. Update the averaged field at rate 0.005 after each training step.
+6. Every 40k, evaluate the averaged field using one action at K = 10, one action at K = 20, and best-of-16 at K = 20. Each uses 50 episodes. Record the preselected 80k and 120k checkpoints as early-stop comparisons, as well as the final three evaluations.
+
+Code: [finetune_actor.py](Aware/finetune_actor.py), options `data_mult` and `bc_coef`; [16 sweep](sweeps/exp16_ogbench_ft_anchor.yaml). Results: [16 summary](sweep_runs/exp16_20261108-132109/summary.md). W&B groups start with `Exp16_FT_`. Best-of-16 is evaluated more often here than in Experiment 14; use this experiment's plain runs for the comparisons below.
+
+**Final results.** Success in %, averaged over 320k, 360k and 400k, then over three seeds.
+
+| Task | Variant | One action, K = 10 | One action, K = 20 | Best of 16, K = 20 |
+|---|---|---|---|---|
+| humanoidmaze-medium | Plain | 1.8 ± 1.6 | **17.3 ± 2.0** | 34.2 ± 3.5 |
+| humanoidmaze-medium | Data ×16 | 1.8 ± 1.7 | **17.3 ± 1.4** | 45.3 ± 2.2 |
+| humanoidmaze-medium | + BC loss | 0.0 ± 0.0 | 8.0 ± 1.6 | **62.2 ± 10.8** |
+| antsoccer-arena | Plain | 2.2 ± 1.7 | 0.2 ± 0.3 | 0.4 ± 0.6 |
+| antsoccer-arena | Data ×16 | 1.6 ± 1.1 | 0.4 ± 0.6 | 0.2 ± 0.3 |
+| antsoccer-arena | + BC loss | **15.3 ± 3.8** | **10.0 ± 0.5** | 2.0 ± 1.1 |
+
+**Early stopping.** These steps were selected before the runs; they are not each run's best checkpoint.
+
+| Evaluation | Variant | 80k | 120k | Final-three mean |
+|---|---|---|---|---|
+| humanoidmaze, best of 16 at K = 20 | Plain | 62.7 ± 7.4 | 52.0 ± 8.6 | 34.2 ± 3.5 |
+| humanoidmaze, best of 16 at K = 20 | Data ×16 | 54.7 ± 9.4 | 56.7 ± 3.8 | 45.3 ± 2.2 |
+| humanoidmaze, best of 16 at K = 20 | + BC loss | 63.3 ± 11.6 | 60.7 ± 17.2 | 62.2 ± 10.8 |
+| antsoccer, one action at K = 10 | Plain | 11.3 ± 4.7 | 4.7 ± 4.1 | 2.2 ± 1.7 |
+| antsoccer, one action at K = 10 | Data ×16 | 14.7 ± 5.0 | 7.3 ± 0.9 | 1.6 ± 1.1 |
+| antsoccer, one action at K = 10 | + BC loss | 9.3 ± 5.0 | 9.3 ± 4.7 | 15.3 ± 3.8 |
+
+**What happened to the actions.** Spread and distance to data have the definitions in Experiments 14 and 12b. Before fine-tuning, humanoidmaze has spread 0.159 and distance 0.266; antsoccer has spread 0.145 and distance 0.217. At the last renewal:
+
+| Task | Variant | Spread | Distance to data |
+|---|---|---|---|
+| humanoidmaze-medium | Plain | 0.029 | 0.339 |
+| humanoidmaze-medium | Data ×16 | 0.081 | 0.309 |
+| humanoidmaze-medium | + BC loss | **0.114** | **0.270** |
+| antsoccer-arena | Plain | 0.025 | 0.362 |
+| antsoccer-arena | Data ×16 | 0.046 | 0.349 |
+| antsoccer-arena | + BC loss | **0.111** | **0.236** |
+
+**Interpretation.** The separate BC loss keeps the proposals wider and closer to the original dataset actions. On humanoidmaze this preserves useful choices for the critic: best-of-16 retains 62.2%, whereas plain training falls from 62.7% at 80k to 34.2% in the final window. But its one-action K = 20 score is lower than plain training, 8.0 versus 17.3%. The improvement depends on keeping the critic in the evaluation policy.
+
+On antsoccer, the same BC addition improves the actor alone to 15.3% at K = 10, while best-of-16 remains only 2.0%. The critic's ranking does not help these proposals. Thus preventing the proposals from becoming too narrow is useful, but it does not guarantee that Q chooses the right action. Data ×16 is less effective than the separate BC loss: its pull toward the data still depends on the critic's weights.
+
+<a id="experiment-17"></a>
+
+### Experiment 17: Gaussian BC on humanoidmaze-medium (3 seeds, 2026-11-09)
+
+**Objective.** Add a Gaussian actor trained on the same data as Experiment 14's EqM-BC. This provides a baseline for goal-reaching and a saved comparison actor for the action-distribution diagnostics.
+
+**Design and implementation.** Use a 4 × 256 Gaussian actor with a state-dependent mean and one learned standard deviation per action coordinate shared across states. Keep the data, state normalization, 500k updates, batch 256, Adam learning rate 0.0003, and three seeds from the BC setup. Train with maximum likelihood: minimize the negative log probability assigned to each dataset action. During evaluation execute the mean action, clipped to the action bounds; do not draw Gaussian noise. This actor has no iterative sampler and therefore no K.
+
+**Algorithm, step by step.**
+
+1. Normalize dataset states and initialize the Gaussian mean network and standard deviations.
+2. Draw 256 state-action pairs and increase their action log probabilities with one Adam update. Every pair has weight one; no critic or reward is used.
+3. Every 50k updates, run 50 episodes of humanoidmaze task 1 using the mean action.
+4. Save a checkpoint every 100k. For the final score, average evaluations at 400k, 450k and 500k within each seed, then average the three seed scores.
+
+Code: [fit_actor.py](Aware/fit_actor.py), `actor: gaussian`; [17 sweep](sweeps/exp17_ogbench_gauss_bc.yaml). All three runs finished. W&B: [seed 1](https://wandb.ai/duck13/E/runs/712f8eae-6bd5-4a1b-bb09-41f5ae4bf7d1), [seed 2](https://wandb.ai/duck13/E/runs/dee14a6a-5ecc-4cff-bc41-7dfa71118cb4), [seed 3](https://wandb.ai/duck13/E/runs/f6b13894-4016-4352-9559-5fd03526cba0). The evaluation values were also checked against the local logs in `sweep_runs/exp17_ogbench_gauss_bc_20261109-093659/`.
+
+| Actor and evaluation | Final-three mean, success % | Best single evaluation per seed, % |
+|---|---|---|
+| Gaussian BC, mean action | **0.0 ± 0.0** | 2 / 4 / 2 |
+| Experiment 14 EqM-BC, one K = 20 action | 0.4 ± 0.6 | See Experiment 14's full curves |
+| Experiment 14 EqM-BC, one K = 30 action | 0.7 ± 0.5 | See Experiment 14's full curves |
+
+**Interpretation.** Both BC policies almost always fail to complete this task. These return scores do not show that one actor represents the conditional action distribution better. That needs a separate comparison of generated actions at the same states. The OGBench action diagnostic later in this file reports the earlier EqM-only test; it should not be read as a measured Gaussian-versus-EqM comparison on humanoidmaze.
+
+<a id="experiment-18"></a>
+
+### Experiment 18: a larger Aware model and a 16-sample value estimate (stopped early, 2026-11-09)
+
+**Objective.** Check whether Aware's failure on humanoidmaze improves when its actor weights use a less noisy estimate of V, together with larger networks and a longer discount horizon.
+
+**Changes from Experiment 13's AWAC variant.**
+
+| Setting | Experiment 13 | Experiment 18 | Reason |
+|---|---|---|---|
+| Actor actions averaged to estimate V(s) | 1 | 16 | Reduce the effect of one random action on the exponential actor weight. |
+| Actor and Q network width | 4 × 256 | 4 × 512 | Give the networks more capacity. |
+| Critic LayerNorm | Off | On | Rescale hidden activations during critic training. |
+| Discount γ | 0.995 | 0.999 | Give rewards farther in the future more weight. |
+
+T stays at 1/3. The actor still uses K = 20, step size 0.01 and momentum 0.3; EqM scale is 8. The critic still learns from a sampled next action, with no clipping of its training target. These four changes were made together, so this experiment cannot isolate their individual effects.
+
+**Algorithm, step by step.**
+
+1. Draw a dataset transition batch. Sample one actor action at each next state and update both critics using the AWAC target described in Experiment 13.
+2. At each current state, draw **16** actor actions. Compute Q for each and average them to estimate V(s).
+3. Subtract this V from Q at the dataset action. Use `min(exp((Q − V) / T), 100)` as the weight on that action's EqM loss.
+4. Update the field and target critics. Log a comparison weight computed with only the first of those 16 samples; this comparison is a diagnostic, not another training run.
+5. Evaluate the actor alone every 100k updates with 50 episodes of task 1. The plan was 1M updates.
+
+Implementation: `_offline_weights_MC` in [agents.py](Aware/agents.py); [18 sweep](sweeps/exp18_ogbench_aware_v.yaml). W&B: [seed 1](https://wandb.ai/duck13/E/runs/ad73c542-5791-4a22-9d1c-85b715abddda), [seed 2](https://wandb.ai/duck13/E/runs/fbcfeeaa-44bb-4823-b665-39ab1219ebbb), [seed 3](https://wandb.ai/duck13/E/runs/57eefa07-76fc-4a5c-9b56-c28e34424be6). Local evaluation logs: `sweep_runs/exp18_ogbench_aware_v_20261109-110133/`.
+
+**Results.** All three runs were stopped and marked `killed`. Last training logs are at 311k, 310k and 301k for seeds 1–3; all reached the 300k evaluation.
+
+| Seed | Success at 100k | At 200k | At 300k | Last mean Q at dataset actions | Last mean actor weight: 16 samples / one-sample diagnostic |
+|---|---|---|---|---|---|
+| 1 | 2% | 0% | 0% | −809.2 | 4.14 / 6.18 |
+| 2 | 0% | 0% | 0% | −858.2 | 3.19 / 5.06 |
+| 3 | 0% | 0% | 0% | −676.4 | 3.18 / 4.52 |
+
+**Interpretation.** Averaging 16 actions changes the weights in the intended direction: the final mean weights are smaller than the one-sample diagnostic. It does not produce a successful policy in the first 300k updates. The Q values above are inside the return range [−1000, 0] for γ = 0.999, so their negative magnitude alone is not evidence of divergence. There is no completed 1M score, and no result here establishes which of the four changes helped or hurt. Experiment 19 changes the role of the critic more directly: train the actor only by BC and use Q when choosing an action.
+
+<a id="experiment-19"></a>
+
+### Experiment 19: IEQM, an independent IQL critic with an EqM-BC actor (3 seeds, 2026-11-10)
+
+**Objective.** Test whether the EqM actor works better when the critic selects among BC proposals during evaluation, instead of weighting the actor's training loss as in Aware. IEQM follows the IFQL procedure described in [IFQL.md](IFQL.md), replacing its flow actor with our EqM actor. The task is `humanoidmaze-medium-navigate-singletask-v0`, default task 1.
+
+**Design and implementation.** Train a 4 × 512 EqM field with Mish activations, scale 8 and decay threshold 0.8, on normalized dataset states. Train V, Q1 and Q2 independently on the same transition batches, using raw states, four hidden layers of width 512, GELU and LayerNorm. Use expectile 0.9, γ = 0.995, target update rate 0.005, batch 256 and Adam learning rate 0.0003. Rewards and task-terminal masks come from the dataset. Dataset actions are clipped just inside the action bounds; critic targets are not clipped. The reward-based lower return bound is −200, not an enforced clamp.
+
+**Algorithm, step by step.**
+
+1. Draw a dataset transition batch. Fit V(s) to the smaller target-Q prediction at the dataset action: for `d = min(target Q1, target Q2)(s, a) − V(s)`, minimize `0.9 × d²` when d ≥ 0 and `0.1 × d²` otherwise.
+2. Fit both Q networks to `reward + 0.995 × (1 − task terminal) × V(next state)`, treating the target as fixed when taking gradients.
+3. Train the EqM field on dataset actions with weight one. Neither Q nor V enters the actor loss; actor samples never enter the critic's training targets.
+4. Take one Adam step on the three losses. Soft-update target Q using the Q parameters from before that step, following the IFQL implementation. Run for 1M updates with compiled losses.
+5. Every 100k, evaluate 50 episodes. At each state generate 32 EqM actions with K = 20 Nesterov steps, step size 0.01 and momentum 0.3. Clip the actions and execute the one with the highest min(Q1, Q2).
+6. With the same critic, also evaluate the frozen Experiment 14 EqM-BC actor of the same seed (4 × 256, trained for 500k). Save checkpoints every 100k. Average the 800k, 900k and 1M evaluations within each seed for the final score.
+
+Code and provenance: [training implementation](Aware/train_ieqm.py), [sweep](sweeps/exp19_ogbench_ieqm.yaml), [launcher](run_exp19.sh), [summary script](diagnostics/summarize_exp19.py), and [full results](sweep_runs/exp19_20261110-000749/summary.md). All three runs finished, taking 66–68 minutes each. The numerical summary was reproduced from `sweep_runs/exp19_ogbench_ieqm_20261110-000749/*/stdout.log`.
+
+| Actor, ranked by the same IQL critic | Seed 1 | Seed 2 | Seed 3 | Final-three success %, mean ± std |
+|---|---|---|---|---|
+| EqM-BC trained in this run, 4 × 512 | 2.7 | 78.0 | 65.3 | **48.7 ± 32.9** |
+| Frozen Experiment 14 EqM-BC, 4 × 256 | 2.7 | 70.7 | 63.3 | **45.6 ± 30.5** |
+
+Both actors work during the middle of training: at 300k–700k their individual evaluations range from 58% to 82%. Seed 1 then falls from 76% at 700k to 8%, 0% and 0% with the trained actor, and from 76% to 2%, 4% and 2% with the frozen actor. Seed 3 also falls at 1M: 78% → 42% trained and 78% → 36% frozen. Seeds 4 and 5 were added with Experiment 20; the five-seed baseline is reported there.
+
+**Interpretation.** A BC EqM actor supplies useful proposals for this critic, including when the actor is frozen. The similar scores of the two actors do not isolate network width or training duration, which differ together. Experiment 15 scored the same frozen actors at 39.0 ± 20.0% with a QIPO critic, K = 20 and N = 32, but used 100 episodes at one checkpoint rather than three 50-episode evaluations. That comparison supports investigating the critic; it is not a matched estimate of the critic's effect. The simultaneous late decline with the frozen actor motivates the checkpoint diagnostics below.
+
+#### Experiment 19 follow-up: a false value peak and an OOD-filter test
+
+**Critic check.** [exp19_critic_drift.py](diagnostics/exp19_critic_drift.py) averages V over 300,000 dataset states grouped by maze cell, then follows the neighbouring cell with the highest mean V from the start. This is a coarse diagnostic, not the action-selection algorithm. At 800k–1M, seed 1's cell walk stops at (4,2), the entrance to a side corridor, instead of reaching the goal. Seed 3 develops the same peak at 1M; seed 2's walk reaches the goal at all ten checkpoints. Seed 1's V at (4,2) rises by 25.7 between 700k and 800k, while changes on the goal side remain small. Frozen-actor rollouts with the later critics spend their failed episodes in this corridor. See the [cell maps and rollouts](diagnostics/out/exp19_critic_drift/summary.md) and [IFQL discussion](IFQL.md#127-why-seed-1-fell-the-critic-grew-a-false-peak-of-v-at-maze-cell-42).
+
+**OOD-filter check.** [exp19_ood_check.py](diagnostics/exp19_ood_check.py) keeps the frozen actor and each saved critic fixed. Compare ranking all 32 candidates with ranking only the 16 having the lowest final field norm, or the lowest sum of field norms across the K = 20 sampler steps. Each treatment uses 50 episodes; these are fresh candidate draws, so the unfiltered scores differ from the training evaluations.
+
+| Seed | Critic checkpoint | No filter | Lowest final norm | Lowest accumulated norm |
+|---|---|---|---|---|
+| 1 | 700k | 70% | 64% | 78% |
+| 1 | 800k | 8% | 2% | 8% |
+| 1 | 900k | 0% | 0% | 0% |
+| 3 | 900k | 92% | 72% | 72% |
+| 3 | 1M | 38% | 46% | 40% |
+
+Only 5–9% of visited corridor states exceed the final-norm threshold that flags 5% of 5,000 held-out dataset states; the accumulated-norm rate is 4–6%. The corresponding nearest-state-distance rate is 5–10%. Filtering does not consistently recover success and can reduce it at a good checkpoint. These observations support a critic-ranking error in a region represented in the data, rather than a failure these OOD scores can reliably flag. They do not establish why the false peak formed. Full [OOD-filter results](diagnostics/out/exp19_ood_check/summary.md).
+
+<a id="experiment-20"></a>
+
+### Experiment 20: lower the IEQM expectile on humanoidmaze-medium (5 seeds, 2026-11-10)
+
+**Objective.** Test whether a lower expectile reduces Experiment 19's late critic failure while retaining useful action ranking. The expectile controls V's asymmetric squared-error fit: underestimation is weighted 9 times as strongly as overestimation at 0.9, 4 times at 0.8, and about 2.3 times at 0.7.
+
+**Design and implementation.** Change only the expectile in the Experiment 19 procedure. Train five seeds each at 0.7 and 0.8, and add baseline seeds 4 and 5 at 0.9: 12 new runs, giving 15 trained policies in the comparison. All reached 1M updates. Keep γ = 0.995, all network and optimizer settings, dataset-only critic targets, the BC actor loss, K = 20, best-of-32 and 50 evaluation episodes every 100k. Seeds 1–3 also evaluate Experiment 14's frozen actors with each critic; seeds 4–5 have no frozen-actor comparison.
+
+The algorithm is the same six-step procedure as Experiment 19 with its chosen expectile substituted in step 1. Configurations: [expectiles 0.7 and 0.8](sweeps/exp20_ogbench_ieqm_expectile.yaml) and [baseline seeds 4–5](sweeps/exp19_ogbench_ieqm_seeds45.yaml). [run_exp20.sh](run_exp20.sh) runs both sweeps and the checkpoint diagnostics. [summarize_exp20.py](diagnostics/summarize_exp20.py) reproduces the [full results](sweep_runs/exp20_20261110-021024/summary.md) directly from all three sweep folders' logs. Final scores again average 800k, 900k and 1M within each seed; ± is population std across seeds.
+
+| Expectile | Trained actor: seed scores 1 / 2 / 3 / 4 / 5 | Final-three success %, mean ± std | 300k–700k mean ± std |
+|---|---|---|---|
+| 0.7 | 11.3 / 17.3 / 26.0 / 17.3 / 28.0 | **20.0 ± 6.2** | 23.7 ± 5.3 |
+| 0.8 | 85.3 / 86.0 / 76.7 / 82.0 / 84.7 | **82.9 ± 3.4** | 73.4 ± 1.3 |
+| 0.9 | 2.7 / 78.0 / 65.3 / 66.7 / 86.0 | **59.7 ± 29.5** | 72.3 ± 3.2 |
+
+| Expectile | Frozen actor: seed scores 1 / 2 / 3 | Final-three success %, mean ± std |
+|---|---|---|
+| 0.7 | 8.7 / 4.7 / 8.0 | **7.1 ± 1.7** |
+| 0.8 | 74.0 / 70.7 / 77.3 | **74.0 ± 2.7** |
+| 0.9 | 2.7 / 70.7 / 63.3 | **45.6 ± 30.5** |
+
+**Checkpoint diagnostic.** Repeat the cell-averaged V walk from Experiment 19 for all five seeds. At 0.8, every walk reaches the goal from 400k through 1M. At 0.9, seed 1 stops at (4,2) from 800k onward, seed 3 stops there at 1M, and seed 4 briefly stops at (2,4) at 900k. At 0.7, no walk reaches the goal at any checkpoint; V near the start is almost flat and close to −200. The walk is only a spatial summary: its failure does not imply zero rollout success. Outputs: [0.7](sweep_runs/exp20_20261110-021024/uphill_expectile0.7.md), [0.8](sweep_runs/exp20_20261110-021024/uphill_expectile0.8.md), [0.9](sweep_runs/exp20_20261110-021024/uphill_expectile0.9.md).
+
+**Interpretation.** Expectile 0.8 gives the highest mean and the smallest variation across these five trained-actor seeds; each final seed score is at least 76.7%. The frozen-actor comparison also improves at 0.8, showing that the changed critic helps without retraining those proposals. Lowering the expectile further to 0.7 loses most success. At 1M, mean V on dataset rows is −193.0 at 0.7, −169.8 at 0.8 and −124.1 at 0.9; the respective mean gaps between Q of the selected action and mean Q of its candidates are 0.212, 1.627 and 1.124. These are consistent with weaker ranking at 0.7, but do not prove its cause. This selects 0.8 among the tested settings for this task; Experiments 21–22 test its behavior on other tasks.
 
 ### OGBench check: do the actor's samples reach both kinds of actions in the data, and where do the samples go after K = 20? (3 seeds, 2026-11-08)
 > **What we tested.** Evaluation only: no training, no episodes, no wandb. Two questions about the EqM-BC actor:
@@ -1859,7 +2226,7 @@ References: Experiment 11 best of 16 (critic at test time) 78.8 / 94.6; CORL IQL
 > 2. After K = 20 the samples keep moving. In which direction do they move?
 >
 > The same test was done on Maze2D before (Experiment 9 follow-up), where an action has 2 numbers. Here an action has 21 numbers (one per motor of the humanoid) and a state has 69 numbers.
-> - **Actors:** the three EqM-BC actors of Experiment 14 on `humanoidmaze-medium-navigate-singletask-v0` (500k training steps, trained and evaluated at K = 20). Experiments 13–16 are not written up in this file yet; their results are in `sweep_runs/exp13_*`, `exp14_*`, `exp15_*` and `exp16_*` (`summary.md`).
+> - **Actors:** the three EqM-BC actors of [Experiment 14](#experiment-14) on `humanoidmaze-medium-navigate-singletask-v0` (500k training steps, with a K = 20 sampler). Experiments 13–18 are written up above, including the local best-of-N evaluation in Experiment 15. This diagnostic uses the EqM actors only; Experiment 17 reports the Gaussian BC training baseline.
 > - **Code:** `diagnostics/ogbench_two_groups.py`, run with the `ogbench` env's python. It takes 23 s for all three actors. Results: `diagnostics/out/ogbench_two_groups/humanoidmaze-medium-navigate-singletask-v0/` (`summary.md`, `results.json`, and all samples).
 
 **Words used below**
@@ -2078,8 +2445,144 @@ With main data directions from the 64 closest states instead of 128, the shares 
    - **About 100 two-group states per dataset.** One state changes "both groups reached" by about 1 percentage point. The 3 seeds differ by up to ±4 points at K = 20.
    - **Only the BC actors were tested,** not actors fine-tuned with a critic.
 
+### HalfCheetah check: action groups and sampler drift on medium-replay (3 seeds, 2026-11-09)
+
+**Design.** Apply the preceding two-group diagnostic to Experiment 3's trained Aware actors (`checkpoint_150000.pt`) and Gaussian AWAC actors (`checkpoint_150999.pt`) on `halfcheetah-medium-replay-v2`. This compares actors trained with critic weights, unlike the AntMaze BC comparison. Use 256 fixed dataset states, 256 samples per state, and 128 neighbouring states from other episodes, with at most four neighbours per episode. Of the 256 states, 49 pass the two-group rule; Gaussian replacements with each state's mean and covariance pass in 0 of 256 cases. There is no new training or rollout evaluation.
+
+| Actor | Both groups reached, % | Random points of the actor's width, % | Width | Distance to data | Data missed | Samples in the middle |
+|---|---|---|---|---|---|---|
+| EqM, K = 10 | 86 ± 3 | 70 ± 4 | 0.349 | 0.254 | 0.214 | 0.25 |
+| EqM, K = 20 | 43 ± 3 | 20 ± 4 | 0.141 | 0.128 | 0.265 | 0.16 |
+| EqM, K = 1000 | 5 ± 2 | 2 ± 2 | 0.013 | 0.115 | 0.466 | 0.06 |
+| Gaussian samples | 27 ± 0 | 22 ± 3 | 0.170 | 0.166 | 0.282 | 0.25 |
+
+The data's middle share is 0.10. The Gaussian's executed mean action lies in the middle in 22% of the two-group states, and its distance to data is 0.132. At K = 20, EqM reaches both groups more often than the Gaussian despite its smaller width. Continuing to K = 1000 makes almost every state's samples coincide and reduces coverage. After K = 20, 87–94% of sampler movement lies along the main data directions, against 62% for random movement. This extends the observed drift pattern to the six-dimensional actions of a trained Aware actor. Neighbouring states only approximate a conditional action distribution; this diagnostic does not measure how coverage causes return. [Full results](diagnostics/out/two_groups/halfcheetah-medium-replay-v2/summary.md); implementation: [ogbench_two_groups.py](diagnostics/ogbench_two_groups.py).
+
+### OOD checks: field norms at states and actions (3 seeds, 2026-11-09)
+
+**Objective and protocol.** Test the OOD hypothesis directly using existing actors, with no new training or rollouts. [ood_check.py](diagnostics/ood_check.py) uses Experiment 10's AntMaze umaze BC actors and Experiments 14/17's humanoidmaze EqM/Gaussian BC actors, all at 500k updates. Each test uses 1,024 dataset state-action pairs: held-out validation rows for humanoidmaze and training rows for AntMaze, excluding the query's episode in nearest-neighbour searches. Larger scores mean more OOD. AUROC is the probability that a test input scores above a dataset input (0.5 is chance, 1 is perfect); detection percentages below use a threshold that flags 5% of dataset inputs. ± is std across the three actors.
+
+**State score.** At each state, sample from noise and average the field norm after K steps over 16 independent starts. Compare states from other AntMaze datasets and Gaussian perturbations of dataset states, with noise std measured in normalized state coordinates.
+
+| Actor's dataset → tested state set | Norm at K = 20: AUROC | Detected at 5% false positives | Nearest-state distance: AUROC / detected % |
+|---|---|---|---|
+| AntMaze umaze → umaze-diverse | 0.52 ± 0.01 | 6 ± 1% | 0.47 / 5 |
+| AntMaze umaze → medium-diverse | 0.86 ± 0.03 | 41 ± 7% | 0.95 / 83 |
+| AntMaze umaze → large-diverse | 0.92 ± 0.01 | 66 ± 1% | 0.96 / 91 |
+| Humanoidmaze → state noise std 0.3 | 0.64 ± 0.01 | 13 ± 1% | 0.72 / 12 |
+| Humanoidmaze → state noise std 1.0 | 0.94 ± 0.00 | 75 ± 2% | 1.00 / 100 |
+
+The signal depends strongly on K. For AntMaze large-diverse, AUROC is 0.92 at K = 20, 0.53 at K = 50 and 0.27 at K = 200: the presumed score direction reverses. At K = 1000 the median norms round to zero for dataset and shifted states. More convergence therefore does not give a more reliable state score. One start is also weaker than 16: at K = 20, large-diverse AUROC drops to 0.82 and humanoidmaze noise-1.0 to 0.83.
+
+**Action scores.** Evaluate the field norm directly at an action, and compare an accumulated `step_size × ‖f‖²` over 200 plain-GD steps starting there. The latter is an energy-drop proxy; the implicit field is not constrained to be an energy gradient. Test perturbed dataset actions, actions swapped between states, uniform actions, and the actor's own clipped samples. Gaussian BC distance in standard-deviation units and distance to neighbouring dataset actions provide baselines.
+
+- For swapped actions, field-norm AUROC is 0.94 on AntMaze and 0.99 on humanoidmaze; for uniform actions it is 1.00 on both. Gaussian BC also separates these shifts, with AUROC 0.99–1.00.
+- Mild action noise (std 0.1) is barely separated: field-norm AUROC 0.56 and 0.55. At std 0.3 it rises to 0.76 and 0.79.
+- The actor's own K = 20 samples score below dataset actions: field-norm AUROC 0.15 on AntMaze and 0.05 on humanoidmaze; at K = 1000 both round to 0.00. Generated samples are comparison sets, not known OOD labels. Low field norm cannot certify data coverage, especially given the collapse measured above.
+
+Full tables: [AntMaze](diagnostics/out/ood_check/antmaze-umaze-v2/summary.md), [humanoidmaze](diagnostics/out/ood_check/humanoidmaze-medium-navigate-singletask-v0/summary.md).
+
+#### OOD follow-up: accumulate along the sampler or across consecutive states
+
+[ood_accumulate.py](diagnostics/ood_accumulate.py) records 1,000 sampler steps with 16 starts per state. Compare a five-step moving average, the sum of norms, and one-sided or two-sided sums of deviations from a calibrated per-step median, scaled by median absolute deviation. These bucket variants use zero leak. Use 512 calibration windows and 512 test windows of 25 consecutive dataset states per set, with fixed sensor offsets of std 0.3 or 1.0 per window. Calibration and test window selections are separate; this is not an independent held-out threshold evaluation. Average scores over W = 1, 5, 10 or 25 states. Windows from the same dataset can overlap.
+
+Accumulating over sampler steps does not consistently improve on the K = 20 norm. On AntMaze large-diverse, the single-state norm gives AUROC 0.92; the sum through K = 1000 gives 0.76. On humanoidmaze offset-1.0, these are 0.94 and 0.53. A five-step moving average ending at K = 20 is similar to the single reading.
+
+Averaging the K = 20 score across consecutive states does help on several shifts. With W = 25, AntMaze medium-diverse reaches AUROC 0.94 and detects 74% at 5% false positives; large-diverse reaches 0.97 and 88%. Humanoidmaze offset-1.0 reaches 0.99 and 97%, whereas offset-0.3 reaches 0.76 and 22%. Nearest-state distance remains a strong baseline: for these four comparisons its AUROCs are 0.96, 0.97, 1.00 and 0.79. Full tables: [AntMaze](diagnostics/out/ood_accumulate/antmaze-umaze-v2/summary.md), [humanoidmaze](diagnostics/out/ood_accumulate/humanoidmaze-medium-navigate-singletask-v0/summary.md). These are offline detection tests; no return improvement from deploying such a detector was measured.
+
+#### OOD follow-up: trained Aware actors and their critics on HalfCheetah
+
+[ood_halfcheetah.py](diagnostics/ood_halfcheetah.py) repeats the tests with Aware and Gaussian AWAC on medium-expert and medium-replay, three seeds each. Aware checkpoints are at 1M and 150k respectively; Gaussian checkpoints are at 150,999 updates. State tests use 512 windows of 25 states per set and 16 sampler starts; action tests use 1,024 states. Nearest-neighbour searches exclude the query's episode. Additional actions come from moving EqM's K = 20 proposal uphill on Aware's own min(Q1, Q2), using 4 or 20 normalized-gradient steps of length 0.05, clipped to the action bounds (labels “Q-ascent 0.2” and “1.0”).
+
+| Training data → tested state set | K = 20 norm AUROC / detected % | Nearest-state distance AUROC / detected % |
+|---|---|---|
+| medium-expert → random | 0.95 ± 0.01 / 71 ± 2 | 1.00 / 100 |
+| medium-expert → medium-replay | 0.64 ± 0.01 / 19 ± 1 | 0.84 / 45 |
+| medium-replay → random | 0.81 ± 0.01 / 22 ± 1 | 0.87 / 10 |
+| medium-replay → expert episodes | 0.63 ± 0.05 / 1 ± 0 | 0.97 / 90 |
+
+Averaging over 25 states raises medium-expert-versus-random detection to 100%, but the medium-replay actor still catches 0% of expert windows at the 5% threshold. Novel expert states are a distribution shift without necessarily being undesirable states.
+
+For actions, the field norm detects uniform or swapped actions well (AUROC 0.92–1.00) and gives low scores to its own proposals. After the longer Q-ascent treatment, Aware rates 100% of medium-expert actions and 99% of medium-replay actions above the corresponding dataset action, while the field score flags only 23% and 7% at the 5% threshold. The shorter treatment flags approximately 0% on both datasets. This shows limited sensitivity to these critic-selected changes; it does not establish that the changed actions have bad true returns. No rollout or ground-truth action-value evaluation was done. Full results: [medium-expert](diagnostics/out/ood_halfcheetah/halfcheetah-medium-expert-v2/summary.md), [medium-replay](diagnostics/out/ood_halfcheetah/halfcheetah-medium-replay-v2/summary.md).
+
+### Experiment 21: IEQM on OGBench AntMaze large (finished 2026-11-10)
+
+**Objective.** Test Experiment 20's approach on `antmaze-large-navigate-singletask-v0`, using the dataset's default task. Compare expectiles 0.9 and 0.8 with seeds 1, 2 and 3 for each setting: six runs. An expectile controls the asymmetric squared-error fit of the state-value network V. At 0.9, underestimating the target Q is weighted nine times as much as overestimating it; at 0.8 the ratio is four to one.
+
+**Design.** Use critic discount γ = 0.99, as requested for this task. Keep the Experiment 20 training procedure: a BC EqM actor and an IQL critic trained independently on dataset transitions. The critic does not weight the actor loss. The actor, Q networks and V network each have four hidden layers of width 512; Q and V use GELU and LayerNorm. Batch size is 256, Adam learning rate is 0.0003, and the target-Q update rate is 0.005. Critic inputs are raw states; actor inputs are normalized states. Use supplied rewards, task-terminal masks, and no clipping of the critic target. There is no separate frozen-actor comparison in this sweep.
+
+**Algorithm.**
+
+1. Draw a batch of dataset transitions. Fit V to the smaller target-Q prediction at the dataset action using the chosen expectile.
+2. Fit Q1 and Q2 to `reward + 0.99 × (1 − task terminal) × V(next state)`. Treat this target as fixed when taking gradients.
+3. Train the EqM field on the same batch's dataset actions with weight one, EqM scale 8 and decay threshold 0.8. No Q or V prediction enters this actor loss.
+4. Repeat for 1M updates. Use compiled losses, with the same target-copy update order as Experiment 20.
+5. Every 100k updates, evaluate 50 episodes. At each state, draw 32 actions with K = 20 Nesterov sampler steps, step size 0.01 and momentum 0.3. Clip the actions to the environment bounds and execute the one with the highest min(Q1, Q2).
+6. Save a checkpoint at every evaluation. The final score averages success at 800k, 900k and 1M within each seed, then reports the mean and standard deviation across the three seeds.
+
+**Files and outputs.** [Sweep configuration](sweeps/exp21_ogbench_ieqm_antmaze_large.yaml), [detached launcher](run_exp21.sh), and [result summary script](diagnostics/summarize_exp21.py). W&B project `E`, groups `Exp21_IEQM_antmaze-large_expectile0.9` and `Exp21_IEQM_antmaze-large_expectile0.8`. Training logs and run status are in `sweep_runs/exp21_ogbench_ieqm_antmaze_large_20261110-095545/`; checkpoints are under `sweep_runs/exp21_checkpoints/`. Full scores and training curves: [Experiment 21 summary](sweep_runs/exp21_20261110-095545/summary.md).
+
+**Results.** All six runs reached 1M updates with no failures, taking 71–75 minutes each. The sweep finished at 11:11 UTC on 2026-11-10. Success is the percentage of 50 evaluation episodes that reach the goal. Each seed's score averages its evaluations at 800k, 900k and 1M; ± is the population standard deviation of those scores across three seeds.
+
+| Expectile | Seed 1 score | Seed 2 score | Seed 3 score | Mean ± std | Success at 1M, seeds 1 / 2 / 3 |
+|---|---|---|---|---|---|
+| 0.9 | 31.3 | 34.7 | 8.0 | **24.7 ± 11.9** | 28 / 30 / 10 |
+| 0.8 | 23.3 | 32.7 | 34.0 | **30.0 ± 4.7** | 28 / 30 / 46 |
+
+**Interpretation.** Expectile 0.8 raises the mean by 5.3 percentage points and reduces variation across seeds. The gain comes from seed 3: its score rises from 8.0 to 34.0, while seeds 1 and 2 score lower than at 0.9. At expectile 0.9, seed 3 falls from 38% success at 700k to 2% at 800k, then 12% and 10%. This resembles the late loss of success in Experiment 19, but its cause was not checked here. Expectile 0.8 also fluctuates: seed 2 reaches 62% at 700k, then 34%, 34% and 30%. With three seeds, these results favor 0.8 in this comparison but do not establish a reliable advantage on other tasks or seeds. Neither setting exceeds 35% in the final three-evaluation average of any seed.
+
+### Experiment 22: IEQM on AntSoccer, discount and expectile comparison (2026-11-10)
+
+**Objective.** Test whether the critic's discount and expectile settings change success on `antsoccer-arena-navigate-singletask-v0`, default task 4. The discount γ controls the weight given to rewards farther in the future. The expectile controls how strongly V is pushed upward toward the higher dataset-action Q values, as defined in Experiment 21.
+
+| Critic discount γ | Expectile | Seeds | Runs |
+|---|---|---|---|
+| 0.999 | 0.9 | 1, 2, 3 | 3 |
+| 0.999 | 0.8 | 1, 2, 3 | 3 |
+| 0.995 | 0.9 | 1, 2, 3 | 3 |
+| 0.995 | 0.8 | 1, 2, 3 | 3 |
+
+**Algorithm and design.** Use the same IEQM implementation as Experiment 21: train a BC EqM actor independently of an IQL critic. For each dataset transition, fit V to the smaller target-Q prediction using the chosen expectile, fit both Q networks to `reward + γ × (1 − task terminal) × V(next state)`, and train the EqM field on the dataset action with weight one. The actor does not use Q weights. Use the supplied task rewards and terminal masks, raw critic states, normalized actor states, four hidden layers of width 512, GELU and LayerNorm for Q and V, batch 256, Adam learning rate 0.0003, and target-Q update rate 0.005. Critic targets are not clipped. The EqM loss uses scale 8 and decay threshold 0.8.
+
+Each of the 12 runs trains for 1M updates. Every 100k, evaluate 50 episodes and save a checkpoint. At each environment step, generate 32 EqM actions using K = 20 Nesterov steps, step size 0.01 and momentum 0.3, then execute the action with the highest min(Q1, Q2). The final score averages success at 800k, 900k and 1M within each seed, then reports the mean and population standard deviation across the three seeds. There is no separate frozen-actor comparison. Within each discount, the two expectiles form a matched three-seed comparison; within each expectile, the two discounts form the other comparison.
+
+**Execution and outputs.** [Sweep](sweeps/exp22_ogbench_ieqm_antsoccer.yaml), [detached launcher](run_exp22.sh), and [summary script](diagnostics/summarize_exp22.py). The launcher allows up to 12 runs at once, starting further runs only when the GPU utilization and free-memory checks pass. W&B project `E` has one group per setting, named `Exp22_IEQM_antsoccer_gamma<discount>_expectile<expectile>`. The actual logs and [run status table](sweep_runs/exp22_20261110-112533/exp22_ogbench_ieqm_antsoccer_20261110-112533/runs.csv) are in `sweep_runs/exp22_20261110-112533/exp22_ogbench_ieqm_antsoccer_20261110-112533/`; the launcher writes its final `summary.md` in the parent folder after completion. Checkpoints are in `sweep_runs/exp22_checkpoints/`.
+
+**Final results.** All 12 runs finished at 1M updates; the launcher completed successfully at 13:53 UTC on 2026-11-10. The table reports the three-evaluation averages at 800k, 900k and 1M. Full curves and individual evaluations: [Experiment 22 summary](sweep_runs/exp22_20261110-112533/summary.md).
+
+| Discount γ | Expectile | Seed 1 score | Seed 2 score | Seed 3 score | Final-three success %, mean ± std |
+|---|---|---|---|---|---|
+| 0.999 | 0.9 | 11.3 | 0.7 | 2.0 | **4.7 ± 4.7** |
+| 0.999 | 0.8 | 29.3 | 24.7 | 1.3 | **18.4 ± 12.2** |
+| 0.995 | 0.9 | 21.3 | 27.3 | 16.0 | **21.6 ± 4.6** |
+| 0.995 | 0.8 | 26.0 | 24.0 | 31.3 | **27.1 ± 3.1** |
+
+**Interpretation.** Expectile 0.8 improves the mean at both discounts. At γ = 0.999, seed 3 still remains near zero. At γ = 0.995, expectile 0.8 reaches 27.1 ± 3.1%, the highest mean of the four settings, with every seed above 24%. The lower discount improves the mean at both expectiles, but three seeds do not establish that this advantage generalizes. Some runs lose success late; for example, γ = 0.999, expectile 0.9, seed 1 falls from 24% at 800k to 10% and 0%. This experiment has not diagnosed the cause.
+
+<a id="experiment-23"></a>
+
+### Experiment 23: IEQM on D4RL HalfCheetah, expectile comparison (2026-11-10)
+
+**Objective.** Test IEQM on `halfcheetah-medium-v2`, `halfcheetah-medium-replay-v2` and `halfcheetah-medium-expert-v2`. Fix critic discount γ = 0.99 and compare IQL expectiles 0.8 and 0.9 (the requested “implicit factor”), with seeds 1, 2 and 3 for each dataset/expectile: **18 runs**. This extends Experiments 19–22 to locomotion and different dataset quality mixtures.
+
+| Dataset | Discount | Expectiles | Seeds per expectile | Runs |
+|---|---|---|---|---|
+| `halfcheetah-medium-v2` | 0.99 | 0.8, 0.9 | 1, 2, 3 | 6 |
+| `halfcheetah-medium-replay-v2` | 0.99 | 0.8, 0.9 | 1, 2, 3 | 6 |
+| `halfcheetah-medium-expert-v2` | 0.99 | 0.8, 0.9 | 1, 2, 3 | 6 |
+
+**Algorithm and controls.** Keep the independent BC EqM actor and dataset-only IQL critic from Experiment 21. Fit V to min(target Q1, target Q2) at the dataset action with the selected expectile; fit both Q networks to `reward + 0.99 × (1 − terminal) × V(next state)`; train the EqM field on dataset actions with weight one. Actor samples do not enter critic training. Use four hidden layers of width 512 for actor, Q and V, GELU and LayerNorm for Q/V, Mish for the field, batch 256, Adam learning rate 0.0003, target update rate 0.005, EqM scale 8 and decay threshold 0.8. This decay threshold stays fixed and is separate from the IQL expectile. Train 1M updates with compiled losses; use the same target-copy update order as the earlier IEQM experiments. There is no separate frozen-actor arm.
+
+**D4RL data and evaluation.** [train_ieqm.py](Aware/train_ieqm.py) now supports D4RL through the existing [offline_data.py](Aware/offline_data.py) loader in the `hawk` environment. Use `d4rl.qlearning_dataset` with original rewards, raw states for Q/V and dataset-normalized states for the actor. Do not scale rewards or clip TD targets. Bootstrap using dataset terminals; time-limit rows are handled by the existing loader. Every 100k updates, evaluate 50 seeded episodes, making 32 candidates with K = 20 Nesterov steps (step size 0.01, momentum 0.3) and executing the highest-min-Q candidate. Log raw returns, D4RL normalized returns, episode length, and the share of episodes whose body angle exceeds 2 radians in magnitude. **Normalized return is not a success percentage.** Save a checkpoint every 100k. For each seed average normalized returns at 800k, 900k and 1M, then report the mean and population std over all three seeds. The summary leaves incomplete seeds and settings pending.
+
+**GPU scheduling.** Queue all 18 runs, with at most six active from this sweep. Before every start, require mean total GPU utilization below 80% over a 60-second window and at least 4,000 MiB free; wait at least 120 seconds between starts. The first run also waits for a complete observation window and passes the same checks. Missing GPU telemetry holds the queue. This accounts for the ongoing Experiment 22 jobs without stopping them. Starts follow the dataset/expectile/seed order in the sweep; two compiler workers per run limit compilation overhead. The initial GPU check showed 46% utilization and about 21 GiB free with three AntSoccer jobs active.
+
+**Files and execution.** [Sweep](sweeps/exp23_d4rl_ieqm_halfcheetah.yaml), [detached launcher](run_exp23.sh), and [summary script](diagnostics/summarize_exp23.py). W&B project `E`, one group per dataset/expectile, named `Exp23_IEQM_halfcheetah-<variant>_expectile<value>`. The launcher records its log under `sweep_runs/exp23_<UTC timestamp>/`; the nested `exp23_d4rl_ieqm_halfcheetah_<timestamp>/` contains the command plan, copied YAML, `runs.csv` and per-run logs. Checkpoints go under `sweep_runs/exp23_checkpoints/`. The launcher writes the final `summary.md` when the queue finishes. Results are pending; the summary script can also inspect an active sweep without assigning premature final scores.
+
+**Launch record.** Started detached at 14:20 UTC on 2026-11-10 (launcher PID 544267), under `sweep_runs/exp23_20261110-142037/`. Experiment 22 finished during preparation, so it no longer occupies the GPU. Before launching, a compiled 100-update HalfCheetah smoke run completed two evaluation episodes and saved a checkpoint that reloaded successfully. Focused checks passed for all 18 configurations, expectile/terminal targets, D4RL return and flip metrics, GPU admission with external load or missing telemetry, and summaries of incomplete runs.
+
 ## Later phases
-- **Phase 2 — OOD:** test `‖f(a|s)‖` and the EqM energy as an action-level OOD score, for candidate filtering, reject-and-rank, and conservative critic targets. Compare against GeCO (final field norm), EqC (path-wise energy consistency), and Fisher-metric layer-gradient norms. ⚠ Experiment 2 found ‖f‖ ≈ 3–6 at dataset actions and ≈ 0 only at the sampler's endpoints (the mode), so as trained now, ‖f‖ measures distance from the mode, not from the data.
+- **Phase 2 — OOD:** initial offline state/action detection checks, sampler-trace accumulation and Experiment 19's candidate-filter intervention are now reported above. Field norms detect several synthetic shifts but depend strongly on K, give especially low scores to the actor's own samples, and do not rescue the measured false-critic-peak failure. Still to test: useful policy improvements from reject-and-rank or conservative targets, EqC path-wise energy consistency, Fisher-metric layer-gradient norms, and an explicit energy model. The accumulated norms and squared-norm proxy tested here do not establish those other methods' behavior.
 - **Phase 3 — Offline-to-online:** continue EqM-AWAC online. Consider FINO (wider action support for exploration) and FFM (behavior-tilted fine-tuning).
 - **Alternatives if AWAC becomes the bottleneck:**
   - IQL critic: in-sample, never queries actor actions, so there is no EqM sampling inside critic updates. Tried in Experiment 7: medium-diverse rises from 0 to about 50 %, but the 4-layer critic diverged in 2 of 3 seeds.

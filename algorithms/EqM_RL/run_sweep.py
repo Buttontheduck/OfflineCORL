@@ -7,7 +7,7 @@ Usage (from algorithms/EqM_RL/):
 
 Any Python with PyYAML can start this file (the hawk, eagle or base env). Each training
 run is started with the Python of the conda env its target needs: `aware`, `awac_d4rl`,
-`iql_d4rl`, `fit_actor`, `train_critic` and `finetune_actor` (D4RL) run in hawk, `aware_minari` and `awac_minari` run in
+`iql_d4rl`, `fit_actor`, `train_critic`, `finetune_actor` and `train_ieqm_d4rl` (D4RL) run in hawk, `aware_minari` and `awac_minari` run in
 eagle, and the OGBench targets `aware_ogbench`, `fit_actor_ogbench`, `train_critic_ogbench`,
 `finetune_actor_ogbench`, `eval_best_of_n_ogbench` and `train_ieqm_ogbench` run in ogbench. The sweep file format is described in sweeps/README.md.
 
@@ -65,6 +65,8 @@ TARGETS = {
     # IEQM = IFQL's critic + the EqM actor + best of N at decision time, on OGBench (Aware/train_ieqm.py; IFQL.md)
     "train_ieqm_ogbench": dict(script=HERE / "Aware" / "train_ieqm.py", conda_env="ogbench",
                                style="pyrallis", data="ogbench", name_prefix="IEQM"),
+    "train_ieqm_d4rl": dict(script=HERE / "Aware" / "train_ieqm.py", conda_env="hawk",
+                            style="pyrallis", data="d4rl", name_prefix="IEQM"),
     # Eval-only best-of-N: frozen EqM-BC actor + frozen critic on OGBench (Aware/eval_best_of_n.py, no training, no wandb)
     "eval_best_of_n_ogbench": dict(script=HERE / "Aware" / "eval_best_of_n.py", conda_env="ogbench",
                                    style="pyrallis", data="ogbench", name_prefix="BestN"),
@@ -86,7 +88,7 @@ SWEEP_KEYS = {"target", "parallel", "stagger", "conda_env", "fixed", "grid", "gp
 #   gpu_gate: {util_max: 80, min_free_mb: 3000, settle_s: 300, window_s: 60}
 # = mean GPU utilization over the last window_s seconds below util_max %, at least min_free_mb
 # free, and at least settle_s seconds since this sweep's last start (so the window sees the
-# new run at work). The first run starts at once; `parallel` is still the upper limit.
+# new run at work). Every run, including the first, must pass the gate; `parallel` is still the upper limit.
 GPU_GATE_DEFAULTS = {"util_max": 80.0, "min_free_mb": 3000.0, "settle_s": 300.0, "window_s": 60.0}
 MUJOCO_BIN = Path.home() / ".mujoco" / "mujoco210" / "bin"
 
@@ -279,6 +281,21 @@ def gpu_sample():
         return None
 
 
+def gpu_gate_ready(gate, gpu, util_hist, last_start, monitor_start, current_time):
+    """Admit each run using total GPU load, including jobs from other sweeps.
+
+    Wait for one observation window before the first start. Missing telemetry holds the queue.
+    """
+    if gate is None:
+        return True
+    if gpu is None or not util_hist:
+        return False
+    if current_time - monitor_start < gate["window_s"] or current_time - last_start < gate["settle_s"]:
+        return False
+    util = sum(u for _, u in util_hist) / len(util_hist)
+    return util < gate["util_max"] and gpu[1] >= gate["min_free_mb"]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("sweep", type=Path, help="sweep YAML file")
@@ -352,26 +369,21 @@ def main() -> int:
         if unknown:
             sys.exit(f"gpu_gate: unknown keys {sorted(unknown)}; allowed: {sorted(GPU_GATE_DEFAULTS)}")
         gate = {k: float(v) for k, v in {**GPU_GATE_DEFAULTS, **gate}.items()}
-        print(f"GPU gate: a further run starts only when GPU utilization (mean over {gate['window_s']:.0f} s) "
+        print(f"GPU gate: every run, including the first, starts only when GPU utilization (mean over {gate['window_s']:.0f} s) "
               f"< {gate['util_max']:.0f}%, free memory >= {gate['min_free_mb']:.0f} MB, and "
               f">= {gate['settle_s']:.0f} s after the last start\n")
     util_hist = deque()                         # (time, utilization %) over the last window_s
     gpu, last_start, last_hold_msg = None, 0.0, 0.0
+    monitor_start = time.time()
 
     def gate_open() -> bool:
         nonlocal last_hold_msg
-        if gate is None or not running:
-            return True
-        if time.time() - last_start < gate["settle_s"]:
-            return False
-        if gpu is None:                         # nvidia-smi unreadable: don't block
-            return True
-        util = sum(u for _, u in util_hist) / max(len(util_hist), 1)
-        if util < gate["util_max"] and gpu[1] >= gate["min_free_mb"]:
+        if gpu_gate_ready(gate, gpu, util_hist, last_start, monitor_start, time.time()):
             return True
         if time.time() - last_hold_msg > 600:
-            print(f"[{now()}] holding {len(waiting)} runs: GPU utilization {util:.0f}%, "
-                  f"free {gpu[1]:.0f} MB", flush=True)
+            detail = "telemetry unavailable" if gpu is None else (
+                f"GPU utilization {sum(u for _, u in util_hist) / max(len(util_hist), 1):.0f}%, free {gpu[1]:.0f} MB")
+            print(f"[{now()}] holding {len(waiting)} runs: {detail}", flush=True)
             last_hold_msg = time.time()
         return False
 

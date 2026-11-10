@@ -40,6 +40,8 @@ grid:                    # every combination is one run: 3 x 2 x 3 = 18 runs
 | `awac_d4rl` | CORL's `algorithms/offline/awac.py` (Gaussian AWAC, pyrallis) | D4RL | `hawk` |
 | `iql_d4rl` | CORL's `algorithms/offline/iql.py` (IQL, pyrallis; its dataset key is `env`, not `env_name`) | D4RL | `hawk` |
 | `fit_actor` | `Aware/fit_actor.py` (Gaussian or EqM actor alone, on fixed weights, pyrallis) | D4RL | `hawk` |
+| `train_ieqm_d4rl` | `Aware/train_ieqm.py` (BC EqM actor + independent IQL critic, pyrallis) | D4RL | `hawk` |
+| `train_ieqm_ogbench` | `Aware/train_ieqm.py` (same algorithm, OGBench evaluation) | OGBench | `ogbench` |
 
 - **Keys** are the names in the target's config. A key that doesn't exist is an error,
   which catches typos (for Hydra targets, write `+key: value` to add a new key).
@@ -54,15 +56,17 @@ grid:                    # every combination is one run: 3 x 2 x 3 = 18 runs
 - **A list as one value:** wrap it in another list, e.g. `some_key: [[1, 2], [3, 4]]` is
   two runs.
 - **Optional keys:** `conda_env` (use another env than the default), `stagger` (seconds
-  between starts, default 2), and `gpu_gate`, which starts each further run only while the GPU
+  between starts, default 2), and `gpu_gate`, which starts each run only while the GPU
   has room:
   ```yaml
   gpu_gate: {util_max: 80, min_free_mb: 3000, settle_s: 300, window_s: 60}
   ```
-  A further run starts only if the GPU's mean utilization over the last `window_s` seconds is
+  A run starts only if the GPU's mean utilization over the last `window_s` seconds is
   below `util_max` %, at least `min_free_mb` MB are free, and at least `settle_s` seconds have
-  passed since the sweep's last start (so the window sees the new run at work). The first run
-  starts at once, and `parallel` is still the upper limit. The runs start in file order.
+  passed since the sweep's last start (so the window sees the new run at work). Before the first
+  run, observe a full `window_s` interval. These checks include other sweeps' GPU use and also
+  apply when no run from this sweep is active. Unavailable GPU telemetry holds the queue.
+  `parallel` is still the upper limit. The runs start in file order.
 
 ## What the runner sets for you
 

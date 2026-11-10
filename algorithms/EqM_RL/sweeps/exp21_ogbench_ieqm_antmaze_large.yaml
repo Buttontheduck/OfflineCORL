@@ -1,0 +1,26 @@
+# Experiment 21: Experiment 20's IEQM recipe on OGBench AntMaze large, default task.
+# Six runs: expectile 0.9 and 0.8, seeds 1-3 each. Discount 0.99.
+# BC actor and dataset-only IQL critic train independently; evaluation chooses the best of 32 actions.
+target: train_ieqm_ogbench
+parallel: 6
+gpu_gate: {util_max: 97, min_free_mb: 3000, settle_s: 30, window_s: 30}
+untagged: [group]
+
+fixed:
+  name: Exp21_IEQM
+  project: E
+  env_name: antmaze-large-navigate-singletask-v0
+  compile: true
+  gamma: 0.99
+  num_train_ops: 1000001
+  eval_frequency: 100000
+  n_test_episodes: 50
+  eval_candidates: 32
+  eval_tasks: own
+  num_step: 20
+  checkpoint_every: 100000
+  checkpoints_path: /workspace/OfflineCORL/algorithms/EqM_RL/sweep_runs/exp21_checkpoints
+
+grid:
+  - {group: Exp21_IEQM_antmaze-large_expectile0.9, expectile: 0.9, seed: [1, 2, 3]}
+  - {group: Exp21_IEQM_antmaze-large_expectile0.8, expectile: 0.8, seed: [1, 2, 3]}

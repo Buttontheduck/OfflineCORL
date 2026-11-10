@@ -1,0 +1,39 @@
+# Experiment 23: 3 D4RL HalfCheetah datasets x 2 IQL expectiles x 3 seeds = 18 runs.
+# Independent BC EqM actor and dataset-only IQL critic; best of 32 at evaluation.
+target: train_ieqm_d4rl
+parallel: 6
+gpu_gate: {util_max: 80, min_free_mb: 4000, settle_s: 120, window_s: 60}
+untagged: [group]
+
+fixed:
+  name: Exp23_IEQM
+  project: E
+  compile: true
+  gamma: 0.99
+  num_train_ops: 1000001
+  eval_frequency: 100000
+  n_test_episodes: 50
+  final_evals: 3
+  eval_candidates: 32
+  num_step: 20
+  step_size: 0.01
+  moment: 0.3
+  hidden_dim: 512
+  num_hidden_layers: 4
+  critic_hidden_dim: 512
+  critic_n_hidden: 4
+  batch_size: 256
+  learning_rate: 0.0003
+  tau: 0.005
+  scale_gradient: 8.0
+  flag_threshold: 0.8
+  checkpoint_every: 100000
+  checkpoints_path: /workspace/OfflineCORL/algorithms/EqM_RL/sweep_runs/exp23_checkpoints
+
+grid:
+  - {group: Exp23_IEQM_halfcheetah-medium_expectile0.8, env_name: halfcheetah-medium-v2, expectile: 0.8, seed: [1, 2, 3]}
+  - {group: Exp23_IEQM_halfcheetah-medium_expectile0.9, env_name: halfcheetah-medium-v2, expectile: 0.9, seed: [1, 2, 3]}
+  - {group: Exp23_IEQM_halfcheetah-medium-replay_expectile0.8, env_name: halfcheetah-medium-replay-v2, expectile: 0.8, seed: [1, 2, 3]}
+  - {group: Exp23_IEQM_halfcheetah-medium-replay_expectile0.9, env_name: halfcheetah-medium-replay-v2, expectile: 0.9, seed: [1, 2, 3]}
+  - {group: Exp23_IEQM_halfcheetah-medium-expert_expectile0.8, env_name: halfcheetah-medium-expert-v2, expectile: 0.8, seed: [1, 2, 3]}
+  - {group: Exp23_IEQM_halfcheetah-medium-expert_expectile0.9, env_name: halfcheetah-medium-expert-v2, expectile: 0.9, seed: [1, 2, 3]}
