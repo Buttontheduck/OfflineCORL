@@ -275,8 +275,127 @@ actor (EqM at K = 20 vs flow), in the actor's width (EqM-BC 4 × 256 vs flow 4 �
 steps), in the evaluation (Exp 15: 100 episodes at the final checkpoints; FQL: the mean of 3 evals of 50 episodes each, at
 800k, 900k and 1M), and in the number of seeds.
 
-**Not tested yet (possible next experiment):** the IFQL recipe with our actor, i.e. train an IQL critic exactly as in Sections 4
+**Tested on 2026-11-10 as Experiment 19 (code and results in Section 12):** the IFQL recipe with our actor, i.e. train an IQL critic exactly as in Sections 4
 and 7 (expectile 0.9, 4 × 512 with LayerNorm, γ = 0.995, 1M steps) and choose the best of 32 EqM-BC samples at K = 20. This would
 separate the effect of the critic training from the effect of the actor type. Experiment 13 already trained an IQL critic
 (expectile 0.9), but a different one, used differently: smaller networks (4 × 256, no LayerNorm), used only for the actor's
 training weights and never to choose among samples, and stopped early (last eval at 200k, 0–2 %).
+
+## 12. IEQM: the IFQL recipe with our EqM actor (Experiment 19)
+
+Prepared and run on 2026-11-10 on branch `ieqm`. IEQM is IFQL with one change: IFQL's flow network is replaced by our EqM field.
+The critic, its training and the way an action is chosen are IFQL's, as written in Sections 3 to 7.
+
+| file | what it does |
+|---|---|
+| `Aware/train_ieqm.py` | trains V, Q1, Q2 and the EqM field on the same batches; at every eval, the critic picks the best of 32 actor samples |
+| `sweeps/exp19_ogbench_ieqm.yaml` | the experiment: humanoidmaze-medium task 1, seeds 1–3, 1M steps |
+| `run_exp19.sh` | starts the sweep, then writes the summary |
+| `diagnostics/summarize_exp19.py` | the summary: scores per actor and seed, success over training, critic numbers |
+| `run_sweep.py` | new target `train_ieqm_ogbench` |
+
+### 12.1 What is the same as IFQL
+
+Every item below is in `Aware/train_ieqm.py` and matches the section named.
+
+| item | value | section |
+|---|---|---|
+| V, Q1, Q2 | 4 × 512; each hidden layer is linear → GELU → LayerNorm; then linear → 1; Glorot-uniform weights, biases 0 | 3 |
+| target copies | Q1 and Q2 only; rate 0.005; the target moves toward the Q weights from before the step | 4, step 6 |
+| V loss | d = min(Q1_target, Q2_target)(s, a) − V(s); 0.9 · d² if d ≥ 0, 0.1 · d² if d < 0 | 4, step 2 |
+| Q loss | y = r + 0.995 · mask · V(s′) with the current V; (Q1 − y)² + (Q2 − y)² | 4, step 3 |
+| one step | one Adam step (learning rate 0.0003) on V loss + Q loss + actor loss; batch 256; 1,000,000 steps | 4, step 5 |
+| inputs of V and Q | raw states, rewards as given, dataset actions clipped to ±(1 − 0.00001), no clipping of the target | 3, 7 |
+| choosing an action | 32 actor samples, clipped to [−1, 1]; the highest min(Q1, Q2) of the trained critic is executed | 5 |
+| evaluation | every 100k steps, 50 episodes; score = mean of the evals at 800k, 900k and 1M | 7 |
+
+As in IFQL, the critic never sees an action made by the actor during training, and the actor never sees Q or V.
+
+### 12.2 What differs from IFQL
+
+| | IFQL | IEQM (our code) |
+|---|---|---|
+| actor network | flow network: 4 × 512, GELU, inputs s, x and the time t | EqM field (`ConditionalMLP`): 4 × 512, Mish, inputs x and s, no time input |
+| actor loss | flow matching (Section 4, step 4) | Aware's EqM loss with every row's weight 1, as in Experiment 14's EqM-BC (`scale_gradient` 8, `flag_type` trun, `flag_threshold` 0.8) |
+| states given to the actor | raw | normalized, (s − mean) / std, as for all our EqM actors |
+| making one sample | 10 Euler steps from noise | K = 20 NAG steps from noise (step size 0.01, momentum 0.3) |
+| actor's starting weights | Glorot-uniform | PyTorch's default, as for all our EqM actors |
+| seeds | 8 | 3 |
+| start states of the eval episodes | not seeded | seeded: every eval of every run uses the same 50 start states |
+| framework | JAX | PyTorch; the sweep sets `compile: true` (see 12.4) |
+
+### 12.3 Two actors are scored by the same critic
+
+The critic does not depend on the actor, so one critic per seed can score two actors. Every eval does both.
+
+| name in the logs | actor | compare with | what differs in that comparison |
+|---|---|---|---|
+| `trained` (`eval/`) | the EqM field trained in the same run (4 × 512, as many steps as the critic) | IFQL: 69 ± 19 % | the actor (table 12.2) |
+| `frozen` (`eval_frozen/`) | Experiment 14's EqM-BC of the same seed (4 × 256, 500k steps), loaded and not trained | Experiment 15, best of 32 at K = 20: 39 % | the critic: IQL here, QIPO there. Also the eval: 50 episodes at 800k, 900k and 1M here; 100 episodes at the final checkpoints there |
+
+### 12.4 Checks done on 2026-11-10
+
+- The V loss and the Q loss equal an independent numpy calculation on a random batch (difference below 0.00001).
+- V's loss changes only V, and Q's loss changes only Q. The expectile weight is 0.9 where V is too low and 0.1 where it is
+  too high. Layer order, Glorot limits and zero biases are as in Section 3. The target copy equals Q at the start.
+- Two test runs of 6,000 steps on the real data, one with `compile: false` and one with `compile: true`. Both trained,
+  evaluated both actors and saved a checkpoint that loads again.
+- `compile: true` runs the three losses as one compiled graph (`torch.compile`). It is the same maths. After 3,000 steps
+  the two test runs agree to 4 digits (Q loss 0.6727 and 0.6728, V on dataset rows −13.5390 and −13.5384). One training
+  step takes 2.6 ms instead of 8.9 ms.
+- **Not done:** running FQL's official JAX code side by side with ours (flax is not installed in the `ogbench` env).
+
+### 12.5 How to run it
+
+```
+cd algorithms/EqM_RL
+setsid nohup bash run_exp19.sh > /dev/null 2>&1 < /dev/null &
+```
+
+The 3 runs run together. One run alone takes about 1 hour: 1,000,000 steps of about 2.6 ms, plus 20 evals of about 1 minute.
+Progress is in `sweep_runs/exp19_<date-time>/orchestrator.log`, the result in `sweep_runs/exp19_<date-time>/summary.md`.
+It needs Experiment 14's EqM-BC checkpoints (`Exp14_BC_…humanoidmaze-medium…_seed1` to `_seed3`, `checkpoint_500000.pt`),
+which are on disk.
+
+### 12.6 Results (2026-11-10: 3 seeds, 1,000,000 steps each, about 67 minutes per run)
+
+Summary file: `sweep_runs/exp19_20261110-000749/summary.md`. Success in %, 50 episodes of task 1 per eval.
+
+| actor | score: mean of the evals at 800k, 900k and 1M, then mean ± std over the 3 seeds | seed 1 / 2 / 3 | reference |
+|---|---|---|---|
+| `trained` (EqM field of the run, 4 × 512) | **48.7 ± 32.9** | 2.7 / 78.0 / 65.3 | IFQL: 69 ± 19 (8 seeds) |
+| `frozen` (Experiment 14's EqM-BC, 4 × 256) | **45.6 ± 30.5** | 2.7 / 70.7 / 63.3 | Experiment 15, same actors, QIPO critic: 39 (18 / 33 / 66) |
+
+Success at every eval, written as `trained` / `frozen`:
+
+| step | seed 1 | seed 2 | seed 3 |
+|---|---|---|---|
+| 100k | 12 / 20 | 22 / 8 | 8 / 16 |
+| 200k | 20 / 38 | 36 / 46 | 36 / 44 |
+| 300k | 58 / 60 | 70 / 60 | 68 / 66 |
+| 400k | 64 / 78 | 68 / 58 | 68 / 76 |
+| 500k | 76 / 68 | 82 / 72 | 80 / 74 |
+| 600k | 74 / 80 | 78 / 74 | 72 / 68 |
+| 700k | 76 / 76 | 74 / 66 | 76 / 60 |
+| 800k | 8 / 2 | 70 / 60 | 76 / 76 |
+| 900k | 0 / 4 | 76 / 74 | 78 / 78 |
+| 1M | 0 / 2 | 88 / 78 | 42 / 36 |
+
+What these numbers show:
+1. **From 300k to 700k, all 3 seeds are between 58 % and 82 %, with both actors.** The same frozen actors with the QIPO
+   critic reached 18, 33 and 66 % in Experiment 15.
+2. **Seed 1 falls from 76 % at 700k to 8 % at 800k, and to 0 % at 900k and 1M.** Both actors fall together. The frozen
+   actor did not change, so the critic changed. Seed 1's V on dataset rows rose from −125.6 at 700k to −115.1 at 900k,
+   about 0.5 per 10k steps. In seeds 2 and 3 it stayed between −125 and −127. Nothing blew up: Q on dataset rows stayed
+   between −187 and −4, and the Q loss rose only from 2.7 to 3.2.
+3. **Seed 3 falls at the last eval** (78 → 42 % `trained`, 78 → 36 % `frozen`). Its V rose by 1.0 over the last 100k
+   steps. Whether this is the same change starting, or noise of one eval, is not known.
+4. **The two actors score about the same with the same critic** (48.7 and 45.6). So with this critic, the actor's width
+   (512 or 256) and its training length (as long as the critic, or 500k) change little.
+5. **The score 48.7 ± 32.9 cannot be told apart from IFQL's 69 ± 19**: we have 3 seeds, and one of them is at 2.7. The
+   FQL paper's own Table 4 gives IFQL at the 1M eval alone as 56 ± 35 (Section 10), so single seeds failing at single
+   evals also happens there.
+
+Not known: why seed 1's critic drifted upward after 700k. Its checkpoints at every 100k steps are saved
+(`/workspace/Trained_Models/checkpoints/Exp19_IEQM_…_seed1-…/checkpoint_700000.pt` and `checkpoint_800000.pt`), so the
+critic before and after the fall can be compared without new training.

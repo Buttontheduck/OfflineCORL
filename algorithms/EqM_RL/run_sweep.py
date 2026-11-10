@@ -8,8 +8,8 @@ Usage (from algorithms/EqM_RL/):
 Any Python with PyYAML can start this file (the hawk, eagle or base env). Each training
 run is started with the Python of the conda env its target needs: `aware`, `awac_d4rl`,
 `iql_d4rl`, `fit_actor`, `train_critic` and `finetune_actor` (D4RL) run in hawk, `aware_minari` and `awac_minari` run in
-eagle, and the OGBench targets `aware_ogbench`, `fit_actor_ogbench`, `train_critic_ogbench` and
-`finetune_actor_ogbench` run in ogbench. The sweep file format is described in sweeps/README.md.
+eagle, and the OGBench targets `aware_ogbench`, `fit_actor_ogbench`, `train_critic_ogbench`,
+`finetune_actor_ogbench`, `eval_best_of_n_ogbench` and `train_ieqm_ogbench` run in ogbench. The sweep file format is described in sweeps/README.md.
 
 Output: sweep_runs/<sweep name>_<date-time>/ with a copy of the sweep file, plan.txt
 (every command), runs.csv (status of every run) and one folder per run with its log.
@@ -62,6 +62,9 @@ TARGETS = {
                                  style="pyrallis", data="ogbench", name_prefix="Critic"),
     "finetune_actor_ogbench": dict(script=HERE / "Aware" / "finetune_actor.py", conda_env="ogbench",
                                    style="pyrallis", data="ogbench", name_prefix="FT"),
+    # IEQM = IFQL's critic + the EqM actor + best of N at decision time, on OGBench (Aware/train_ieqm.py; IFQL.md)
+    "train_ieqm_ogbench": dict(script=HERE / "Aware" / "train_ieqm.py", conda_env="ogbench",
+                               style="pyrallis", data="ogbench", name_prefix="IEQM"),
     # Eval-only best-of-N: frozen EqM-BC actor + frozen critic on OGBench (Aware/eval_best_of_n.py, no training, no wandb)
     "eval_best_of_n_ogbench": dict(script=HERE / "Aware" / "eval_best_of_n.py", conda_env="ogbench",
                                    style="pyrallis", data="ogbench", name_prefix="BestN"),
